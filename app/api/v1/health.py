@@ -2,9 +2,10 @@
 
 import asyncio
 import psutil
+import platform
 from datetime import datetime
-from fastapi import APIRouter, Request
-from typing import Dict, Any
+from fastapi import APIRouter, Request, HTTPException
+from typing import Dict, Any, Optional
 
 from app.models.schemas import HealthResponse
 from app.core.database import db_manager
@@ -253,6 +254,115 @@ async def readiness_check(request: Request) -> Dict[str, str]:
     except Exception as e:
         logger.error(f"❌ Readiness check failed: {e}")
         return {"status": "not_ready", "timestamp": datetime.utcnow().isoformat() + "Z"}
+
+
+@router.get("/system")
+async def system_info() -> Dict[str, Any]:
+    """
+    Detailed system information endpoint.
+    Provides comprehensive system metrics and information.
+    """
+    try:
+        system_info = {
+            "platform": {
+                "system": platform.system(),
+                "release": platform.release(),
+                "version": platform.version(),
+                "machine": platform.machine(),
+                "processor": platform.processor(),
+                "python_version": platform.python_version()
+            },
+            "memory": {
+                "total": psutil.virtual_memory().total,
+                "available": psutil.virtual_memory().available,
+                "percent": psutil.virtual_memory().percent,
+                "used": psutil.virtual_memory().used,
+                "free": psutil.virtual_memory().free
+            },
+            "cpu": {
+                "count_logical": psutil.cpu_count(logical=True),
+                "count_physical": psutil.cpu_count(logical=False),
+                "percent": psutil.cpu_percent(interval=1),
+                "freq_current": psutil.cpu_freq().current if psutil.cpu_freq() else "N/A",
+                "freq_max": psutil.cpu_freq().max if psutil.cpu_freq() else "N/A"
+            },
+            "disk": {
+                "total": psutil.disk_usage('/').total,
+                "used": psutil.disk_usage('/').used,
+                "free": psutil.disk_usage('/').free,
+                "percent": (psutil.disk_usage('/').used / psutil.disk_usage('/').total) * 100
+            },
+            "network": {
+                "connections": len(psutil.net_connections()),
+                "io_counters": dict(psutil.net_io_counters()._asdict()) if psutil.net_io_counters() else {}
+            },
+            "processes": {
+                "count": len(psutil.pids()),
+                "running": len([p for p in psutil.process_iter(['status']) if p.info['status'] == 'running'])
+            }
+        }
+        
+        return {
+            "status": "success",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "system_info": system_info
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ System info check failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve system information: {str(e)}")
+
+
+@router.get("/metrics")
+async def health_metrics(request: Request) -> Dict[str, Any]:
+    """
+    Health metrics endpoint for monitoring systems.
+    Returns key performance indicators and health metrics.
+    """
+    try:
+        # Get basic system metrics
+        memory = psutil.virtual_memory()
+        cpu_percent = psutil.cpu_percent(interval=0.1)
+        disk = psutil.disk_usage('/')
+        
+        # Calculate uptime
+        uptime_seconds = 0
+        if hasattr(request.app.state, 'startup_time'):
+            uptime_seconds = (datetime.utcnow() - request.app.state.startup_time).total_seconds()
+        
+        # Database status
+        db_status = "up" if await db_manager.ping() else "down"
+        
+        metrics = {
+            "health_status": {
+                "overall": "healthy" if db_status == "up" and memory.percent < 90 and cpu_percent < 90 else "degraded",
+                "database": db_status,
+                "uptime_seconds": uptime_seconds
+            },
+            "performance_metrics": {
+                "memory_usage_percent": memory.percent,
+                "memory_used_bytes": memory.used,
+                "memory_available_bytes": memory.available,
+                "cpu_usage_percent": cpu_percent,
+                "disk_usage_percent": (disk.used / disk.total) * 100,
+                "disk_free_bytes": disk.free
+            },
+            "application_metrics": {
+                "version": settings.app_version,
+                "environment": getattr(settings, 'environment', 'production'),
+                "process_id": psutil.Process().pid,
+                "threads_count": psutil.Process().num_threads()
+            }
+        }
+        
+        return {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "metrics": metrics
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Health metrics check failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve health metrics: {str(e)}")
 
 
 @router.get("/live")
