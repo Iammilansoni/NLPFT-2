@@ -1,0 +1,22 @@
+[
+  {"name": "open_browser", "description": "Open a web browser window."},
+  {"name": "close_browser", "description": "Close the web browser window."},
+  {"name": "navigate_to_url", "description": "Navigate to a specific URL."},
+  {"name": "click_element", "description": "Click on a specified element."},
+  {"name": "input_text", "description": "Input text into a field."},
+  {"name": "submit_form", "description": "Submit a form on the page."},
+  {"name": "scroll_down", "description": "Scroll down the page."},
+  {"name": "scroll_up", "description": "Scroll up the page."},
+  {"name": "refresh_page", "description": "Refresh the current page."},
+  {"name": "go_back", "description": "Go back to the previous page."},
+  {"name": "go_forward", "description": "Go forward to the next page."},
+  {"name": "select_dropdown", "description": "Select an option from a dropdown."},
+  {"name": "hover_element", "description": "Hover over a specified element."},
+  {"name": "download_file", "description": "Download a file from the page."},
+  {"name": "upload_file", "description": "Upload a file to the page."},
+  {"name": "take_screenshot", "description": "Take a screenshot of the page."},
+  {"name": "extract_text", "description": "Extract text from the page."},
+  {"name": "find_element", "description": "Find an element on the page."},
+  {"name": "wait_for_element", "description": "Wait for an element to appear."},
+  {"name": "switch_tab", "description": "Switch to another browser tab."}
+]
