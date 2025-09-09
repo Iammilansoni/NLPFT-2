@@ -1,22 +1,173 @@
 [
-  {"name": "open_browser", "description": "Open a web browser window."},
-  {"name": "close_browser", "description": "Close the web browser window."},
-  {"name": "navigate_to_url", "description": "Navigate to a specific URL."},
-  {"name": "click_element", "description": "Click on a specified element."},
-  {"name": "input_text", "description": "Input text into a field."},
-  {"name": "submit_form", "description": "Submit a form on the page."},
-  {"name": "scroll_down", "description": "Scroll down the page."},
-  {"name": "scroll_up", "description": "Scroll up the page."},
-  {"name": "refresh_page", "description": "Refresh the current page."},
-  {"name": "go_back", "description": "Go back to the previous page."},
-  {"name": "go_forward", "description": "Go forward to the next page."},
-  {"name": "select_dropdown", "description": "Select an option from a dropdown."},
-  {"name": "hover_element", "description": "Hover over a specified element."},
-  {"name": "download_file", "description": "Download a file from the page."},
-  {"name": "upload_file", "description": "Upload a file to the page."},
-  {"name": "take_screenshot", "description": "Take a screenshot of the page."},
-  {"name": "extract_text", "description": "Extract text from the page."},
-  {"name": "find_element", "description": "Find an element on the page."},
-  {"name": "wait_for_element", "description": "Wait for an element to appear."},
-  {"name": "switch_tab", "description": "Switch to another browser tab."}
+  {
+    "id": "nav_open_url",
+    "name": "open_url",
+    "signature": { "url": "str" },
+    "templates": [
+      "go to {url}",
+      "open {url}",
+      "navigate to {url}"
+    ],
+    "examples": [
+      "Go to https://example.com",
+      "Open https://dashboard.local"
+    ]
+  },
+  {
+    "id": "nav_click",
+    "name": "click",
+    "signature": { "selector": "str" },
+    "templates": [
+      "click {selector}",
+      "press {selector}",
+      "tap on {selector}"
+    ],
+    "examples": [
+      "Click the login button",
+      "Tap on #submit"
+    ]
+  },
+  {
+    "id": "nav_wait_visible",
+    "name": "wait_for_visible",
+    "signature": { "selector": "str", "timeout": "int" },
+    "templates": [
+      "wait until {selector} appears",
+      "wait for {selector} to be visible"
+    ],
+    "examples": [
+      "Wait for spinner to appear",
+      "Wait until .toast-message is visible"
+    ]
+  },
+  {
+    "id": "nav_wait_invisible",
+    "name": "wait_for_invisible",
+    "signature": { "selector": "str", "timeout": "int" },
+    "templates": [
+      "wait until {selector} disappears",
+      "wait for {selector} to be gone"
+    ],
+    "examples": [
+      "Wait until loader disappears"
+    ]
+  },
+  {
+    "id": "nav_back",
+    "name": "navigation_back",
+    "signature": {},
+    "templates": [
+      "go back",
+      "navigate back",
+      "return to previous page"
+    ],
+    "examples": [
+      "Go back"
+    ]
+  },
+  {
+    "id": "nav_refresh",
+    "name": "refresh_page",
+    "signature": {},
+    "templates": [
+      "refresh the page",
+      "reload page",
+      "hard refresh"
+    ],
+    "examples": [
+      "Refresh the page"
+    ]
+  },
+
+  { "id": "form_fill", "name": "fill", "signature": { "selector": "str", "value": "any" },
+    "templates": ["enter {value} in {selector}", "fill {selector} with {value}"],
+    "examples": ["Enter email@domain.com in #email"] },
+
+  { "id": "form_clear", "name": "clear", "signature": { "selector": "str" },
+    "templates": ["clear {selector}", "reset {selector}"],
+    "examples": ["Clear the search box"] },
+
+  { "id": "form_dropdown", "name": "select_dropdown", "signature": { "selector": "str", "value": "str" },
+    "templates": ["choose {value} from {selector}", "select {value} in {selector}"],
+    "examples": ["Choose 'USA' from #country"] },
+
+  { "id": "form_check", "name": "check", "signature": { "selector": "str" },
+    "templates": ["check {selector}", "tick {selector}"],
+    "examples": ["Check the terms box"] },
+
+  { "id": "form_uncheck", "name": "uncheck", "signature": { "selector": "str" },
+    "templates": ["uncheck {selector}", "untick {selector}"],
+    "examples": ["Uncheck newsletter box"] },
+
+  { "id": "auth_login", "name": "login", "signature": { "username": "str", "password": "str" },
+    "templates": ["log in as {username} with {password}", "sign in with {username}/{password}"],
+    "examples": ["Log in as admin with password123"] },
+
+  { "id": "auth_logout", "name": "logout", "signature": {},
+    "templates": ["logout", "sign out"],
+    "examples": ["Sign out"] },
+
+  { "id": "auth_expect_in", "name": "expect_logged_in", "signature": {},
+    "templates": ["verify user is logged in", "check session is active"],
+    "examples": ["Verify user is logged in"] },
+
+  { "id": "assert_text", "name": "expect_text", "signature": { "selector": "str", "expected": "str" },
+    "templates": ["verify {expected} appears in {selector}", "check {selector} contains {expected}"],
+    "examples": ["Verify 'Welcome' appears on screen"] },
+
+  { "id": "assert_visible", "name": "expect_visible", "signature": { "selector": "str" },
+    "templates": ["make sure {selector} is visible", "assert {selector} is shown"],
+    "examples": ["Make sure #dashboard is visible"] },
+
+  { "id": "assert_url", "name": "expect_url", "signature": { "pattern": "str" },
+    "templates": ["check url contains {pattern}", "verify current url is {pattern}"],
+    "examples": ["Check URL contains 'success'"] },
+
+  { "id": "assert_title", "name": "expect_title", "signature": { "title": "str" },
+    "templates": ["assert title is {title}", "verify page title equals {title}"],
+    "examples": ["Assert title is 'Dashboard'"] },
+
+  { "id": "file_upload", "name": "upload_file", "signature": { "selector": "str", "path": "str" },
+    "templates": ["upload {path} to {selector}", "select {path} in {selector}"],
+    "examples": ["Upload resume.pdf to #cv-input"] },
+
+  { "id": "file_download", "name": "download_verify", "signature": { "filename": "str", "timeout": "int" },
+    "templates": ["check {filename} was downloaded", "verify {filename} download"],
+    "examples": ["Check report.csv was downloaded"] },
+
+  { "id": "table_find", "name": "table_find_row", "signature": { "table": "str", "where": "dict" },
+    "templates": ["find row in {table} where {where}", "search {table} for {where}"],
+    "examples": ["Find user with email=test@site.com"] },
+
+  { "id": "table_expect", "name": "table_expect_cell", "signature": { "table": "str", "row": "int", "column": "str", "status": "str" },
+    "templates": ["check row {row} in {table} column {column} is {status}"],
+    "examples": ["Check first row status is Active"] },
+
+  { "id": "table_sort", "name": "table_sort", "signature": { "table": "str", "column": "str", "order": "str" },
+    "templates": ["sort {table} by {column} {order}", "order {table} column {column} {order}"],
+    "examples": ["Sort logs by date descending"] },
+
+  { "id": "modal_expect", "name": "expect_modal", "signature": { "title": "str" },
+    "templates": ["verify modal {title} appears", "check {title} popup is shown"],
+    "examples": ["Verify 'Delete Confirmation' modal appears"] },
+
+  { "id": "modal_dismiss", "name": "dismiss_modal", "signature": {},
+    "templates": ["close modal", "dismiss popup"],
+    "examples": ["Close the popup"] },
+
+  { "id": "toast_expect", "name": "expect_toast", "signature": { "type": "str", "message": "str" },
+    "templates": ["check {type} toast says {message}", "verify toast {message}"],
+    "examples": ["Check success toast says 'Saved'"] },
+
+  { "id": "rbac_as_user", "name": "as_user", "signature": { "role": "str" },
+    "templates": ["as {role}, {action}", "switch to role {role}"],
+    "examples": ["As admin, view logs"] },
+
+  { "id": "rbac_expect_deny", "name": "expect_access_denied", "signature": {},
+    "templates": ["verify access denied", "check permission denied"],
+    "examples": ["Verify guest cannot edit settings"] },
+
+  { "id": "rbac_expect_grant", "name": "expect_access_granted", "signature": {},
+    "templates": ["verify access granted", "check permission allowed"],
+    "examples": ["Verify admin can edit settings"] }
 ]
