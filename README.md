@@ -16,9 +16,12 @@ A modular FastAPI-based NLP project that provides comprehensive natural language
 - 🗄️ **Database Integration** - MongoDB support with async operations
 - 📈 **Metrics & Monitoring** - System resource monitoring and request tracking
 
+<<<<<<< HEAD
 ## Project Structure
 
 ```
+=======
+>>>>>>> 4375fa89e968a4947a0bb180f74586766528b9c6
 NLPForge-Tester/
 ├── .dockerignore                    # Docker ignore patterns
 ├── .git/                           # Git repository data
@@ -66,6 +69,7 @@ NLPForge-Tester/
     ├── function_dictionary.json # Browser automation functions (20 entries)
     └── faiss_index/             # Vector search index storage
         └── .gitkeep             # Placeholder for git tracking
+<<<<<<< HEAD
 ```
 
 ## API Endpoints
@@ -165,3 +169,5 @@ NLPForge-Tester/
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+=======
+>>>>>>> 4375fa89e968a4947a0bb180f74586766528b9c6
