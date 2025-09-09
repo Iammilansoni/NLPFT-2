@@ -1,11 +1,9 @@
 """Main FastAPI application for NLPForge."""
 
-import asyncio
 from contextlib import asynccontextmanager
-from datetime import datetime
-from typing import Dict, Any
+from datetime import datetime, timezone
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -24,6 +22,10 @@ async def lifespan(app: FastAPI):
     log_startup("NLPForge API")
     
     try:
+        # Ensure storage directories exist
+        settings.ensure_storage_directories()
+        logger.info(f"✅ Storage directory initialized at: {settings.storage_path}")
+        
         # Connect to database
         await db_manager.connect()
         
@@ -31,8 +33,8 @@ async def lifespan(app: FastAPI):
         app.state.dictionary_loader = None  # Will be initialized when needed
         app.state.faiss_manager = None      # Will be initialized when needed
         app.state.embedding_model = None    # Will be initialized when needed
-        app.state.last_worker_heartbeat = datetime.utcnow()
-        app.state.startup_time = datetime.utcnow()
+        app.state.last_worker_heartbeat = datetime.now(timezone.utc)
+        app.state.startup_time = datetime.now(timezone.utc)
         app.state.request_count = 0
         
         logger.info("✅ Application startup completed")
@@ -81,24 +83,24 @@ def create_app() -> FastAPI:
     
     # Middleware for request counting
     @app.middleware("http")
-    async def count_requests(request: Request, call_next):
+    async def count_requests(request: Request, call_next):  # type: ignore
         """Count all requests for metrics."""
         if hasattr(request.app.state, 'request_count'):
             request.app.state.request_count += 1
         
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         response = await call_next(request)
-        duration = (datetime.utcnow() - start_time).total_seconds()
+        duration = (datetime.now(timezone.utc) - start_time).total_seconds()
         
         # Log request (optional, can be disabled in production)
         if settings.debug:
-            logger.info(f"🌐 {request.method} {request.url.path} → {response.status_code} ({duration:.3f}s)")
+            logger.info(f"🌐 {request.method} {request.url.path} → {response.status_code} ({duration:.3f}s)")  # type: ignore
         
         return response
     
     # Global exception handler
     @app.exception_handler(Exception)
-    async def global_exception_handler(request: Request, exc: Exception):
+    async def global_exception_handler(request: Request, exc: Exception):  # type: ignore
         """Handle unexpected exceptions."""
         log_error(exc, f"Request: {request.method} {request.url}")
         
@@ -106,13 +108,14 @@ def create_app() -> FastAPI:
             status_code=500,
             content=ErrorResponse(
                 error="Internal Server Error",
-                detail="An unexpected error occurred. Please try again later."
-            ).dict()
+                detail="An unexpected error occurred. Please try again later.",
+                request_id=None
+            ).model_dump()
         )
     
     # Root endpoint
     @app.get("/")
-    async def root():
+    async def root():  # type: ignore
         """Root endpoint with basic API information."""
         return {
             "name": settings.app_name,

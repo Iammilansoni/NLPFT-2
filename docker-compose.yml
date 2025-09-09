@@ -8,6 +8,10 @@ services:
     environment:
       - MONGODB_URL=mongodb://mongo:27017
       - MONGODB_DATABASE=nlpforge
+      - ENVIRONMENT=production
+    volumes:
+      # Mount storage directory for persistent data
+      - ./storage:/app/storage
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/ready"]
       interval: 30s

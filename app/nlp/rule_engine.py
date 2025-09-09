@@ -1,7 +1,9 @@
+from typing import List, Dict, Any
+
 class RuleEngine:
-    def parse(self, text: str):
+    def parse(self, text: str) -> List[Dict[str, Any]]:
         # Very simple demo: detect "login"
-        steps = []
+        steps: List[Dict[str, Any]] = []
         if "login" in text.lower():
             steps.append({
                 "function": "AUTH.LOGIN",
