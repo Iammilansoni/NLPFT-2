@@ -1,376 +1,144 @@
-"""Health check endpoints for NLPForge API."""
+"""Optimized health check endpoints for NLPForge API (Docker-ready)."""
 
-import asyncio
 import psutil
-import platform
-from datetime import datetime
-from fastapi import APIRouter, Request, HTTPException
-from typing import Dict, Any, Optional
+from datetime import datetime, timezone
+from fastapi import APIRouter, Request
+from typing import Dict, Any
 
 from app.models.schemas import HealthResponse
 from app.core.database import db_manager
-from app.core.logger import logger, log_health_check
+from app.core.logger import logger
 from app.core.config import settings
-
-# cSpell:ignore faiss
 
 router = APIRouter(prefix="/health", tags=["health"])
 
 
-async def check_database() -> Dict[str, str]:
-    """Check database connectivity."""
+async def get_basic_status() -> Dict[str, str]:
+    """Get basic system health status."""
     try:
-        if await db_manager.ping():
-            return {"mongodb": "healthy"}
-        else:
-            return {"mongodb": "disconnected"}
-    except Exception as e:
-        logger.error(f"❌ MongoDB health check failed: {e}")
-        return {"mongodb": f"error: {str(e)}"}
-
-
-async def check_system_resources() -> Dict[str, str]:
-    """Check system resource health."""
-    checks = {}
-    
-    try:
-        # Memory check
+        # Check database
+        db_healthy = await db_manager.ping()
+        
+        # Check system resources
         memory = psutil.virtual_memory()
-        if memory.percent > 90:
-            checks["memory"] = f"critical: {memory.percent:.1f}% used"
-        elif memory.percent > 75:
-            checks["memory"] = f"warning: {memory.percent:.1f}% used"
-        else:
-            checks["memory"] = "healthy"
+        cpu_percent = psutil.cpu_percent(interval=0.1)
         
-        # CPU check
-        cpu_percent = psutil.cpu_percent(interval=1)
-        if cpu_percent > 90:
-            checks["cpu"] = f"critical: {cpu_percent:.1f}% used"
-        elif cpu_percent > 75:
-            checks["cpu"] = f"warning: {cpu_percent:.1f}% used"
-        else:
-            checks["cpu"] = "healthy"
-            
-        # Disk check
-        disk = psutil.disk_usage('/')
-        disk_percent = (disk.used / disk.total) * 100
-        if disk_percent > 90:
-            checks["disk"] = f"critical: {disk_percent:.1f}% used"
-        elif disk_percent > 75:
-            checks["disk"] = f"warning: {disk_percent:.1f}% used"
-        else:
-            checks["disk"] = "healthy"
-            
+        status = {
+            "database": "healthy" if db_healthy else "unhealthy",
+            "memory": "healthy" if memory.percent < 85 else "warning",
+            "cpu": "healthy" if cpu_percent < 85 else "warning"
+        }
+        
+        return status
     except Exception as e:
-        logger.error(f"❌ System resource check failed: {e}")
-        checks["system_resources"] = f"error: {str(e)}"
-    
-    return checks
-
-
-async def check_nlp_components(app_state) -> Dict[str, str]:
-    """Check NLP component health."""
-    checks = {}
-    
-    # Dictionary loader
-    if hasattr(app_state, "dictionary_loader") and app_state.dictionary_loader:
-        checks["dictionary"] = "healthy"
-    else:
-        checks["dictionary"] = "not_initialized"
-    
-    # FAISS index
-    if hasattr(app_state, "faiss_manager") and app_state.faiss_manager:
-        checks["faiss_index"] = "healthy"
-    else:
-        checks["faiss_index"] = "not_initialized"
-    
-    # Embedding model
-    if hasattr(app_state, "embedding_model") and app_state.embedding_model:
-        checks["embedding_model"] = "healthy"
-    else:
-        checks["embedding_model"] = "not_initialized"
-    
-    return checks
-
-
-async def check_background_worker(app_state) -> Dict[str, str]:
-    """Check background worker health."""
-    if hasattr(app_state, "last_worker_heartbeat"):
-        last = app_state.last_worker_heartbeat
-        delta = datetime.utcnow() - last
-        
-        if delta.total_seconds() < 300:  # 5 minutes
-            return {"background_worker": "healthy"}
-        elif delta.total_seconds() < 900:  # 15 minutes
-            return {"background_worker": "stalled"}
-        else:
-            return {"background_worker": "dead"}
-    else:
-        return {"background_worker": "not_initialized"}
-
-
-def calculate_overall_status(checks: Dict[str, str]) -> str:
-    """Calculate overall system status based on individual checks."""
-    statuses = list(checks.values())
-    
-    # Count different status types
-    error_count = sum(1 for status in statuses if "error" in status.lower())
-    critical_count = sum(1 for status in statuses if "critical" in status.lower())
-    warning_count = sum(1 for status in statuses if "warning" in status.lower())
-    stalled_count = sum(1 for status in statuses if "stalled" in status.lower())
-    dead_count = sum(1 for status in statuses if "dead" in status.lower())
-    
-    # Determine overall status
-    if error_count > 0 or critical_count > 0 or dead_count > 0:
-        return "unhealthy"
-    elif stalled_count > 0 or warning_count > 0:
-        return "degraded"
-    elif all(status == "healthy" for status in statuses):
-        return "healthy"
-    else:
-        return "degraded"
+        logger.error(f"❌ Health check failed: {e}")
+        return {"system": "error"}
 
 
 @router.get("/", response_model=HealthResponse)
 async def health_check(request: Request) -> HealthResponse:
     """
     Comprehensive health check endpoint.
-    
-    Verifies all system components:
-    - Database connectivity (MongoDB)
-    - NLP components (dictionary, FAISS, embeddings)
-    - Background worker status
-    - System resources (CPU, memory, disk)
+    Optimized for Docker deployments.
     """
-    start_time = datetime.utcnow()
-    all_checks = {}
-
+    start_time = datetime.now(timezone.utc)
+    
     try:
-        # Run all health checks concurrently for better performance
-        db_check_task = check_database()
-        resource_check_task = check_system_resources()
-        nlp_check_task = check_nlp_components(request.app.state)
-        worker_check_task = check_background_worker(request.app.state)
-        
-        # Wait for all checks to complete
-        db_checks, resource_checks, nlp_checks, worker_checks = await asyncio.gather(
-            db_check_task,
-            resource_check_task,
-            nlp_check_task,
-            worker_check_task,
-            return_exceptions=True
-        )
-        
-        # Combine all checks
-        if isinstance(db_checks, dict):
-            all_checks.update(db_checks)
-        else:
-            all_checks["database"] = f"error: {str(db_checks)}"
-            
-        if isinstance(resource_checks, dict):
-            all_checks.update(resource_checks)
-        else:
-            all_checks["resources"] = f"error: {str(resource_checks)}"
-            
-        if isinstance(nlp_checks, dict):
-            all_checks.update(nlp_checks)
-        else:
-            all_checks["nlp"] = f"error: {str(nlp_checks)}"
-            
-        if isinstance(worker_checks, dict):
-            all_checks.update(worker_checks)
-        else:
-            all_checks["worker"] = f"error: {str(worker_checks)}"
-
-        # Calculate overall status
-        overall_status = calculate_overall_status(all_checks)
-        
-        # Add performance metrics
-        check_duration = (datetime.utcnow() - start_time).total_seconds()
-        all_checks["health_check_duration"] = f"{check_duration:.3f}s"
+        # Get basic status
+        checks = await get_basic_status()
         
         # Add uptime if available
         if hasattr(request.app.state, 'startup_time'):
-            uptime = (datetime.utcnow() - request.app.state.startup_time).total_seconds()
-            all_checks["uptime"] = f"{uptime:.0f}s"
-
+            uptime = (datetime.now(timezone.utc) - request.app.state.startup_time).total_seconds()
+            checks["uptime"] = f"{uptime:.0f}s"
+        
+        # Calculate overall status
+        overall_status = "healthy" if all(
+            status in ["healthy", "ready"] for status in checks.values() 
+            if not status.endswith("s")  # Skip uptime
+        ) else "degraded"
+        
+        # Add check duration
+        duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+        checks["check_duration"] = f"{duration:.3f}s"
+        
+        return HealthResponse(
+            status=overall_status,
+            version=settings.app_version,
+            timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            checks=checks
+        )
+        
     except Exception as e:
         logger.error(f"❌ Health check crashed: {e}")
-        all_checks = {"error": str(e)}
-        overall_status = "unhealthy"
-
-    # Log the health check results
-    log_health_check(overall_status, all_checks)
-
-    return HealthResponse(
-        status=overall_status,
-        version=settings.app_version,
-        timestamp=datetime.utcnow().isoformat() + "Z",
-        checks=all_checks
-    )
-
-
-@router.get("/simple")
-async def simple_health_check() -> Dict[str, str]:
-    """
-    Simple health check endpoint for load balancers.
-    Returns basic status without detailed checks.
-    """
-    try:
-        # Quick database ping
-        if await db_manager.ping():
-            return {"status": "healthy", "timestamp": datetime.utcnow().isoformat() + "Z"}
-        else:
-            return {"status": "unhealthy", "timestamp": datetime.utcnow().isoformat() + "Z"}
-    except Exception:
-        return {"status": "unhealthy", "timestamp": datetime.utcnow().isoformat() + "Z"}
+        return HealthResponse(
+            status="unhealthy",
+            version=settings.app_version,
+            timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            checks={"error": str(e)}
+        )
 
 
 @router.get("/ready")
-async def readiness_check(request: Request) -> Dict[str, str]:
+async def readiness_check() -> Dict[str, str]:
     """
-    Readiness check endpoint for Kubernetes.
-    Checks if the service is ready to accept traffic.
+    Readiness check for Docker health checks.
+    Simple and fast - perfect for Docker HEALTHCHECK.
     """
     try:
-        # Check essential components
-        ready = True
-        
-        # Database must be connected
-        if not await db_manager.ping():
-            ready = False
-        
-        # Essential NLP components should be initialized
-        # (can be relaxed based on requirements)
-        if not (hasattr(request.app.state, "dictionary_loader") and 
-                hasattr(request.app.state, "faiss_manager")):
-            # For now, we'll allow the service to be ready even without NLP components
-            pass
-        
-        status = "ready" if ready else "not_ready"
-        return {"status": status, "timestamp": datetime.utcnow().isoformat() + "Z"}
-        
+        # Essential check: database connectivity
+        if await db_manager.ping():
+            return {"status": "ready", "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")}
+        else:
+            return {"status": "not_ready", "reason": "database_down", "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")}
     except Exception as e:
         logger.error(f"❌ Readiness check failed: {e}")
-        return {"status": "not_ready", "timestamp": datetime.utcnow().isoformat() + "Z"}
-
-
-@router.get("/system")
-async def system_info() -> Dict[str, Any]:
-    """
-    Detailed system information endpoint.
-    Provides comprehensive system metrics and information.
-    """
-    try:
-        system_info = {
-            "platform": {
-                "system": platform.system(),
-                "release": platform.release(),
-                "version": platform.version(),
-                "machine": platform.machine(),
-                "processor": platform.processor(),
-                "python_version": platform.python_version()
-            },
-            "memory": {
-                "total": psutil.virtual_memory().total,
-                "available": psutil.virtual_memory().available,
-                "percent": psutil.virtual_memory().percent,
-                "used": psutil.virtual_memory().used,
-                "free": psutil.virtual_memory().free
-            },
-            "cpu": {
-                "count_logical": psutil.cpu_count(logical=True),
-                "count_physical": psutil.cpu_count(logical=False),
-                "percent": psutil.cpu_percent(interval=1),
-                "freq_current": psutil.cpu_freq().current if psutil.cpu_freq() else "N/A",
-                "freq_max": psutil.cpu_freq().max if psutil.cpu_freq() else "N/A"
-            },
-            "disk": {
-                "total": psutil.disk_usage('/').total,
-                "used": psutil.disk_usage('/').used,
-                "free": psutil.disk_usage('/').free,
-                "percent": (psutil.disk_usage('/').used / psutil.disk_usage('/').total) * 100
-            },
-            "network": {
-                "connections": len(psutil.net_connections()),
-                "io_counters": dict(psutil.net_io_counters()._asdict()) if psutil.net_io_counters() else {}
-            },
-            "processes": {
-                "count": len(psutil.pids()),
-                "running": len([p for p in psutil.process_iter(['status']) if p.info['status'] == 'running'])
-            }
-        }
-        
-        return {
-            "status": "success",
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "system_info": system_info
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ System info check failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve system information: {str(e)}")
-
-
-@router.get("/metrics")
-async def health_metrics(request: Request) -> Dict[str, Any]:
-    """
-    Health metrics endpoint for monitoring systems.
-    Returns key performance indicators and health metrics.
-    """
-    try:
-        # Get basic system metrics
-        memory = psutil.virtual_memory()
-        cpu_percent = psutil.cpu_percent(interval=0.1)
-        disk = psutil.disk_usage('/')
-        
-        # Calculate uptime
-        uptime_seconds = 0
-        if hasattr(request.app.state, 'startup_time'):
-            uptime_seconds = (datetime.utcnow() - request.app.state.startup_time).total_seconds()
-        
-        # Database status
-        db_status = "up" if await db_manager.ping() else "down"
-        
-        metrics = {
-            "health_status": {
-                "overall": "healthy" if db_status == "up" and memory.percent < 90 and cpu_percent < 90 else "degraded",
-                "database": db_status,
-                "uptime_seconds": uptime_seconds
-            },
-            "performance_metrics": {
-                "memory_usage_percent": memory.percent,
-                "memory_used_bytes": memory.used,
-                "memory_available_bytes": memory.available,
-                "cpu_usage_percent": cpu_percent,
-                "disk_usage_percent": (disk.used / disk.total) * 100,
-                "disk_free_bytes": disk.free
-            },
-            "application_metrics": {
-                "version": settings.app_version,
-                "environment": getattr(settings, 'environment', 'production'),
-                "process_id": psutil.Process().pid,
-                "threads_count": psutil.Process().num_threads()
-            }
-        }
-        
-        return {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "metrics": metrics
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Health metrics check failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve health metrics: {str(e)}")
+        return {"status": "not_ready", "reason": "error", "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")}
 
 
 @router.get("/live")
 async def liveness_check() -> Dict[str, str]:
     """
-    Liveness check endpoint for Kubernetes.
-    Checks if the service is alive and should not be restarted.
+    Liveness check for Docker containers.
+    Always returns alive unless the process is completely broken.
     """
-    # For liveness, we just need to respond
-    # This endpoint should always return healthy unless the process is completely broken
-    return {"status": "alive", "timestamp": datetime.utcnow().isoformat() + "Z"}
+    return {"status": "alive", "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")}
+
+
+@router.get("/simple")
+async def simple_health_check() -> Dict[str, str]:
+    """
+    Ultra-simple health check for load balancers.
+    """
+    try:
+        db_ok = await db_manager.ping()
+        status = "healthy" if db_ok else "unhealthy"
+        return {"status": status, "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")}
+    except Exception:
+        return {"status": "unhealthy", "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")}
+
+
+@router.get("/metrics")
+async def health_metrics() -> Dict[str, Any]:
+    """
+    Essential metrics for monitoring (Docker-optimized).
+    """
+    try:
+        memory = psutil.virtual_memory()
+        cpu_percent = psutil.cpu_percent(interval=0.1)
+        
+        return {
+            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "metrics": {
+                "memory_percent": memory.percent,
+                "cpu_percent": cpu_percent,
+                "memory_available_mb": round(memory.available / 1024 / 1024),
+                "process_id": psutil.Process().pid
+            }
+        }
+    except Exception as e:
+        logger.error(f"❌ Metrics failed: {e}")
+        return {
+            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "error": str(e)
+        }
