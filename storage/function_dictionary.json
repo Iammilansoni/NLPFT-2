@@ -1,1 +1,322 @@
-{}
+[
+  {
+    "id": "nav_open_url",
+    "name": "open_url",
+    "signature": { "url": "str" },
+    "templates": [
+      "go to {url}",
+      "open {url}",
+      "navigate to {url}"
+    ],
+    "examples": [
+      "Go to https://example.com",
+      "Open https://dashboard.local"
+    ]
+  },
+  {
+    "id": "nav_click",
+    "name": "click",
+    "signature": { "selector": "str" },
+    "templates": [
+      "click {selector}",
+      "press {selector}",
+      "tap on {selector}"
+    ],
+    "examples": [
+      "Click the login button",
+      "Tap on #submit"
+    ]
+  },
+  {
+    "id": "nav_wait_visible",
+    "name": "wait_for_visible",
+    "signature": { "selector": "str", "timeout": "int" },
+    "templates": [
+      "wait until {selector} appears",
+      "wait for {selector} to be visible"
+    ],
+    "examples": [
+      "Wait for spinner to appear",
+      "Wait until .toast-message is visible"
+    ]
+  },
+  {
+    "id": "nav_wait_invisible",
+    "name": "wait_for_invisible",
+    "signature": { "selector": "str", "timeout": "int" },
+    "templates": [
+      "wait until {selector} disappears",
+      "wait for {selector} to be gone"
+    ],
+    "examples": [
+      "Wait until loader disappears"
+    ]
+  },
+  {
+    "id": "nav_back",
+    "name": "navigation_back",
+    "signature": {},
+    "templates": [
+      "go back",
+      "navigate back",
+      "return to previous page"
+    ],
+    "examples": [
+      "Go back"
+    ]
+  },
+  {
+    "id": "nav_refresh",
+    "name": "refresh_page",
+    "signature": {},
+    "templates": [
+      "refresh the page",
+      "reload page",
+      "hard refresh"
+    ],
+    "examples": [
+      "Refresh the page"
+    ]
+  },
+
+  { "id": "form_fill", "name": "fill", "signature": { "selector": "str", "value": "any" },
+    "templates": ["enter {value} in {selector}", "fill {selector} with {value}"],
+    "examples": ["Enter email@domain.com in #email"] },
+
+  { "id": "form_clear", "name": "clear", "signature": { "selector": "str" },
+    "templates": ["clear {selector}", "reset {selector}"],
+    "examples": ["Clear the search box"] },
+
+  { "id": "form_dropdown", "name": "select_dropdown", "signature": { "selector": "str", "value": "str" },
+    "templates": ["choose {value} from {selector}", "select {value} in {selector}"],
+    "examples": ["Choose 'USA' from #country"] },
+
+  { "id": "form_check", "name": "check", "signature": { "selector": "str" },
+    "templates": ["check {selector}", "tick {selector}"],
+    "examples": ["Check the terms box"] },
+
+  { "id": "form_uncheck", "name": "uncheck", "signature": { "selector": "str" },
+    "templates": ["uncheck {selector}", "untick {selector}"],
+    "examples": ["Uncheck newsletter box"] },
+
+  { "id": "auth_login", "name": "login", "signature": { "username": "str", "password": "str" },
+    "templates": ["log in as {username} with {password}", "sign in with {username}/{password}"],
+    "examples": ["Log in as admin with password123"] },
+
+  { "id": "auth_logout", "name": "logout", "signature": {},
+    "templates": ["logout", "sign out"],
+    "examples": ["Sign out"] },
+
+  { "id": "auth_expect_in", "name": "expect_logged_in", "signature": {},
+    "templates": ["verify user is logged in", "check session is active"],
+    "examples": ["Verify user is logged in"] },
+
+  { "id": "assert_text", "name": "expect_text", "signature": { "selector": "str", "expected": "str" },
+    "templates": ["verify {expected} appears in {selector}", "check {selector} contains {expected}"],
+    "examples": ["Verify 'Welcome' appears on screen"] },
+
+  { "id": "assert_visible", "name": "expect_visible", "signature": { "selector": "str" },
+    "templates": ["make sure {selector} is visible", "assert {selector} is shown"],
+    "examples": ["Make sure #dashboard is visible"] },
+
+  { "id": "assert_url", "name": "expect_url", "signature": { "pattern": "str" },
+    "templates": ["check url contains {pattern}", "verify current url is {pattern}"],
+    "examples": ["Check URL contains 'success'"] },
+
+  { "id": "assert_title", "name": "expect_title", "signature": { "title": "str" },
+    "templates": ["assert title is {title}", "verify page title equals {title}"],
+    "examples": ["Assert title is 'Dashboard'"] },
+
+  { "id": "file_upload", "name": "upload_file", "signature": { "selector": "str", "path": "str" },
+    "templates": ["upload {path} to {selector}", "select {path} in {selector}"],
+    "examples": ["Upload resume.pdf to #cv-input"] },
+
+  { "id": "file_download", "name": "download_verify", "signature": { "filename": "str", "timeout": "int" },
+    "templates": ["check {filename} was downloaded", "verify {filename} download"],
+    "examples": ["Check report.csv was downloaded"] },
+
+  { "id": "table_find", "name": "table_find_row", "signature": { "table": "str", "where": "dict" },
+    "templates": ["find row in {table} where {where}", "search {table} for {where}"],
+    "examples": ["Find user with email=test@site.com"] },
+
+  { "id": "table_expect", "name": "table_expect_cell", "signature": { "table": "str", "row": "int", "column": "str", "status": "str" },
+    "templates": ["check row {row} in {table} column {column} is {status}"],
+    "examples": ["Check first row status is Active"] },
+
+  { "id": "table_sort", "name": "table_sort", "signature": { "table": "str", "column": "str", "order": "str" },
+    "templates": ["sort {table} by {column} {order}", "order {table} column {column} {order}"],
+    "examples": ["Sort logs by date descending"] },
+
+  { "id": "modal_expect", "name": "expect_modal", "signature": { "title": "str" },
+    "templates": ["verify modal {title} appears", "check {title} popup is shown"],
+    "examples": ["Verify 'Delete Confirmation' modal appears"] },
+
+  { "id": "modal_dismiss", "name": "dismiss_modal", "signature": {},
+    "templates": ["close modal", "dismiss popup"],
+    "examples": ["Close the popup"] },
+
+  { "id": "toast_expect", "name": "expect_toast", "signature": { "type": "str", "message": "str" },
+    "templates": ["check {type} toast says {message}", "verify toast {message}"],
+    "examples": ["Check success toast says 'Saved'"] },
+
+  { "id": "rbac_as_user", "name": "as_user", "signature": { "role": "str" },
+    "templates": ["as {role}, {action}", "switch to role {role}"],
+    "examples": ["As admin, view logs"] },
+
+  { "id": "rbac_expect_deny", "name": "expect_access_denied", "signature": {},
+    "templates": ["verify access denied", "check permission denied"],
+    "examples": ["Verify guest cannot edit settings"] },
+
+  { "id": "rbac_expect_grant", "name": "expect_access_granted", "signature": {},
+    "templates": ["verify access granted", "check permission allowed"],
+    "examples": ["Verify admin can edit settings"] },
+
+  { "id": "keyboard_press", "name": "press_key", "signature": { "key": "str" },
+    "templates": ["press {key}", "hit {key}", "press the {key} key"],
+    "examples": ["Press Enter", "Hit the Tab key"] },
+
+  { "id": "keyboard_type", "name": "type_text", "signature": { "text": "str" },
+    "templates": ["type {text}", "keyboard input {text}", "enter text {text}"],
+    "examples": ["Type 'Hello World'", "Enter text 'username123'"] },
+
+  { "id": "keyboard_shortcut", "name": "keyboard_shortcut", "signature": { "keys": "str" },
+    "templates": ["press {keys}", "use shortcut {keys}", "keyboard combination {keys}"],
+    "examples": ["Press Ctrl+C", "Use shortcut Ctrl+V"] },
+
+  { "id": "scroll_to", "name": "scroll_to_element", "signature": { "selector": "str" },
+    "templates": ["scroll to {selector}", "scroll until {selector} is visible", "bring {selector} into view"],
+    "examples": ["Scroll to footer", "Scroll until #contact-section is visible"] },
+
+  { "id": "scroll_page", "name": "scroll_page", "signature": { "direction": "str", "amount": "int" },
+    "templates": ["scroll {direction} by {amount}", "scroll {direction} {amount} pixels"],
+    "examples": ["Scroll down by 500", "Scroll up 300 pixels"] },
+
+  { "id": "hover_element", "name": "hover", "signature": { "selector": "str" },
+    "templates": ["hover over {selector}", "mouse over {selector}", "hover on {selector}"],
+    "examples": ["Hover over the menu button", "Mouse over #dropdown-trigger"] },
+
+  { "id": "drag_drop", "name": "drag_and_drop", "signature": { "source": "str", "target": "str" },
+    "templates": ["drag {source} to {target}", "move {source} to {target}", "drag and drop {source} onto {target}"],
+    "examples": ["Drag #item1 to #dropzone", "Move the file to trash"] },
+
+  { "id": "right_click", "name": "right_click", "signature": { "selector": "str" },
+    "templates": ["right click {selector}", "context click {selector}", "right-click on {selector}"],
+    "examples": ["Right click the image", "Context click #menu-item"] },
+
+  { "id": "double_click", "name": "double_click", "signature": { "selector": "str" },
+    "templates": ["double click {selector}", "double-click {selector}", "double tap {selector}"],
+    "examples": ["Double click the folder", "Double-click #file-icon"] },
+
+  { "id": "window_switch", "name": "switch_to_window", "signature": { "title": "str" },
+    "templates": ["switch to window {title}", "focus window {title}", "activate window {title}"],
+    "examples": ["Switch to window 'Settings'", "Focus window 'Dashboard'"] },
+
+  { "id": "window_close", "name": "close_window", "signature": {},
+    "templates": ["close window", "close current window", "close this window"],
+    "examples": ["Close window", "Close current tab"] },
+
+  { "id": "window_maximize", "name": "maximize_window", "signature": {},
+    "templates": ["maximize window", "maximize browser", "make window fullscreen"],
+    "examples": ["Maximize window", "Make browser fullscreen"] },
+
+  { "id": "window_minimize", "name": "minimize_window", "signature": {},
+    "templates": ["minimize window", "minimize browser", "hide window"],
+    "examples": ["Minimize window", "Hide browser"] },
+
+  { "id": "frame_switch", "name": "switch_to_frame", "signature": { "frame": "str" },
+    "templates": ["switch to frame {frame}", "enter frame {frame}", "focus frame {frame}"],
+    "examples": ["Switch to frame 'content'", "Enter iframe #payment-form"] },
+
+  { "id": "frame_default", "name": "switch_to_default_frame", "signature": {},
+    "templates": ["switch to main frame", "exit frame", "return to default frame"],
+    "examples": ["Switch to main frame", "Exit iframe"] },
+
+  { "id": "alert_accept", "name": "accept_alert", "signature": {},
+    "templates": ["accept alert", "click OK on alert", "confirm alert"],
+    "examples": ["Accept alert", "Click OK on popup"] },
+
+  { "id": "alert_dismiss", "name": "dismiss_alert", "signature": {},
+    "templates": ["dismiss alert", "click Cancel on alert", "reject alert"],
+    "examples": ["Dismiss alert", "Click Cancel on popup"] },
+
+  { "id": "alert_text", "name": "get_alert_text", "signature": {},
+    "templates": ["get alert text", "read alert message", "capture alert text"],
+    "examples": ["Get alert text", "Read popup message"] },
+
+  { "id": "wait_time", "name": "wait", "signature": { "seconds": "int" },
+    "templates": ["wait {seconds} seconds", "pause for {seconds} seconds", "sleep {seconds} seconds"],
+    "examples": ["Wait 3 seconds", "Pause for 5 seconds"] },
+
+  { "id": "wait_clickable", "name": "wait_for_clickable", "signature": { "selector": "str", "timeout": "int" },
+    "templates": ["wait until {selector} is clickable", "wait for {selector} to be enabled"],
+    "examples": ["Wait until button is clickable", "Wait for #submit to be enabled"] },
+
+  { "id": "wait_text", "name": "wait_for_text", "signature": { "text": "str", "timeout": "int" },
+    "templates": ["wait for text {text}", "wait until {text} appears", "wait for text {text} to be visible"],
+    "examples": ["Wait for text 'Success'", "Wait until 'Loading...' disappears"] },
+
+  { "id": "cookie_add", "name": "add_cookie", "signature": { "name": "str", "value": "str" },
+    "templates": ["add cookie {name} with value {value}", "set cookie {name} to {value}"],
+    "examples": ["Add cookie 'session' with value 'abc123'", "Set cookie 'theme' to 'dark'"] },
+
+  { "id": "cookie_get", "name": "get_cookie", "signature": { "name": "str" },
+    "templates": ["get cookie {name}", "read cookie {name}", "retrieve cookie {name}"],
+    "examples": ["Get cookie 'session'", "Read cookie value for 'user_id'"] },
+
+  { "id": "cookie_delete", "name": "delete_cookie", "signature": { "name": "str" },
+    "templates": ["delete cookie {name}", "remove cookie {name}", "clear cookie {name}"],
+    "examples": ["Delete cookie 'session'", "Remove cookie 'temp_data'"] },
+
+  { "id": "storage_set", "name": "set_local_storage", "signature": { "key": "str", "value": "str" },
+    "templates": ["set local storage {key} to {value}", "store {value} in {key}"],
+    "examples": ["Set local storage 'theme' to 'light'", "Store 'user123' in 'current_user'"] },
+
+  { "id": "storage_get", "name": "get_local_storage", "signature": { "key": "str" },
+    "templates": ["get local storage {key}", "read local storage {key}", "retrieve {key} from storage"],
+    "examples": ["Get local storage 'theme'", "Read stored value for 'user_id'"] },
+
+  { "id": "storage_clear", "name": "clear_local_storage", "signature": {},
+    "templates": ["clear local storage", "empty local storage", "reset local storage"],
+    "examples": ["Clear local storage", "Reset browser storage"] },
+
+  { "id": "screenshot_take", "name": "take_screenshot", "signature": { "filename": "str" },
+    "templates": ["take screenshot {filename}", "capture screen as {filename}", "save screenshot {filename}"],
+    "examples": ["Take screenshot 'test_result.png'", "Capture screen as 'error_state.jpg'"] },
+
+  { "id": "element_text", "name": "get_element_text", "signature": { "selector": "str" },
+    "templates": ["get text from {selector}", "read text of {selector}", "extract text from {selector}"],
+    "examples": ["Get text from h1", "Read text of #status-message"] },
+
+  { "id": "element_attribute", "name": "get_element_attribute", "signature": { "selector": "str", "attribute": "str" },
+    "templates": ["get {attribute} of {selector}", "read {attribute} from {selector}"],
+    "examples": ["Get href of #download-link", "Read value from #input-field"] },
+
+  { "id": "element_count", "name": "count_elements", "signature": { "selector": "str" },
+    "templates": ["count {selector} elements", "how many {selector}", "number of {selector}"],
+    "examples": ["Count .item elements", "How many rows in table"] },
+
+  { "id": "element_exists", "name": "element_exists", "signature": { "selector": "str" },
+    "templates": ["check if {selector} exists", "verify {selector} is present", "does {selector} exist"],
+    "examples": ["Check if #error-message exists", "Verify button is present"] },
+
+  { "id": "text_highlight", "name": "highlight_text", "signature": { "text": "str" },
+    "templates": ["highlight text {text}", "select text {text}", "mark text {text}"],
+    "examples": ["Highlight text 'Important'", "Select text 'Terms of Service'"] },
+
+  { "id": "focus_element", "name": "focus_on", "signature": { "selector": "str" },
+    "templates": ["focus on {selector}", "set focus to {selector}", "activate {selector}"],
+    "examples": ["Focus on #search-input", "Set focus to textarea"] },
+
+  { "id": "blur_element", "name": "blur", "signature": { "selector": "str" },
+    "templates": ["blur {selector}", "remove focus from {selector}", "unfocus {selector}"],
+    "examples": ["Blur #input-field", "Remove focus from button"] },
+
+  { "id": "api_request", "name": "make_api_call", "signature": { "method": "str", "url": "str", "data": "dict" },
+    "templates": ["make {method} request to {url}", "call API {url} with {method}"],
+    "examples": ["Make GET request to /api/users", "Call API /api/login with POST"] },
+
+  { "id": "random_data", "name": "generate_random", "signature": { "type": "str", "length": "int" },
+    "templates": ["generate random {type} of length {length}", "create random {type}"],
+    "examples": ["Generate random string of length 10", "Create random email address"] }
+]
+

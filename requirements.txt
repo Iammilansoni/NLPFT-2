@@ -10,6 +10,9 @@ pymongo==4.6.0  # MongoDB driver
 # System monitoring (used in health.py)
 psutil==5.9.6
 
+# NLP dependencies
+rapidfuzz==3.5.2  # For fuzzy string matching in rule engine
+
 # Standard library imports (no additional packages needed for):
 # - datetime, timezone
 # - typing
