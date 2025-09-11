@@ -65,8 +65,7 @@ NLPForge-Tester/
 │
 └── storage/                      # Data storage directory
     ├── __init__.py              # Package initialization
-    ├── feedback.db              # SQLite feedback database
-    ├── function_dictionary.json # Browser automation functions (20 entries)
+    ├── function_dictionary.json # Browser automation functions (29 entries)
     └── faiss_index/             # Vector search index storage
         └── .gitkeep             # Placeholder for git tracking
 <<<<<<< HEAD

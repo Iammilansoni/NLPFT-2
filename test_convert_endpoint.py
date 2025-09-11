@@ -7,10 +7,10 @@ This script tests the complete NLP pipeline through the FastAPI endpoint.
 
 import requests
 import json
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 
-def test_convert_endpoint():
+def test_convert_endpoint() -> None:
     """Test the /convert endpoint with various inputs."""
     base_url = "http://localhost:8000"
     convert_url = f"{base_url}/convert/"
@@ -18,8 +18,8 @@ def test_convert_endpoint():
     print("🧪 Testing /convert endpoint")
     print("=" * 40)
     
-    # Test cases
-    test_cases = [
+    # Test cases with proper type annotation
+    test_cases: List[Dict[str, Any]] = [
         {
             "text": "log in as admin with password123",
             "target_format": "nlp_steps",
@@ -60,7 +60,7 @@ def test_convert_endpoint():
         try:
             response = requests.post(
                 convert_url,
-                json=test_case,
+                json=test_case,  # type: ignore - requests handles Dict[str, Any] properly
                 headers={"Content-Type": "application/json"}
             )
             
