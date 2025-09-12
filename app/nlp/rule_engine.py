@@ -9,7 +9,7 @@ string matching algorithms.
 import json
 import re
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple, Pattern
+from typing import List, Dict, Any, Optional, Tuple, Pattern, Set
 try:
     from rapidfuzz import fuzz, process  # type: ignore
 except ImportError:
@@ -83,6 +83,9 @@ class RuleEngine:
                         "func_id": func_def.get("id", "")
                     })
         
+        # Sort patterns by template length (longer/more specific first)
+        self.template_patterns.sort(key=lambda x: len(x["template"]), reverse=True)
+        
         logger.debug(f"Compiled {len(self.template_patterns)} template patterns")
     
     def _template_to_regex(self, template: str, signature: Dict[str, str]) -> Optional[Pattern[str]]:
@@ -107,17 +110,22 @@ class RuleEngine:
                 placeholder = re.escape("{" + arg_name + "}")
                 
                 if arg_type == "str":
-                    # Match non-whitespace or quoted strings
-                    group_pattern = f"(?P<{arg_name}>\\S+|'[^']*'|\"[^\"]*\")"
+                    # For strings, be more permissive to handle usernames, passwords with spaces/special chars
+                    if arg_name in ["username", "password", "text", "message"]:
+                        # Allow alphanumeric, spaces, and common symbols (non-greedy but stop at word boundaries)
+                        group_pattern = f"(?P<{arg_name}>[\\w\\s@.-]+)"
+                    else:
+                        # Match word characters, allowing alphanumeric and common symbols
+                        group_pattern = f"(?P<{arg_name}>[\\w@.-]+|'[^']*'|\"[^\"]*\")"
                 elif arg_type == "int":
                     # Match integers
                     group_pattern = f"(?P<{arg_name}>\\d+)"
                 elif arg_type == "any":
-                    # Match anything non-whitespace
-                    group_pattern = f"(?P<{arg_name}>\\S+)"
+                    # Match anything reasonable (word chars and common symbols)
+                    group_pattern = f"(?P<{arg_name}>[\\w@.-]+)"
                 else:
-                    # Default to non-whitespace
-                    group_pattern = f"(?P<{arg_name}>\\S+)"
+                    # Default to word characters and common symbols
+                    group_pattern = f"(?P<{arg_name}>[\\w@.-]+)"
                 
                 escaped = escaped.replace(placeholder, group_pattern)
             
@@ -276,28 +284,49 @@ class RuleEngine:
         steps: List[Dict[str, Any]] = []
         matched_spans: List[Tuple[int, int]] = []
         
-        # Phase 1: Try exact template matching
-        for pattern_info in self.template_patterns:
-            args, confidence = self._extract_arguments(text, pattern_info)
-            
-            if confidence > 0:
-                # Find the span that was matched
-                match = pattern_info["pattern"].search(text)
-                if match:
-                    matched_spans.append((match.start(), match.end()))
-                
-                step: Dict[str, Any] = {
-                    "function": pattern_info["function"],
-                    "args": args,
-                    "confidence": confidence,
-                    "source": "rule",
-                    "match_type": "exact",
-                    "template": pattern_info["template"]
-                }
-                steps.append(step)
-                logger.debug(f"Exact match: {pattern_info['function']} with confidence {confidence}")
+        # Phase 0: Split compound sentences by common delimiters
+        text_segments = self._split_compound_sentences(text)
         
-        # Phase 2: If no exact matches, try fuzzy matching
+        # Phase 1: Try exact template matching for each segment
+        for segment in text_segments:
+            segment_steps: List[Dict[str, Any]] = []
+            segment_spans: List[Tuple[int, int]] = []
+            matched_functions: Set[str] = set()  # Track matched functions per segment
+            
+            for pattern_info in self.template_patterns:
+                # Skip if we already found this function in this segment
+                if pattern_info["function"] in matched_functions:
+                    continue
+                    
+                args, confidence = self._extract_arguments(segment, pattern_info)
+                
+                if confidence > 0:
+                    # Find the span that was matched
+                    match = pattern_info["pattern"].search(segment)
+                    if match:
+                        # Calculate absolute span position in original text
+                        segment_start = text.find(segment)
+                        abs_start = segment_start + match.start() if segment_start >= 0 else match.start()
+                        abs_end = segment_start + match.end() if segment_start >= 0 else match.end()
+                        matched_spans.append((abs_start, abs_end))
+                        segment_spans.append((match.start(), match.end()))
+                        matched_functions.add(pattern_info["function"])
+                    
+                    step: Dict[str, Any] = {
+                        "function": pattern_info["function"],
+                        "args": args,
+                        "confidence": confidence,
+                        "source": "rule",
+                        "match_type": "exact",
+                        "template": pattern_info["template"]
+                    }
+                    segment_steps.append(step)
+                    logger.debug(f"Exact match in segment '{segment}': {pattern_info['function']} with confidence {confidence}")
+                    break  # Stop after first match for this function to avoid duplicates
+            
+            steps.extend(segment_steps)
+        
+        # Phase 2: If no exact matches found, try fuzzy matching on original text
         if not steps:
             fuzzy_matches = self._fuzzy_match_templates(text, threshold=70.0)
             steps.extend(fuzzy_matches)
@@ -320,13 +349,45 @@ class RuleEngine:
         elif unresolved_tokens:
             # Add unresolved tokens as metadata to existing steps
             for step in steps:
-                step["unresolved_tokens"] = unresolved_tokens
+                if "unresolved_tokens" not in step:
+                    step["unresolved_tokens"] = unresolved_tokens
         
         # Sort by confidence (highest first)
         steps.sort(key=lambda x: x["confidence"], reverse=True)  # type: ignore
         
         logger.info(f"Parsed '{text}' into {len(steps)} steps")
         return steps
+    
+    def _split_compound_sentences(self, text: str) -> List[str]:
+        """
+        Split compound sentences into individual commands.
+        
+        Args:
+            text: Input text that may contain multiple commands
+            
+        Returns:
+            List of individual command segments
+        """
+        # Common delimiters for separating commands - avoid breaking "username X and password Y"
+        delimiters = [', and then ', ', then ', ' then ', ', and ', ', ', ' and then ']
+        
+        segments: List[str] = [text]
+        
+        for delimiter in delimiters:
+            new_segments: List[str] = []
+            for segment in segments:
+                if delimiter in segment:
+                    parts = segment.split(delimiter)
+                    new_segments.extend([part.strip() for part in parts if part.strip()])
+                else:
+                    new_segments.append(segment)
+            segments = new_segments
+        
+        # Filter out very short segments (likely noise)
+        meaningful_segments = [seg for seg in segments if len(seg.strip()) > 3]
+        
+        logger.debug(f"Split '{text}' into {len(meaningful_segments)} segments: {meaningful_segments}")
+        return meaningful_segments if meaningful_segments else [text]
     
     def get_function_info(self, function_name: str) -> Optional[Dict[str, Any]]:
         """

@@ -1,5 +1,6 @@
 """Database configuration and connection for NLPForge."""
 
+import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase  # type: ignore
 from typing import Optional, Any, Dict
 from pymongo.collection import Collection  # type: ignore
@@ -23,13 +24,21 @@ class DatabaseManager:
             if self.client is not None:  # type: ignore
                 self.database = self.client[settings.mongodb_database]  # type: ignore
                 
-                # Test the connection
-                await self.client.admin.command('ping')  # type: ignore
+                # Test the connection with timeout
+                await asyncio.wait_for(
+                    self.client.admin.command('ping'),  # type: ignore
+                    timeout=5.0
+                )
                 logger.info("✅ Successfully connected to MongoDB")
             
+        except asyncio.TimeoutError:
+            logger.warning("⚠️  MongoDB connection timeout - running without database")
+            self.client = None
+            self.database = None
         except Exception as e:
-            logger.error(f"❌ Failed to connect to MongoDB: {e}")
-            raise
+            logger.warning(f"⚠️  Failed to connect to MongoDB: {e} - running without database")
+            self.client = None
+            self.database = None
     
     async def disconnect(self) -> None:
         """Disconnect from MongoDB."""

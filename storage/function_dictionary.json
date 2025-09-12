@@ -1,5 +1,19 @@
 [
   {
+    "id": "login",
+    "name": "login",
+    "signature": { "username": "str", "password": "str" },
+    "templates": [
+      "login with username {username} and password {password}",
+      "log in as {username} with {password}",
+      "sign in with {username}/{password}"
+    ],
+    "examples": [
+      "Login with username admin and password secret123",
+      "Log in as testuser with Pa$$w0rd"
+    ]
+  },
+  {
     "id": "nav_open_url",
     "name": "open_url",
     "signature": { "url": "str" },
@@ -19,11 +33,16 @@
     "signature": { "selector": "str" },
     "templates": [
       "click {selector}",
+      "click on {selector}",
+      "click on the {selector}",
+      "click the {selector}",
       "press {selector}",
-      "tap on {selector}"
+      "tap on {selector}",
+      "tap the {selector}"
     ],
     "examples": [
       "Click the login button",
+      "Click on the Profile button",
       "Tap on #submit"
     ]
   },
@@ -100,8 +119,14 @@
     "examples": ["Uncheck newsletter box"] },
 
   { "id": "auth_login", "name": "login", "signature": { "username": "str", "password": "str" },
-    "templates": ["log in as {username} with {password}", "sign in with {username}/{password}"],
-    "examples": ["Log in as admin with password123"] },
+    "templates": [
+      "log in as {username} with {password}", 
+      "sign in with {username}/{password}",
+      "login with username {username} and password {password}",
+      "authenticate with {username} and {password}",
+      "log in using {username} and {password}"
+    ],
+    "examples": ["Log in as admin with password123", "Login with username admin and password secret123"] },
 
   { "id": "auth_logout", "name": "logout", "signature": {},
     "templates": ["logout", "sign out"],
