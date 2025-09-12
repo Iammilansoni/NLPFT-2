@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.responses import Response
 import uvicorn
 
 from app.core.config import settings
@@ -87,16 +88,15 @@ def create_app() -> FastAPI:
         """Count all requests for metrics."""
         if hasattr(request.app.state, 'request_count'):
             request.app.state.request_count += 1
-        
         start_time = datetime.now(timezone.utc)
-        response = await call_next(request)
+        response: Response = await call_next(request)  # type: ignore
         duration = (datetime.now(timezone.utc) - start_time).total_seconds()
         
         # Log request (optional, can be disabled in production)
         if settings.debug:
             logger.info(f"🌐 {request.method} {request.url.path} → {response.status_code} ({duration:.3f}s)")  # type: ignore
         
-        return response
+        return response  # type: ignore
     
     # Global exception handler
     @app.exception_handler(Exception)
@@ -134,7 +134,7 @@ app = create_app()
 
 def main():
     """Run the application."""
-    uvicorn.run(
+    uvicorn.run(  # type: ignore
         "app.main:app",
         host=settings.host,
         port=settings.port,

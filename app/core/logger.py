@@ -3,7 +3,6 @@
 import logging
 import sys
 from typing import Any, Dict
-from datetime import datetime
 
 
 class ColoredFormatter(logging.Formatter):

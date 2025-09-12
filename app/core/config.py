@@ -33,6 +33,11 @@ class Settings:
         return self.storage_path / "function_dictionary.json"
     
     @property
+    def feedback_db_path(self) -> Path:
+        """Get the feedback database file path: NLPForge-Tester/storage/feedback.db"""
+        return self.storage_path / "feedback.db"
+    
+    @property
     def faiss_index_path(self) -> Path:
         """Get the FAISS index directory path: NLPForge-Tester/storage/faiss_index"""
         return self.storage_path / "faiss_index"

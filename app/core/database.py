@@ -1,7 +1,8 @@
 """Database configuration and connection for NLPForge."""
 
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
-from typing import Optional
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase  # type: ignore
+from typing import Optional, Any, Dict
+from pymongo.collection import Collection  # type: ignore
 
 from app.core.config import settings
 from app.core.logger import logger
@@ -11,19 +12,20 @@ class DatabaseManager:
     """MongoDB database manager."""
     
     def __init__(self):
-        self.client: Optional[AsyncIOMotorClient] = None
-        self.database: Optional[AsyncIOMotorDatabase] = None
+        self.client: Optional[AsyncIOMotorClient] = None  # type: ignore
+        self.database: Optional[AsyncIOMotorDatabase] = None  # type: ignore
     
     async def connect(self) -> None:
         """Connect to MongoDB."""
         try:
             logger.info(f"🔌 Connecting to MongoDB at {settings.mongodb_url}")
-            self.client = AsyncIOMotorClient(settings.mongodb_url)
-            self.database = self.client[settings.mongodb_database]
-            
-            # Test the connection
-            await self.client.admin.command('ping')
-            logger.info("✅ Successfully connected to MongoDB")
+            self.client = AsyncIOMotorClient(settings.mongodb_url)  # type: ignore
+            if self.client is not None:  # type: ignore
+                self.database = self.client[settings.mongodb_database]  # type: ignore
+                
+                # Test the connection
+                await self.client.admin.command('ping')  # type: ignore
+                logger.info("✅ Successfully connected to MongoDB")
             
         except Exception as e:
             logger.error(f"❌ Failed to connect to MongoDB: {e}")
@@ -31,9 +33,9 @@ class DatabaseManager:
     
     async def disconnect(self) -> None:
         """Disconnect from MongoDB."""
-        if self.client:
+        if self.client is not None:  # type: ignore
             logger.info("🔌 Disconnecting from MongoDB")
-            self.client.close()
+            self.client.close()  # type: ignore
             self.client = None
             self.database = None
             logger.info("✅ Disconnected from MongoDB")
@@ -41,44 +43,38 @@ class DatabaseManager:
     async def ping(self) -> bool:
         """Ping the database to check connection."""
         try:
-            if self.client:
-                await self.client.admin.command('ping')
+            if self.client is not None:  # type: ignore
+                await self.client.admin.command('ping')  # type: ignore
                 return True
             return False
         except Exception:
             return False
     
-    def get_collection(self, collection_name: str):
+    def get_collection(self, collection_name: str) -> Any:  # type: ignore
         """Get a collection from the database."""
-        if not self.database:
+        if self.database is None:  # type: ignore
             raise RuntimeError("Database not connected")
-        return self.database[collection_name]
+        return self.database[collection_name]  # type: ignore
 
 
 # Global database manager instance
 db_manager = DatabaseManager()
 
-# Convenience property to access the database
-@property
-def db() -> AsyncIOMotorDatabase:
-    """Get the database instance."""
-    if not db_manager.database:
-        raise RuntimeError("Database not connected")
-    return db_manager.database
 
-# Make db accessible as a module attribute
 class DatabaseProxy:
     """Proxy to access the database."""
     
-    def __getattr__(self, name):
-        if not db_manager.database:
+    def __getattr__(self, name: str) -> Any:
+        if db_manager.database is None:  # type: ignore
             raise RuntimeError("Database not connected")
-        return getattr(db_manager.database, name)
+        return getattr(db_manager.database, name)  # type: ignore
     
-    async def command(self, command):
+    async def command(self, command: Dict[str, Any]) -> Dict[str, Any]:  # type: ignore
         """Execute a database command."""
-        if not db_manager.database:
+        if db_manager.database is None:  # type: ignore
             raise RuntimeError("Database not connected")
-        return await db_manager.database.command(command)
+        return await db_manager.database.command(command)  # type: ignore
 
+
+# Database proxy instance
 db = DatabaseProxy()
