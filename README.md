@@ -42,8 +42,7 @@ NLPForge-Tester/
 │   │       ├── __init__.py
 │   │       ├── convert.py        # Text conversion endpoints
 │   │       ├── dictionary.py     # Dictionary management endpoints
-│   │       ├── health.py         # Health check endpoints
-│   │       └── metrics.py        # Metrics and monitoring endpoints
+│   │       └── health.py         # Health check and metrics endpoints (consolidated)
 │   │
 │   ├── core/                     # Core application components
 │   │   ├── __init__.py
@@ -79,7 +78,7 @@ NLPForge-Tester/
 - `GET /health/ready` - Readiness probe for Kubernetes
 - `GET /health/live` - Liveness probe for Kubernetes
 - `GET /health/simple` - Basic health status for load balancers
-- `GET /health/metrics` - Detailed system metrics
+- `GET /health/metrics` - Prometheus-compatible metrics (consolidated endpoint)
 
 ### Text Processing
 - `POST /convert/` - Convert natural language to structured test steps
@@ -87,7 +86,9 @@ NLPForge-Tester/
 - `POST /dictionary/` - Add new dictionary entries
 
 ### Monitoring
-- `GET /metrics/` - Application and system metrics
+All monitoring functionality is consolidated in the health endpoints:
+- `GET /health/` - Comprehensive JSON health status and metrics
+- `GET /health/metrics` - Prometheus-compatible metrics format
 
 ## Quick Start
 

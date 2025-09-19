@@ -1,0 +1,42 @@
+# Prometheus configuration for NLPForge monitoring
+# Save this as prometheus.yml and run with: prometheus --config.file=prometheus.yml
+
+global:
+  scrape_interval: 15s # Scrape targets every 15 seconds
+  evaluation_interval: 15s # Evaluate rules every 15 seconds
+
+# Rule files
+rule_files:
+  # - "nlpforge_alert_rules.yml"
+
+# Scrape configuration
+scrape_configs:
+  # NLPForge API monitoring
+  - job_name: 'nlpforge-api'
+    static_configs:
+      - targets: ['localhost:8000'] # Your FastAPI server
+    metrics_path: '/api/v1/health/' # Unified health endpoint with content negotiation
+    scrape_interval: 10s # Scrape every 10 seconds
+    scrape_timeout: 5s
+    honor_labels: true
+    
+    # Optional: Add labels to all metrics from this job
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'nlpforge-api'
+      - source_labels: []
+        target_label: service
+        replacement: 'nlpforge'
+
+  # Optional: Monitor Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - "localhost:9093"

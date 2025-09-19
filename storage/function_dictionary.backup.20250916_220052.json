@@ -1715,6 +1715,26 @@
     "is_active": true
   },
   {
+    "id": "test_sync_function",
+    "name": "test_sync_function",
+    "display_name": "test_sync_function",
+    "description": "Test function for sync verification",
+    "signature": {},
+    "templates": [
+      "test sync {param1}",
+      "verify sync works with {param1}"
+    ],
+    "category": "test",
+    "examples": [
+      "Example: test sync {param1}",
+      "Example: verify sync works with {param1}"
+    ],
+    "created_by": "admin",
+    "updated_by": "admin",
+    "usage_count": 0,
+    "is_active": true
+  },
+  {
     "id": "dismiss_modal",
     "name": "dismiss_modal",
     "display_name": "Dismiss Modal",

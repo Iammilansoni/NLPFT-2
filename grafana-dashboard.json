@@ -1,0 +1,96 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "NLPForge System Monitor",
+    "tags": ["nlpforge", "api", "health"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "System Health Overview",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "nlpforge_system_health_status",
+            "legendFormat": "{{component}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 0.5},
+                {"color": "green", "value": 0.9}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Database Response Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "nlpforge_database_response_time_ms",
+            "legendFormat": "Database Response Time (ms)"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Rule Engine Performance",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "nlpforge_rule_engine_response_time_ms",
+            "legendFormat": "Rule Engine Response Time (ms)"
+          },
+          {
+            "expr": "nlpforge_rule_engine_parses_total",
+            "legendFormat": "Total Parses"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "System Resources",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "nlpforge_memory_usage_percent",
+            "legendFormat": "Memory Usage %"
+          },
+          {
+            "expr": "nlpforge_cpu_usage_percent", 
+            "legendFormat": "CPU Usage %"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Rule Engine Stats",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "nlpforge_rule_engine_functions_total",
+            "legendFormat": "Functions"
+          },
+          {
+            "expr": "nlpforge_rule_engine_patterns_total",
+            "legendFormat": "Patterns"
+          }
+        ]
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "10s"
+  }
+}

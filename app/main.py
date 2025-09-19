@@ -12,7 +12,7 @@ import uvicorn
 from app.core.config import settings
 from app.core.database import db_manager
 from app.core.logger import logger, log_startup, log_shutdown, log_error
-from app.api.v1 import health, dictionary, convert, metrics
+from app.api.v1 import health, dictionary, convert
 from app.models.schemas import ErrorResponse
 
 
@@ -80,7 +80,6 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(dictionary.router, prefix="/api/v1")
     app.include_router(convert.router, prefix="/api/v1")
-    app.include_router(metrics.router, prefix="/api/v1")
     
     # Middleware for request counting
     @app.middleware("http")

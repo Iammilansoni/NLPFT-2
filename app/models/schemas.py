@@ -6,11 +6,11 @@ from pydantic import BaseModel, Field
 
 
 class HealthResponse(BaseModel):
-    """Health check response schema."""
-    status: str = Field(..., description="Overall system status")
+    """Comprehensive health check response schema."""
+    status: str = Field(..., description="Overall system status (healthy, warning, degraded, unhealthy)")
     version: str = Field(..., description="Application version")
     timestamp: str = Field(..., description="Health check timestamp in ISO format")
-    checks: Dict[str, str] = Field(..., description="Individual component health statuses")
+    checks: Dict[str, Any] = Field(..., description="Detailed component health statuses and metrics")
 
 
 class ConvertRequest(BaseModel):
