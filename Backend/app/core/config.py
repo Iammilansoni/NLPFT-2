@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 class Settings:
@@ -8,9 +9,9 @@ class Settings:
     workers = 1
     debug = True
     log_level = "info"
-    environment = "development"
-    mongodb_url = "mongodb://localhost:27017"
-    mongodb_database = "nlpforge"
+    environment = os.getenv("ENVIRONMENT", "development")
+    mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
+    mongodb_database = os.getenv("MONGODB_DATABASE", "nlpforge")
     
     # Storage paths - NLPForge-Tester/storage
     @property

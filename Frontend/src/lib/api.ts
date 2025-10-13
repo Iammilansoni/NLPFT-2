@@ -11,9 +11,21 @@ import {
 } from './types';
 import { mockFunctions, mockHealthStatus, mockConvertResponse } from './mock-data';
 
-// Create axios instance with base configuration
+// Determine if we're on the server or client
+const isServer = typeof window === 'undefined';
+
+// Use internal Docker service URL for server-side, public URL for client-side
+const getBaseURL = () => {
+  if (isServer) {
+    // Server-side: use internal Docker network
+    return process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://backend:8000';
+  }
+  // Client-side: use public URL
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+};
+
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
+  baseURL: getBaseURL(),
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -21,17 +33,17 @@ const apiClient = axios.create({
   },
 });
 
-// Request interceptor
+
 apiClient.interceptors.request.use(
   (config) => {
-    // Add timestamp to prevent caching issues
+    
     config.params = { ...config.params, _t: Date.now() };
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for error handling
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -44,7 +56,7 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Health API
+
 export const healthApi = {
   getHealth: async (): Promise<HealthStatus> => {
     try {
@@ -53,8 +65,9 @@ export const healthApi = {
       return response.data;
     } catch (error) {
       console.error('❌ Backend health API error:', error);
-      console.warn('Backend not available, using mock health data');
-      return mockHealthStatus;
+      console.warn('Backend not available - throwing error for fallback mode');
+      
+      throw error;
     }
   },
 
@@ -77,12 +90,12 @@ export const healthApi = {
   },
 };
 
-// Convert API
+
 export const convertApi = {
   convertText: async (request: ConvertRequest): Promise<ConvertResponse> => {
     try {
       console.log('🔄 Converting text:', request.text);
-      // Ensure target_format is always provided (backend requires it)
+      
       const requestWithFormat = {
         ...request,
         target_format: request.target_format || 'nlp_steps'
@@ -90,11 +103,11 @@ export const convertApi = {
       const response = await apiClient.post('/api/v1/convert', requestWithFormat);
       console.log('✅ Backend convert response:', response.data);
       
-      // Extract the actual convert data from the response metadata 
+      
       const backendResponse = response.data;
       const metadata = backendResponse.metadata || {};
       
-      // Transform to the format expected by the frontend
+      
       const frontendResponse: ConvertResponse = {
         steps: metadata.steps || [],
         overall_confidence: metadata.overall_confidence || 0,
@@ -107,27 +120,27 @@ export const convertApi = {
     } catch (error) {
       console.error('❌ Backend convert API error:', error);
       console.warn('Backend not available, using mock convert response');
-      // Return a mock response with the original text
+      
       return {
         ...mockConvertResponse,
         steps: mockConvertResponse.steps.map(step => ({
           ...step,
-          matched_text: request.text.substring(0, 50) // Use part of original text
+          matched_text: request.text.substring(0, 50) 
         }))
       };
     }
   },
 };
 
-// Dictionary API  
+
 export const dictionaryApi = {
   getFunctions: async (): Promise<DictionaryFunction[]> => {
     try {
       const response: AxiosResponse<DictionaryListResponse> = await apiClient.get('/api/v1/dictionary?page_size=100');
-      // The API returns { functions: [...] } so we need to extract and transform the functions array
+      
       const apiFunctions = response.data.functions || [];
       
-      // Transform API format to frontend format
+      
       return apiFunctions.map((apiFunc: ApiFunctionResponse) => ({
         _id: apiFunc.id,
         function_name: apiFunc.name || '',
@@ -141,9 +154,10 @@ export const dictionaryApi = {
         created_at: apiFunc.created_at,
         updated_at: apiFunc.updated_at,
       }));
-    } catch {
-      console.warn('Backend not available, using mock functions data');
-      return mockFunctions;
+    } catch (error) {
+      console.error('❌ Dictionary API error:', error);
+      console.warn('Backend not available - throwing error for fallback mode');
+      throw error;
     }
   },
 
@@ -152,7 +166,7 @@ export const dictionaryApi = {
       const response: AxiosResponse<DictionaryListResponse> = await apiClient.get('/api/v1/dictionary?page_size=100');
       const apiFunctions = response.data.functions || [];
       
-      // Transform API format to frontend format
+      
       const transformedFunctions = apiFunctions.map((apiFunc: ApiFunctionResponse) => ({
         _id: apiFunc.id,
         function_name: apiFunc.name || '',
@@ -171,12 +185,10 @@ export const dictionaryApi = {
         functions: transformedFunctions,
         totalCount: response.data.total_count || transformedFunctions.length
       };
-    } catch {
-      console.warn('Backend not available, using mock functions data');
-      return {
-        functions: mockFunctions,
-        totalCount: mockFunctions.length
-      };
+    } catch (error) {
+      console.error('❌ Dictionary metadata API error:', error);
+      console.warn('Backend not available - throwing error for fallback mode');
+      throw error;
     }
   },
 
@@ -185,7 +197,7 @@ export const dictionaryApi = {
       const response: AxiosResponse<ApiFunctionResponse> = await apiClient.get(`/api/v1/dictionary/${id}`);
       const apiFunc = response.data;
       
-      // Transform API format to frontend format
+      
       return {
         _id: apiFunc.id,
         function_name: apiFunc.name || '',
@@ -200,7 +212,7 @@ export const dictionaryApi = {
         updated_at: apiFunc.updated_at,
       };
     } catch {
-      // Find mock function by id
+      
       const mockFunc = mockFunctions.find(f => f._id === id);
       if (!mockFunc) {
         throw new Error(`Function not found: ${id}`);
@@ -211,45 +223,85 @@ export const dictionaryApi = {
 
   createFunction: async (func: Omit<DictionaryFunction, '_id' | 'created_at' | 'updated_at'>): Promise<DictionaryFunction> => {
     try {
-      // Transform frontend format to API format
+      
+      interface StructuredArgument {
+        type: string;
+        required?: boolean;
+        description?: string;
+        default?: unknown;
+      }
+      
+      const argumentsArray = Object.entries(func.args || {}).map(([name, value]) => {
+        
+        if (typeof value === 'object' && value !== null && 'type' in value) {
+          
+          const structuredValue = value as StructuredArgument;
+          return {
+            name,
+            type: structuredValue.type || 'str',
+            required: structuredValue.required ?? true,
+            description: structuredValue.description || `${name} parameter`,
+            default: structuredValue.default
+          };
+        } else {
+          
+          return {
+            name,
+            type: typeof value === 'string' ? value : 'str',
+            required: true,
+            description: `${name} parameter`
+          };
+        }
+      });
+
+      
       const apiRequest = {
         name: func.function_name,
         description: func.description,
-        templates: func.templates,
-        arguments: func.args,
-        tags: func.tags,
-        category: func.category,
+        templates: func.templates || [],
+        arguments: argumentsArray,
+        tags: func.tags || [],
+        category: func.category || 'general',
+        
+        ...(func.examples && func.examples.length > 0 && {
+          aliases: func.examples 
+        })
       };
+      
+      console.log('🔄 Creating function with payload:', apiRequest);
       
       const response: AxiosResponse<CreateFunctionResponse> = await apiClient.post('/api/v1/dictionary', apiRequest);
       const apiResponse = response.data;
       
-      // Transform response back to frontend format
+      console.log('✅ Function created successfully:', apiResponse);
+      
+      
       return {
         _id: apiResponse.function_id,
         function_name: apiResponse.name || func.function_name,
-        description: func.description,
-        templates: func.templates,
-        examples: [],
-        args: func.args,
-        tags: func.tags,
-        category: func.category,
-        confidence_threshold: 0.7,
+        description: func.description || '',
+        templates: func.templates || [],
+        examples: func.examples || [],
+        args: func.args || {},
+        tags: func.tags || [],
+        category: func.category || 'general',
+        confidence_threshold: func.confidence_threshold || 0.7,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-    } catch {
-      // Return mock created function
+    } catch (error) {
+      console.error('❌ Failed to create function:', error);
+      
       return {
         _id: Math.random().toString(36).substr(2, 9),
         function_name: func.function_name,
-        description: func.description,
-        templates: func.templates,
-        examples: [],
-        args: func.args,
-        tags: func.tags,
-        category: func.category,
-        confidence_threshold: func.confidence_threshold,
+        description: func.description || '',
+        templates: func.templates || [],
+        examples: func.examples || [],
+        args: func.args || {},
+        tags: func.tags || [],
+        category: func.category || 'general',
+        confidence_threshold: func.confidence_threshold || 0.7,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -258,18 +310,52 @@ export const dictionaryApi = {
 
   updateFunction: async (id: string, func: Partial<DictionaryFunction>): Promise<DictionaryFunction> => {
     try {
-      // Transform frontend format to API format
+      
       const apiRequest: Record<string, unknown> = {};
       if (func.function_name) apiRequest.name = func.function_name;
       if (func.description) apiRequest.description = func.description;
       if (func.templates) apiRequest.templates = func.templates;
-      if (func.args) apiRequest.arguments = func.args;
       if (func.tags) apiRequest.tags = func.tags;
       if (func.category) apiRequest.category = func.category;
       
+      
+      if (func.args) {
+        interface StructuredArgument {
+          type: string;
+          required?: boolean;
+          description?: string;
+          default?: unknown;
+        }
+        
+        const argumentsArray = Object.entries(func.args).map(([name, value]) => {
+          if (typeof value === 'object' && value !== null && 'type' in value) {
+            const structuredValue = value as StructuredArgument;
+            return {
+              name,
+              type: structuredValue.type || 'str',
+              required: structuredValue.required ?? true,
+              description: structuredValue.description || `${name} parameter`,
+              default: structuredValue.default
+            };
+          } else {
+            return {
+              name,
+              type: typeof value === 'string' ? value : 'str',
+              required: true,
+              description: `${name} parameter`
+            };
+          }
+        });
+        apiRequest.arguments = argumentsArray;
+      }
+      
+      console.log('🔄 Updating function with payload:', apiRequest);
+      
       await apiClient.put(`/api/v1/dictionary/${id}`, apiRequest);
       
-      // For update, just return the updated data
+      console.log('✅ Function updated successfully');
+      
+      
       return {
         _id: id,
         function_name: func.function_name || '',
@@ -283,8 +369,9 @@ export const dictionaryApi = {
         created_at: func.created_at,
         updated_at: new Date().toISOString(),
       };
-    } catch {
-      // Return mock updated function
+    } catch (error) {
+      console.error('❌ Failed to update function:', error);
+      
       return {
         _id: id,
         function_name: func.function_name || '',
@@ -305,7 +392,7 @@ export const dictionaryApi = {
     try {
       await apiClient.delete(`/api/v1/dictionary/${id}`);
     } catch {
-      // Mock delete - just resolve
+      
       return Promise.resolve();
     }
   },
@@ -320,12 +407,12 @@ export const dictionaryApi = {
   },
 
   exportFunctions: async (): Promise<DictionaryFunction[]> => {
-    // Use the same endpoint as getFunctions
+    
     return dictionaryApi.getFunctions();
   },
 };
 
-// Utility functions
+
 export const downloadJson = (data: unknown, filename: string = 'data.json') => {
   const jsonStr = JSON.stringify(data, null, 2);
   const dataBlob = new Blob([jsonStr], { type: 'application/json' });
@@ -364,11 +451,11 @@ export const formatUptime = (seconds: number): string => {
   return parts.join(' ');
 };
 
-// Consistent time formatting to prevent hydration mismatches
+
 export const formatTime = (date: Date | string): string => {
   const d = typeof date === 'string' ? new Date(date) : date;
   
-  // Use consistent 24-hour format to avoid AM/PM locale differences
+  
   const hours = d.getHours().toString().padStart(2, '0');
   const minutes = d.getMinutes().toString().padStart(2, '0');
   const seconds = d.getSeconds().toString().padStart(2, '0');
@@ -379,7 +466,7 @@ export const formatTime = (date: Date | string): string => {
 export const formatDateTime = (date: Date | string): string => {
   const d = typeof date === 'string' ? new Date(date) : date;
   
-  // Use ISO date format and 24-hour time to avoid locale differences
+  
   const year = d.getFullYear();
   const month = (d.getMonth() + 1).toString().padStart(2, '0');
   const day = d.getDate().toString().padStart(2, '0');
@@ -387,17 +474,17 @@ export const formatDateTime = (date: Date | string): string => {
   return `${year}-${month}-${day} ${formatTime(d)}`;
 };
 
-// Unified API export for easier usage
+
 export const api = {
-  // Health endpoints
+  
   getHealth: healthApi.getHealth,
   getReadiness: healthApi.getReadiness,
   getLiveness: healthApi.getLiveness,
   
-  // Convert endpoints
+  
   convertText: convertApi.convertText,
   
-  // Dictionary endpoints
+  
   getFunctions: dictionaryApi.getFunctions,
   getFunctionsWithMetadata: dictionaryApi.getFunctionsWithMetadata,
   getFunction: dictionaryApi.getFunction,
@@ -407,7 +494,7 @@ export const api = {
   importFunctions: dictionaryApi.importFunctions,
   exportFunctions: dictionaryApi.exportFunctions,
   
-  // Utility functions
+  
   downloadJson,
   formatBytes,
   formatUptime,
