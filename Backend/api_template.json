@@ -12,7 +12,9 @@
         "login",
         "sign in",
         "log in",
-        "credentials"
+        "credentials",
+        "validate",
+        "authenticate"
       ],
       "slots": [
         {
@@ -217,6 +219,7 @@
       "name": "download_file",
       "endpoint_template": "<base_url>/api/download_file",
       "intent_keywords": [
+        "download file",
         "download",
         "get file",
         "fetch file"
@@ -277,9 +280,14 @@
       "name": "get_user",
       "endpoint_template": "<base_url>/api/get_user",
       "intent_keywords": [
+        "get user details",
+        "fetch user",
+        "retrieve user",
         "get user",
         "user details",
-        "fetch user"
+        "fetch user info",
+        "get account",
+        "fetch account"
       ],
       "slots": [
         {

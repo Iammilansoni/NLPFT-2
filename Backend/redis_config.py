@@ -1,19 +1,23 @@
 
 import os
 import redis
+from dotenv import load_dotenv
 
-USERNAME = os.getenv("REDIS_USERNAME")
-PASSWORD = os.getenv("REDIS_PASSWORD")
-HOST = "redis-18922.c212.ap-south-1-1.ec2.redns.redis-cloud.com"
-PORT = 18922
 
-def get_redis_client():
+load_dotenv()
+
+
+redis_host = os.getenv("REDIS_HOST", "localhost")
+redis_port = int(os.getenv("REDIS_PORT", "6379"))
+
+print(f"🔧 Using Redis at {redis_host}:{redis_port}")
+
+def get_redis_client() -> redis.Redis:
+    """
+    Get Redis client configured for local Docker Redis
+    """
     return redis.Redis(
-        host=HOST,
-        port=PORT,
-        username=USERNAME,
-        password=PASSWORD,
-        decode_responses=False,
-        ssl=True,
-        ssl_cert_reqs=None
+        host=redis_host,
+        port=redis_port,
+        decode_responses=False
     )

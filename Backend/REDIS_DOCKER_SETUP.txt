@@ -1,0 +1,124 @@
+===============================================
+REDIS WITH DOCKER - QUICK SETUP GUIDE
+===============================================
+
+📋 PREREQUISITES (Fresh PC)
+---------------------------
+1. Install Docker Desktop: https://www.docker.com/products/docker-desktop
+2. Install Python 3.8+: https://www.python.org/downloads/
+3. Install Git: https://git-scm.com/downloads
+
+===============================================
+🚀 SETUP (5 Minutes)
+===============================================
+
+Step 1: Clone & Navigate
+-------------------------
+git clone <your-repo-url>
+cd Backend
+
+Step 2: Create Virtual Environment
+-----------------------------------
+python -m venv venv
+venv\Scripts\activate
+
+Step 3: Install Dependencies
+-----------------------------
+pip install pandas numpy redis sentence-transformers tqdm python-dotenv
+
+Step 4: Start Redis
+--------------------
+docker-compose -f docker-compose.redis.yml up -d
+
+Wait 10 seconds, then verify:
+docker exec nlpforge-redis redis-cli ping
+(Should return: PONG)
+
+Step 5: Load Data
+-----------------
+python database_generator.py
+
+This loads ALL CSV records with embeddings (~10-15 minutes for 37,500 records)
+
+===============================================
+🌐 VIEW DATA (Choose One)
+===============================================
+
+RedisInsight (Recommended): http://localhost:8001
+  - First time: Add database (Host: localhost, Port: 6379)
+  - Browse keys: Search "api:*"
+  
+Redis Commander: http://localhost:8081
+  - Auto-configured, ready to use
+
+Python CLI:
+  python view_redis_data.py
+
+===============================================
+🔧 MANAGEMENT
+===============================================
+
+Start:    docker-compose -f docker-compose.redis.yml up -d
+Stop:     docker-compose -f docker-compose.redis.yml down
+Status:   docker ps
+CLI:      docker exec -it nlpforge-redis redis-cli
+Logs:     docker-compose -f docker-compose.redis.yml logs -f
+
+===============================================
+🔍 VERIFY DATA
+===============================================
+
+Count records:
+  docker exec nlpforge-redis redis-cli DBSIZE
+
+View sample:
+  docker exec nlpforge-redis redis-cli HGETALL api:0
+
+Check index:
+  docker exec nlpforge-redis redis-cli FT.INFO idx:apis
+
+===============================================
+⚡ TROUBLESHOOTING
+===============================================
+
+Problem: Port in use
+→ netstat -ano | findstr :6379
+→ Stop conflicting service or change port in docker-compose.redis.yml
+
+Problem: Module not found
+→ Verify RediSearch: docker exec nlpforge-redis redis-cli MODULE LIST
+→ Should see "search" module
+
+Problem: Container restarting
+→ docker logs nlpforge-redis
+→ docker-compose -f docker-compose.redis.yml down -v
+→ docker-compose -f docker-compose.redis.yml up -d
+
+===============================================
+📁 KEY FILES
+===============================================
+
+docker-compose.redis.yml  - Docker configuration
+redis_config.py           - Python Redis connection
+database_generator.py     - Load data with embeddings
+view_redis_data.py        - Browse data via CLI
+
+===============================================
+💾 DATA PERSISTENCE
+===============================================
+
+Data persists in Docker volume "backend_redis-data"
+- Survives container restarts
+- To reset: docker-compose -f docker-compose.redis.yml down -v
+
+===============================================
+🎯 QUICK REFERENCE
+===============================================
+
+Setup:       git clone → venv → pip install → docker-compose up
+Load Data:   python database_generator.py
+View Web:    http://localhost:8001
+View CLI:    python view_redis_data.py
+Stop:        docker-compose -f docker-compose.redis.yml down
+
+===============================================

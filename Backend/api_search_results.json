@@ -1,0 +1,119 @@
+[
+  {
+    "query": "How to authenticate a user?",
+    "num_results": 0,
+    "results": [],
+    "processing_time_seconds": 0.132,
+    "retrieval_config": {
+      "initial_candidates": 50,
+      "final_results": 5,
+      "min_score_threshold": 0.3
+    }
+  },
+  {
+    "query": "Create a new post",
+    "num_results": 0,
+    "results": [],
+    "processing_time_seconds": 0.188,
+    "retrieval_config": {
+      "initial_candidates": 50,
+      "final_results": 5,
+      "min_score_threshold": 0.3
+    }
+  },
+  {
+    "query": "Delete user account",
+    "num_results": 5,
+    "results": [
+      {
+        "rank": 1,
+        "api": "delete_account",
+        "endpoint": "<base_url>/api/delete_account",
+        "request": "{\"user_id\": \"U12980\", \"confirm\": false}",
+        "response": "{\"definition\": \"Deletes the user account after confirmation, revoking all associated permissions.\"}",
+        "matched_query": "dEletE user -> {\"accOuNt_idENtifIEr\":\"u12980\",\"aPpROvaL\":FalSe}",
+        "relevance_score": 7.5995,
+        "vector_score": 0.1389
+      },
+      {
+        "rank": 2,
+        "api": "delete_account",
+        "endpoint": "<base_url>/api/delete_account",
+        "request": "{\"user_id\": \"U70801\", \"confirm\": false}",
+        "response": "{\"definition\": \"Deletes the user account after confirmation, revoking all associated permissions.\"}",
+        "matched_query": "deLete This ACcounT | USER iD=U70801 \\ vErifiEd=fALSE",
+        "relevance_score": 6.8813,
+        "vector_score": 0.1386
+      },
+      {
+        "rank": 3,
+        "api": "delete_account",
+        "endpoint": "<base_url>/api/delete_account",
+        "request": "{\"user_id\": \"U46715\", \"confirm\": true}",
+        "response": "{\"definition\": \"Deletes the user account after confirmation, revoking all associated permissions.\"}",
+        "matched_query": "dEletE ThIS aCcouNT -> {\"USer_IdENTifiEr\":\"U46715\",\"COnfIRMATiOn\":trUE}",
+        "relevance_score": 6.6568,
+        "vector_score": 0.1416
+      },
+      {
+        "rank": 4,
+        "api": "delete_account",
+        "endpoint": "<base_url>/api/delete_account",
+        "request": "{\"user_id\": \"U73278\", \"confirm\": true}",
+        "response": "{\"definition\": \"Deletes the user account after confirmation, revoking all associated permissions.\"}",
+        "matched_query": "delete this account -> user identifier=U73278-approval=true",
+        "relevance_score": 6.4308,
+        "vector_score": 0.1374
+      },
+      {
+        "rank": 5,
+        "api": "delete_account",
+        "endpoint": "<base_url>/api/delete_account",
+        "request": "{\"user_id\": \"U64281\", \"confirm\": true}",
+        "response": "{\"definition\": \"Deletes the user account after confirmation, revoking all associated permissions.\"}",
+        "matched_query": "remove user account | account id=U64281>consent=true",
+        "relevance_score": 6.2798,
+        "vector_score": 0.1363
+      }
+    ],
+    "processing_time_seconds": 0.164,
+    "retrieval_config": {
+      "initial_candidates": 50,
+      "final_results": 5,
+      "min_score_threshold": 0.3
+    }
+  },
+  {
+    "query": "Get list of all products",
+    "num_results": 0,
+    "results": [],
+    "processing_time_seconds": 0.155,
+    "retrieval_config": {
+      "initial_candidates": 50,
+      "final_results": 5,
+      "min_score_threshold": 0.3
+    }
+  },
+  {
+    "query": "Update user settings",
+    "num_results": 1,
+    "results": [
+      {
+        "rank": 1,
+        "api": "update_profile",
+        "endpoint": "<base_url>/api/update_profile",
+        "request": "{\"user_id\": \"U65453\", \"name\": \"Alpha Zero\", \"phone\": \"+91-9696969696\"}",
+        "response": "{\"definition\": \"Updates user profile information such as name, contact number, and preferences.\"}",
+        "matched_query": "update preferences with {\"user id\":\"U65453\",\"username\":\"Alpha Zero\",\"contact\":\"+91-9696969696\"}",
+        "relevance_score": 0.7469,
+        "vector_score": 0.1949
+      }
+    ],
+    "processing_time_seconds": 0.162,
+    "retrieval_config": {
+      "initial_candidates": 50,
+      "final_results": 5,
+      "min_score_threshold": 0.3
+    }
+  }
+]
