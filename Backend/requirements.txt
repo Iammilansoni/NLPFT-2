@@ -29,3 +29,6 @@ httpx==0.25.2
 python-multipart==0.0.6  # For form uploads
 aiofiles==23.2.1  # For async file operations
 python-dotenv==1.0.0  # For environment variables
+
+# Radis Stack
+radis
