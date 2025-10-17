@@ -16,25 +16,23 @@ PASSWORD = os.getenv("REDIS_PASSWORD")
 
 print("Loading model...")
 model = SentenceTransformer("BAAI/bge-small-en-v1.5")
-model.max_seq_length = 256  # Reduced from 512 for faster processing
+model.max_seq_length = 256  
 EMBED_DIM = model.get_sentence_embedding_dimension()
 
 print("Loading CSV...")
 df = pd.read_csv(CSV_PATH)
-# Clean the data - remove rows with NaN values and convert to string
 df = df.dropna(subset=['query'])
 df['query'] = df['query'].astype(str)
 
 print(f"Loaded {len(df)} valid records from CSV")
 
-# SPEED OPTIMIZATION: Batch encoding with progress bar and larger batch size
 print("Generating embeddings...")
 embeddings = model.encode(
     df["query"].tolist(), 
     normalize_embeddings=True,
-    batch_size=256,  # Larger batch size for faster processing
-    show_progress_bar=True,  # Show progress
-    convert_to_numpy=True  # Direct numpy conversion (faster)
+    batch_size=256,  
+    show_progress_bar=True,  
+    convert_to_numpy=True  
 )
 embeddings = np.asarray(embeddings, dtype=np.float32)
 print(f"Generated {len(embeddings)} embeddings")
@@ -54,7 +52,7 @@ SCHEMA = [
         {
             "TYPE": "FLOAT32",
             "DIM": EMBED_DIM,
-            "DISTANCE_METRIC": "COSINE",  # Fixed typo: was DISTANCE_METRICS
+            "DISTANCE_METRIC": "COSINE",  
             "M": 16,
             "EF_CONSTRUCTION": 200
         }
@@ -74,9 +72,8 @@ except ResponseError as e:
     else:
         raise
 
-# SPEED OPTIMIZATION: Batch insert with progress tracking and error handling
 print("Inserting into Redis...")
-BATCH_SIZE = 500  # Reduced from 1000 to be safer with memory
+BATCH_SIZE = 500  
 total_batches = (len(df) + BATCH_SIZE - 1) // BATCH_SIZE
 inserted_count = 0
 
@@ -106,12 +103,12 @@ for batch_num in tqdm(range(total_batches), desc="Inserting batches"):
         pipe.execute()
         inserted_count = end_idx
     except Exception as e:
-        print(f"\n❌ Error at batch {batch_num + 1}: {e}")
+        print(f"\n Error at batch {batch_num + 1}: {e}")
         print(f"Successfully inserted {inserted_count} records before error.")
-        print("\n💡 Your Redis instance has limited memory. Try:")
+        print("\n Your Redis instance has limited memory. Try:")
         print(f"   1. Reduce MAX_RECORDS in the script (currently {len(df)})")
         print(f"   2. Upgrade Redis plan for more memory")
         print(f"   3. Use a local Redis instance")
         break
 
-print(f"✅ Successfully inserted {inserted_count} records into Redis!")
+print(f" Successfully inserted {inserted_count} records into Redis!")
