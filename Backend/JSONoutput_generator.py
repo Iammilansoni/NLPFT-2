@@ -27,6 +27,7 @@ FILE_ID_PATTERN = re.compile(r'\b[A-Z]{1,10}\d{3,10}\b')
 FILENAME_PATTERN = re.compile(r'\b[\w-]+\.(pdf|docx|xlsx|csv|txt|png|jpg|jpeg|mp4|zip|sql|pptx)\b', re.IGNORECASE)
 
 
+# For lazy-loading and caching of apis in json format
 def load_templates() -> Dict[str, Any]:
     global _templates
     if _templates is None:
@@ -35,6 +36,7 @@ def load_templates() -> Dict[str, Any]:
     return _templates
 
 
+# Retrieve the configuration of a specific API from the template
 def get_api_config(api_name: str) -> Optional[Dict[str, Any]]:
     for api in load_templates().get("apis", []):
         if api.get("name") == api_name:
