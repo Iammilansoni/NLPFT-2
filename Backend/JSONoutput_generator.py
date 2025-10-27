@@ -20,7 +20,7 @@ import numpy as np
 try:
     from redis_config import get_redis_client
 except Exception:
-    print("❌ redis_config.get_redis_client is required but not importable. Provide redis_config.py.", file=sys.stderr)
+    print("redis_config.get_redis_client is required but not importable. Provide redis_config.py.", file=sys.stderr)
     raise
 
 INDEX_NAME = "idx:apis"
@@ -40,7 +40,7 @@ def get_encoder():
         try:
             from sentence_transformers import SentenceTransformer
         except Exception:
-            print("❌ sentence_transformers is required for vector search. Install it first.", file=sys.stderr)
+            print("sentence_transformers is required for vector search. Install it first.", file=sys.stderr)
             raise
         _encoder = SentenceTransformer(EMBED_MODEL_NAME)
         _encoder.max_seq_length = 256
@@ -198,7 +198,7 @@ def vector_search(qvec: bytes, top_k: int = 5) -> List[Dict[str, Any]]:
             "DIALECT", "2"
         )
     except Exception as e:
-        print(f"❌ Redis vector search failed: {e}", file=sys.stderr)
+        print(f"Redis vector search failed: {e}", file=sys.stderr)
         raise
 
     if not res or len(res) < 2:
