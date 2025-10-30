@@ -254,7 +254,7 @@ def get_tiny_qa():
                 use_mlock=CONFIG.PHI3_USE_MLOCK,
                 verbose=False
             )
-            logger.info("✅ Phi-3-Mini Q4 GGUF loaded successfully")
+            logger.info(" Phi-3-Mini Q4 GGUF loaded successfully")
         except Exception as e:
             logger.warning(f"Phi-3 initialization failed: {e}")
             return None
@@ -820,22 +820,22 @@ def main():
     print("🚀 NLPForge JSON Output Generator v8.3 (Enhanced with Phi-3-Mini)")
     try:
         get_redis_client().ping()
-        print("✅ Redis connected")
+        print(" Redis connected")
     except Exception as e:
         logger.error(f"Redis connection failed: {e}")
         raise SystemExit(1)
     
     if not CONFIG.DISABLE_QA:
-        print("🔄 Loading Phi-3-Mini Q4 GGUF model (first run downloads ~2.3GB)...")
+        print(" Loading Phi-3-Mini Q4 GGUF model (first run downloads ~2.3GB)...")
         qa_model = get_tiny_qa()
         if qa_model:
-            print(f"✅ Phi-3 loaded with {CONFIG.PHI3_THREADS} threads")
+            print(f" Phi-3 loaded with {CONFIG.PHI3_THREADS} threads")
         else:
-            print("⚠️  Phi-3 not available, using regex/NER only")
+            print("  Phi-3 not available, using regex/NER only")
     
     while True:
         try:
-            q = input("\n📝 Enter your query (or 'quit' to exit): ").strip()
+            q = input("\n Enter your query (or 'quit' to exit): ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\nExiting."); break
         if q.lower() in {"quit","exit","q"}: break
