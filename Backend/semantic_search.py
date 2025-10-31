@@ -3,7 +3,6 @@ import json
 from sentence_transformers import SentenceTransformer
 from redis.commands.search.query import Query
 from redis_config import get_redis_client
-from sklearn.metrics.pairwise import cosine_similarity
 
 # -------------------------------
 # CONFIG
@@ -33,56 +32,45 @@ ft = r.ft(INDEX_NAME)
 def semantic_search(user_query: str, top_k: int = TOP_K):
     print(f"\nSearching for: '{user_query}'")
 
-    # Encode user query
+    
     query_vec = model.encode([user_query], normalize_embeddings=True)
     query_vec_bytes = np.asarray(query_vec, dtype=np.float32).tobytes()
 
-    # Search Redis
+    
     q = (
         Query("*=>[KNN $k @query_embedding $vec AS score]")
         .sort_by("score")
-        .return_fields("query", "api", "endpoint", "request", "response", "score", "query_embedding")
+        .return_fields("query", "api", "endpoint", "request", "response", "score")
         .dialect(2)
     )
 
     params = {"vec": query_vec_bytes, "k": top_k}
     results = ft.search(q, query_params=params)
 
-    # Process results and calculate cosine similarity
     matches = []
     for doc in results.docs:
         try:
-            # Parse document data
+            cosine_distance = float(doc.score)
+            cosine_similarity = 1.0 - cosine_distance
+            
             match_data = {
                 "query": doc.query,
                 "api": doc.api,
                 "endpoint": doc.endpoint,
                 "request": json.loads(doc.request) if doc.request else {},
                 "response": json.loads(doc.response) if doc.response else {},
-                "redis_score": float(doc.score),
+                "cosine_distance": cosine_distance,
+                "cosine_similarity": cosine_similarity,
             }
-            
-            # Calculate cosine similarity
-            if hasattr(doc, 'query_embedding') and doc.query_embedding:
-                # Convert stored embedding back to numpy array
-                stored_vec = np.frombuffer(doc.query_embedding, dtype=np.float32).reshape(1, -1)
-                query_vec_2d = query_vec.reshape(1, -1)
-                
-                # Calculate cosine similarity
-                cos_sim = cosine_similarity(query_vec_2d, stored_vec)[0][0]
-                match_data["cosine_similarity"] = float(cos_sim)
-            else:
-                match_data["cosine_similarity"] = None
-                
-        except Exception as e:
+        except Exception:
             match_data = {
                 "query": getattr(doc, "query", ""),
                 "api": getattr(doc, "api", ""),
                 "endpoint": getattr(doc, "endpoint", ""),
                 "request": getattr(doc, "request", ""),
                 "response": getattr(doc, "response", ""),
-                "redis_score": float(getattr(doc, "score", 0)),
-                "cosine_similarity": None,
+                "cosine_distance": float(getattr(doc, "score", 1.0)),
+                "cosine_similarity": 1.0 - float(getattr(doc, "score", 1.0)),
             }
         matches.append(match_data)
 
@@ -117,15 +105,14 @@ if __name__ == "__main__":
         if results["results"]:
             top_1 = results["results"][0]
             print("\n" + "="*60)
-            print("🏆 TOP 1 RESULT:")
+            print("TOP 1 RESULT:")
             print("="*60)
             print(f"Query: {top_1['query']}")
             print(f"API: {top_1['api']}")
             print(f"Endpoint: {top_1['endpoint']}")
-            print(f"Redis Score: {top_1['redis_score']:.4f}")
-            if top_1.get('cosine_similarity') is not None:
-                print(f"Cosine Similarity: {top_1['cosine_similarity']:.4f} ({top_1['cosine_similarity']*100:.2f}%)")
+            print(f"Cosine Distance: {top_1['cosine_distance']:.4f} (lower is better)")
+            print(f"Cosine Similarity: {top_1['cosine_similarity']:.4f} ({top_1['cosine_similarity']*100:.2f}%)")
             print(f"Request: {json.dumps(top_1['request'], indent=2)}")
             print(f"Response: {json.dumps(top_1['response'], indent=2)}")
         else:
-            print("\n⚠️  No results found!")
+            print("\n No results found!")
