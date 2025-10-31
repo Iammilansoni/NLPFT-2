@@ -90,4 +90,24 @@ if __name__ == "__main__":
             break
 
         results = semantic_search(user_input, TOP_K)
+        
+        # Print all results
+        print("\n" + "="*60)
+        print("ALL TOP 5 RESULTS:")
+        print("="*60)
         print(json.dumps(results, indent=2))
+        
+        # Print only top 1 result
+        if results["results"]:
+            top_1 = results["results"][0]
+            print("\n" + "="*60)
+            print("TOP 1 RESULT:")
+            print("="*60)
+            print(f"Query: {top_1['query']}")
+            print(f"API: {top_1['api']}")
+            print(f"Endpoint: {top_1['endpoint']}")
+            print(f"Score: {top_1['score']:.4f}")
+            print(f"Request: {json.dumps(top_1['request'], indent=2)}")
+            print(f"Response: {json.dumps(top_1['response'], indent=2)}")
+        else:
+            print("\nNo results found!")
