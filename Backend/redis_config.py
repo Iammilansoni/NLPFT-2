@@ -10,7 +10,7 @@ load_dotenv()
 redis_host = os.getenv("REDIS_HOST", "localhost")
 redis_port = int(os.getenv("REDIS_PORT", "6379"))
 
-print(f"🔧 Using Redis at {redis_host}:{redis_port}")
+print(f"Using Redis at {redis_host}:{redis_port}")
 
 def get_redis_client() -> redis.Redis:
     """

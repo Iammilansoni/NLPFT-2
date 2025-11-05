@@ -64,3 +64,32 @@ class ErrorResponse(BaseModel):
     detail: Optional[str] = Field(None, description="Detailed error information")
     timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"))
     request_id: Optional[str] = Field(None, description="Request ID for tracking")
+
+class SearchRequest(BaseModel):
+    query: str
+    top_k: Optional[int] = None
+
+class ResultItem(BaseModel):
+    query: str
+    api: str
+    endpoint: str
+    request: Dict[str, Any]
+    response: Dict[str, Any]
+    cosine_distance: float
+    cosine_similarity: float
+
+class SearchResponse(BaseModel):
+    input_query: str
+    top_k: int
+    results: List[ResultItem]
+
+class DatasetGenerateRequest(BaseModel):
+    seed_query: str
+    api: str
+    endpoint: str
+    request: Dict[str, Any]
+    response: Dict[str, Any]
+    examples: int = 50
+class UploadResponse(BaseModel):
+    message: str
+    filename: str

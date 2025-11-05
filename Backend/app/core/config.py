@@ -1,5 +1,8 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class Settings:
     app_name = "NLPForge API"
@@ -55,3 +58,12 @@ class Settings:
 
 settings = Settings()
 
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+MODEL_NAME = os.getenv("MODEL_NAME", "BAAI/bge-small-en-v1.5")
+INDEX_NAME = os.getenv("INDEX_NAME", "idx:apis")
+TOP_K = int(os.getenv("TOP_K", "5"))
+
+
+# LLM provider key (optional, used for dataset generation)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")

@@ -31,4 +31,13 @@ aiofiles==23.2.1  # For async file operations
 python-dotenv==1.0.0  # For environment variables
 
 # Radis Stack
-radis
+redis
+
+# sentence_transformers
+sentence_transformers
+
+# python libraries 
+numpy
+pandas
+pandas-multipart
+openai
