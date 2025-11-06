@@ -1,5 +1,7 @@
+#app/nlp/embedding_model.py
+
 from sentence_transformers import SentenceTransformer
-from core.config import MODEL_NAME
+from app.core.config import MODEL_NAME
 
 # load model once
 _model = None

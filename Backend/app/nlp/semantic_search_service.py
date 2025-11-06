@@ -1,9 +1,11 @@
+#app/nlp/semantic_search_service.py
+
 import numpy as np
 import json
 from sentence_transformers import SentenceTransformer
 from redis.commands.search.query import Query
-from redis_config import get_redis_client
-from nlp.embedding_model import get_model
+from app.redis_config import get_redis_client
+from app.nlp.embedding_model import get_model
 
 # ===============================================================
 # CONFIGURATION SECTION
@@ -100,4 +102,3 @@ def semantic_search(user_query: str, top_k: int = TOP_K):
         "top_k": top_k,
         "results": matches,
     }
-

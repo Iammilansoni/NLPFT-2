@@ -8,12 +8,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
 
-from core.config import settings  
-from core.logger import logger, log_startup, log_shutdown, log_error
-from core.database import db_manager 
-from api.v1.dataset import router as dataset_router
-from api.v1.search import router as search_router
-from models.schemas import ErrorResponse
+from app.core.config import settings  
+from app.core.logger import logger, log_startup, log_shutdown, log_error
+from app.core.database import db_manager 
+from app.api.v1.dataset import router as dataset_router
+from app.api.v1.search import router as search_router
+from app.models.schemas import ErrorResponse
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

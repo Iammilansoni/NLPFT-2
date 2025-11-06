@@ -1,4 +1,5 @@
-# nlp/dataset_ingestor.py
+# app/nlp/dataset_ingestor.py
+
 import os
 import pandas as pd
 import numpy as np
@@ -6,9 +7,9 @@ from tqdm import tqdm
 from redis.commands.search.field import TextField, VectorField
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.exceptions import ResponseError
-from redis_config import get_redis_client
-from nlp.embedding_model import get_model
-from core.config import INDEX_NAME, DATASETS_DIR, BATCH_SIZE
+from app.redis_config import get_redis_client
+from app.nlp.embedding_model import get_model
+from app.core.config import INDEX_NAME, DATASETS_DIR, BATCH_SIZE
 
 os.makedirs(DATASETS_DIR, exist_ok=True)
 
@@ -68,7 +69,6 @@ def ingest_csv_to_redis(csv_path: str, max_records: int = None):
     model = get_model()
     embed_dim = model.get_sentence_embedding_dimension()
 
-    # generate embeddings in batches to limit memory usage
     all_queries = df["query"].tolist()
     embeddings = model.encode(
         all_queries, normalize_embeddings=True, batch_size=256, show_progress_bar=False, convert_to_numpy=True
@@ -85,7 +85,7 @@ def ingest_csv_to_redis(csv_path: str, max_records: int = None):
         pipe = r.pipeline(transaction=False)
         for i in range(start, end):
             row = df.iloc[i]
-            key = f"api:{inserted + i - start}"  # unique-ish key (can adjust if you want timestamps)
+            key = f"api:{inserted + i - start}"  
             vec_bytes = embeddings[i].tobytes()
             mapping = {
                 "query": row.get("query", ""),
@@ -100,6 +100,5 @@ def ingest_csv_to_redis(csv_path: str, max_records: int = None):
             pipe.execute()
             inserted = end
         except Exception as e:
-            # partial failure handling
             return {"status": "error", "message": str(e), "inserted": inserted}
     return {"status": "success", "records": inserted, "csv_path": csv_path}

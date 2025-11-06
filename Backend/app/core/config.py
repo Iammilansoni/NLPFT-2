@@ -1,3 +1,5 @@
+#app/core/config.py
+
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -7,6 +9,7 @@ load_dotenv()
 class Settings:
     app_name = "NLPForge API"
     app_version = "0.1.0"
+    description = "AI-powered NLP testing framework with semantic search and dataset generation"
     host = "127.0.0.1"
     port = 8000
     workers = 1
@@ -46,24 +49,33 @@ class Settings:
         """Get the FAISS index directory path: NLPForge-Tester/storage/faiss_index"""
         return self.storage_path / "faiss_index"
     
+    @property
+    def datasets_path(self) -> Path:
+        """Get the datasets directory path: NLPForge-Tester/Backend/datasets"""
+        return self.project_root / "Backend" / "datasets"
+    
     def ensure_storage_directories(self):
         """Ensure all storage directories exist."""
         self.storage_path.mkdir(exist_ok=True)
         self.faiss_index_path.mkdir(exist_ok=True)
         
-        # Create __init__.py in storage if it doesn't exist
         storage_init = self.storage_path / "__init__.py"
         if not storage_init.exists():
             storage_init.touch()
 
 settings = Settings()
 
+# Ensure datasets directory exists
+DATASETS_DIR = settings.datasets_path
+DATASETS_DIR.mkdir(exist_ok=True, parents=True)
+
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 MODEL_NAME = os.getenv("MODEL_NAME", "BAAI/bge-small-en-v1.5")
 INDEX_NAME = os.getenv("INDEX_NAME", "idx:apis")
 TOP_K = int(os.getenv("TOP_K", "5"))
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", "32"))
 
 
-# LLM provider key (optional, used for dataset generation)
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+# Gemini API key for dataset generation
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")

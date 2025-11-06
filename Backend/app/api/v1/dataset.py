@@ -4,9 +4,9 @@ import shutil
 from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException, Form
 from fastapi.responses import FileResponse
 from typing import Optional
-from nlp.dataset_ingestor import ingest_csv_to_redis
-from nlp.dataset_generator import generate_dataset_from_prompt
-from core.config import DATASETS_DIR
+from app.nlp.dataset_ingestor import ingest_csv_to_redis
+from app.nlp.dataset_generator import generate_dataset_from_prompt
+from app.core.config import DATASETS_DIR
 
 router = APIRouter()
 os.makedirs(DATASETS_DIR, exist_ok=True)
@@ -24,12 +24,10 @@ async def upload_dataset(file: UploadFile = File(...), background_tasks: Backgro
         content = await file.read()
         f.write(content)
 
-    # Run ingestion in background to avoid blocking the request
     if background_tasks is not None:
         background_tasks.add_task(ingest_csv_to_redis, save_path)
         return {"message": "File uploaded. Ingestion started in background.", "file": save_path}
     else:
-        # fallback synchronous
         result = ingest_csv_to_redis(save_path)
         return {"message": "File ingested", "result": result}
 
@@ -47,7 +45,6 @@ async def generate_dataset(
     """
     res = generate_dataset_from_prompt(seed_prompt, examples=int(examples), api_name=api_name, endpoint=endpoint)
     csv_path = res["csv_path"]
-    # If ingestion done inside generator already, res includes ingestion summary.
     return {"message": "Dataset generated and ingested", "csv_path": csv_path, "ingestion": res.get("ingestion")}
 
 @router.get("/list")

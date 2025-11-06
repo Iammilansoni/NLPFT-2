@@ -90,6 +90,7 @@ class DatasetGenerateRequest(BaseModel):
     request: Dict[str, Any]
     response: Dict[str, Any]
     examples: int = 50
+    
 class UploadResponse(BaseModel):
     message: str
     filename: str
