@@ -3,13 +3,13 @@ import json
 from sentence_transformers import SentenceTransformer
 from redis.commands.search.query import Query
 from redis_config import get_redis_client
+from nlp.embedding_model import get_model
 
 # ===============================================================
 # CONFIGURATION SECTION
 # ===============================================================
 # Defines constants used across the module for model loading,
 # Redis index name, and number of top search results to retrieve.
-MODEL_NAME = "BAAI/bge-small-en-v1.5"
 INDEX_NAME = "idx:apis"
 TOP_K = 5
 
@@ -20,7 +20,7 @@ TOP_K = 5
 # and sets a max sequence length for text input. This model converts
 # text queries and stored API descriptions into embedding vectors.
 print("Loading embedding model...")
-model = SentenceTransformer(MODEL_NAME)
+model = get_model()
 model.max_seq_length = 256
 EMBED_DIM = model.get_sentence_embedding_dimension()
 
@@ -56,11 +56,9 @@ ft = r.ft(INDEX_NAME)
 def semantic_search(user_query: str, top_k: int = TOP_K):
     print(f"\nSearching for: '{user_query}'")
 
-    # Step 1: Generate query embedding
     query_vec = model.encode([user_query], normalize_embeddings=True)
     query_vec_bytes = np.asarray(query_vec, dtype=np.float32).tobytes()
 
-    # Step 2: Construct Redis KNN search query
     q = (
         Query("*=>[KNN $k @query_embedding $vec AS score]")
         .sort_by("score")
@@ -68,11 +66,9 @@ def semantic_search(user_query: str, top_k: int = TOP_K):
         .dialect(2)
     )
 
-    # Step 3: Execute the search and retrieve top results
     params = {"vec": query_vec_bytes, "k": top_k}
     results = ft.search(q, query_params=params)
 
-    # Step 4: Parse results into structured response format
     matches = []
     for doc in results.docs:
         try:
@@ -88,7 +84,6 @@ def semantic_search(user_query: str, top_k: int = TOP_K):
                 "cosine_similarity": cosine_similarity,
             }
         except Exception:
-            # Fallback if fields are missing or incorrectly formatted
             match_data = {
                 "query": getattr(doc, "query", ""),
                 "api": getattr(doc, "api", ""),
@@ -100,7 +95,6 @@ def semantic_search(user_query: str, top_k: int = TOP_K):
             }
         matches.append(match_data)
 
-    # Step 5: Return final structured result
     return {
         "input_query": user_query,
         "top_k": top_k,

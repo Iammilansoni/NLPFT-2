@@ -1,20 +1,19 @@
 # app/api/v1/search.py
 from fastapi import APIRouter, Query, HTTPException
 from typing import Optional
-from semantic_search import semantic_search  # import your semantic search function
+from app.nlp.semantic_search_service import semantic_search
+from app.models.schemas import SearchRequest, SearchResponse
 
 router = APIRouter()
 
-@router.get("/search")
-async def search_api(
-    q: str = Query(..., description="Query text for semantic search"),
-    top_k: Optional[int] = Query(5, description="Number of results to return")
-):
+@router.get("/search", response_model=SearchResponse)
+async def search_api(req: SearchResponse):
     """
     Perform semantic search on the ingested API dataset using embeddings stored in Redis.
     """
     try:
-        results = semantic_search(q, top_k)
-        return {"status": "success", "results": results}
+        top_k = req.top_k or 5
+        res = semantic_search(req.query, top_k=top_k)
+        return SearchResponse(**req)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

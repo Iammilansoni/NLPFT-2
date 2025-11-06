@@ -1,4 +1,4 @@
-# mlp/dataset_generator.py
+# nlp/dataset_generator.py
 import os
 import csv
 import uuid
