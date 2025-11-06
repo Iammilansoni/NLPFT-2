@@ -1,4 +1,4 @@
-# mlp/dataset_ingestor.py
+# nlp/dataset_ingestor.py
 import os
 import pandas as pd
 import numpy as np

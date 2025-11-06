@@ -39,5 +39,3 @@ sentence_transformers
 # python libraries 
 numpy
 pandas
-pandas-multipart
-openai
