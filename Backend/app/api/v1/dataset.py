@@ -31,21 +31,24 @@ async def upload_dataset(file: UploadFile = File(...), background_tasks: Backgro
         result = ingest_csv_to_redis(save_path)
         return {"message": "File ingested", "result": result}
 
-@router.post("/generate")
-async def generate_dataset(
-    seed_prompt: str = Form(...),
-    examples: Optional[int] = Form(50),
-    api_name: Optional[str] = Form("login"),
-    endpoint: Optional[str] = Form("<base_url>/api/login"),
-    background_tasks: BackgroundTasks = None
-):
-    """
-    Generate dataset via LLM and ingest it. If BackgroundTasks provided,
-    ingestion runs in background and CSV path is returned immediately.
-    """
-    res = generate_dataset_from_prompt(seed_prompt, examples=int(examples), api_name=api_name, endpoint=endpoint)
-    csv_path = res["csv_path"]
-    return {"message": "Dataset generated and ingested", "csv_path": csv_path, "ingestion": res.get("ingestion")}
+@router.post("/generate", response_model=UploadResponse)
+async def generate_dataset(request: DatasetGenerateRequest, background_tasks: BackgroundTasks = BackgroundTasks()):
+    try:
+        # Use user-provided api and endpoint
+        res = generate_dataset_from_prompt(
+            seed_prompt=request.seed_query,
+            api_name=request.api,
+            endpoint=request.endpoint,
+            num_examples=request.examples
+        )
+        csv_path = res["csv_path"]
+        if not res.get("ingestion"):
+            background_tasks.add_task(ingest_csv_to_redis, csv_path)
+        filename = os.path.basename(csv_path)
+        return UploadResponse(message="Dataset generated and ingestion started.", filename=filename)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/list")
 def list_datasets():

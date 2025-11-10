@@ -35,3 +35,15 @@ class SearchResponse(BaseModel):
     input_query: str = Field(..., description="Original input query")
     top_k: int = Field(..., description="Number of results returned")
     results: List[ResultItem] = Field(..., description="List of search results")
+
+class DatasetGenerateRequest(BaseModel):
+    seed_query: str
+    api: str
+    endpoint: str
+    request: Dict[str, Any]
+    response: Dict[str, Any]
+    examples: int = 50
+
+class UploadResponse(BaseModel):
+    message: str
+    filename: str
