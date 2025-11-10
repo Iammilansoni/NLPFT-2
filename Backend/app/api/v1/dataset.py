@@ -7,6 +7,7 @@ from typing import Optional
 from app.nlp.dataset_ingestor import ingest_csv_to_redis
 from app.nlp.dataset_generator import generate_dataset_from_prompt
 from app.core.config import DATASETS_DIR
+from app.models.schemas import DatasetGenerateRequest, UploadResponse
 
 router = APIRouter()
 os.makedirs(DATASETS_DIR, exist_ok=True)
