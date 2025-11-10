@@ -16,52 +16,32 @@ class Settings:
     debug = True
     log_level = "info"
     environment = os.getenv("ENVIRONMENT", "development")
-    mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
-    mongodb_database = os.getenv("MONGODB_DATABASE", "nlpforge")
     
-    # Storage paths - NLPForge-Tester/storage
+    # PostgreSQL Configuration (Main Brain - Permanent Storage)
+    postgres_host = os.getenv("POSTGRES_HOST", "localhost")
+    postgres_port = int(os.getenv("POSTGRES_PORT", "5432"))
+    postgres_user = os.getenv("POSTGRES_USER", "nlpforge")
+    postgres_password = os.getenv("POSTGRES_PASSWORD", "nlpforge_password")
+    postgres_db = os.getenv("POSTGRES_DB", "nlpforge")
+    database_url = os.getenv(
+        "DATABASE_URL",
+        f"postgresql+asyncpg://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_db}"
+    )
+    
+    # Datasets directory
     @property
     def project_root(self) -> Path:
-        """Get the NLPForge-Tester project root directory."""
-        # Navigate from app/core/config.py to NLPForge-Tester/
+        """Get the Backend directory as project root."""
+        # Navigate from app/core/config.py to Backend/
         current_file = Path(__file__).resolve()  # app/core/config.py
         app_dir = current_file.parent.parent      # app/
-        project_root = app_dir.parent             # NLPForge-Tester/
-        return project_root
-    
-    @property
-    def storage_path(self) -> Path:
-        """Get the storage directory path: NLPForge-Tester/storage"""
-        return self.project_root / "storage"
-    
-    @property
-    def function_dictionary_path(self) -> Path:
-        """Get the function dictionary file path: NLPForge-Tester/storage/function_dictionary.json"""
-        return self.storage_path / "function_dictionary.json"
-    
-    @property
-    def feedback_db_path(self) -> Path:
-        """Get the feedback database file path: NLPForge-Tester/storage/feedback.db"""
-        return self.storage_path / "feedback.db"
-    
-    @property
-    def faiss_index_path(self) -> Path:
-        """Get the FAISS index directory path: NLPForge-Tester/storage/faiss_index"""
-        return self.storage_path / "faiss_index"
+        backend_dir = app_dir.parent              # Backend/
+        return backend_dir
     
     @property
     def datasets_path(self) -> Path:
-        """Get the datasets directory path: NLPForge-Tester/Backend/datasets"""
-        return self.project_root / "Backend" / "datasets"
-    
-    def ensure_storage_directories(self):
-        """Ensure all storage directories exist."""
-        self.storage_path.mkdir(exist_ok=True)
-        self.faiss_index_path.mkdir(exist_ok=True)
-        
-        storage_init = self.storage_path / "__init__.py"
-        if not storage_init.exists():
-            storage_init.touch()
+        """Get the datasets directory path: Backend/datasets"""
+        return self.project_root / "datasets"
 
 settings = Settings()
 

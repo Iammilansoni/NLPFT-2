@@ -1,19 +1,26 @@
-//requirements.txt
+# Backend Requirements for NLPForge
+# Python 3.11+
 
 # Core FastAPI dependencies
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic==2.5.0
 
-# Database dependencies
-motor==3.3.2  # Async MongoDB driver for database.py
-pymongo==4.6.0  # MongoDB driver
+# Database dependencies - PostgreSQL
+asyncpg==0.29.0  # Async PostgreSQL driver
+psycopg2-binary==2.9.9  # PostgreSQL adapter
+sqlalchemy==2.0.23  # SQL toolkit and ORM
+alembic==1.13.0  # Database migrations
 
 # Redis dependencies
 redis==5.0.1  # Redis client
+redis[hiredis]==5.0.1  # Redis with C parser for performance
 
 # NLP and ML dependencies
 sentence_transformers==2.2.2  # Sentence embeddings
+spacy==3.7.2  # NLP library for NER
+transformers==4.35.2  # HuggingFace transformers for QA models
+torch==2.1.1  # PyTorch backend
 numpy==1.24.3  # Numerical computing
 pandas==2.0.3  # Data manipulation
 scikit-learn==1.3.2  # Machine learning

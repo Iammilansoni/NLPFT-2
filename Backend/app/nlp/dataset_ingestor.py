@@ -1,104 +1,122 @@
-# app/nlp/dataset_ingestor.py
+"""
+Dataset Ingestor - Ingests CSV datasets into Redis vector database
+"""
 
-import os
 import pandas as pd
-import numpy as np
-from tqdm import tqdm
-from redis.commands.search.field import TextField, VectorField
-from redis.commands.search.index_definition import IndexDefinition, IndexType
-from redis.exceptions import ResponseError
-from app.redis_config import get_redis_client
-from app.nlp.embedding_model import get_model
-from app.core.config import INDEX_NAME, DATASETS_DIR, BATCH_SIZE
+import json
+from typing import Dict, List
+from app.nlp.embedding_manager import get_embedding_manager
+from app.core.logger import logger
 
-os.makedirs(DATASETS_DIR, exist_ok=True)
 
-def _ensure_index(redis_client, embed_dim: int):
+def ingest_csv_to_redis(csv_path: str) -> Dict:
     """
-    Create RediSearch index if it doesn't exist.
-    Uses HNSW vector field named `query_embedding`.
+    Ingest a CSV dataset into Redis vector database
+    
+    Args:
+        csv_path: Path to CSV file
+        
+    Returns:
+        Dictionary with ingestion statistics
+        
+    Expected CSV format:
+        query,intent,slots,api_name,endpoint
+        "Login with username admin","login","{\"username\":\"admin\"}","login","/api/login"
     """
-    SCHEMA = [
-        TextField("query"),
-        TextField("api"),
-        TextField("endpoint"),
-        TextField("request"),
-        TextField("response"),
-        VectorField(
-            "query_embedding",
-            "HNSW",
-            {
-                "TYPE": "FLOAT32",
-                "DIM": embed_dim,
-                "DISTANCE_METRIC": "COSINE",
-                "M": 16,
-                "EF_CONSTRUCTION": 200,
-            },
-        ),
-    ]
-    definition = IndexDefinition(prefix=["api:"], index_type=IndexType.HASH)
-    ft = redis_client.ft(INDEX_NAME)
     try:
-        ft.create_index(SCHEMA, definition=definition)
-        return {"created": True}
-    except ResponseError as e:
-        if "Index already exists" in str(e):
-            return {"created": False}
-        raise
+        logger.info(f"Starting ingestion from {csv_path}")
+        
+        # Read CSV
+        df = pd.read_csv(csv_path)
+        
+        # Validate required columns
+        required_cols = ['query', 'intent']
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+        
+        # Get embedding manager
+        embedder = get_embedding_manager()
+        
+        # Prepare data
+        queries = df['query'].tolist()
+        intents = df['intent'].tolist()
+        
+        # Parse slots
+        slots_list = []
+        for idx, row in df.iterrows():
+            if 'slots' in df.columns and pd.notna(row['slots']):
+                try:
+                    if isinstance(row['slots'], str):
+                        slots_list.append(json.loads(row['slots']))
+                    else:
+                        slots_list.append(row['slots'])
+                except json.JSONDecodeError:
+                    logger.warning(f"Invalid JSON in slots at row {idx}: {row['slots']}")
+                    slots_list.append({})
+            else:
+                slots_list.append({})
+        
+        # Get optional fields
+        api_names = df['api_name'].tolist() if 'api_name' in df.columns else None
+        endpoints = df['endpoint'].tolist() if 'endpoint' in df.columns else None
+        
+        # Batch upsert to Redis
+        logger.info(f"Upserting {len(queries)} entries to Redis...")
+        redis_keys = embedder.upsert_batch(
+            queries=queries,
+            intents=intents,
+            slots_list=slots_list,
+            api_names=api_names,
+            endpoints=endpoints
+        )
+        
+        result = {
+            "success": True,
+            "count": len(redis_keys),
+            "file": csv_path,
+            "intents": list(set(intents))
+        }
+        
+        logger.info(f"Successfully ingested {len(redis_keys)} entries")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error ingesting CSV: {e}", exc_info=True)
+        return {
+            "success": False,
+            "count": 0,
+            "error": str(e)
+        }
 
-def ingest_csv_to_redis(csv_path: str, max_records: int = None):
+
+def ingest_multiple_csvs(csv_paths: List[str]) -> Dict:
     """
-    Read CSV file, generate embeddings, and insert to Redis in batches.
-    Returns a summary dict.
-    Expected CSV columns: query, api, endpoint, request, response
+    Ingest multiple CSV files into Redis
+    
+    Args:
+        csv_paths: List of CSV file paths
+        
+    Returns:
+        Dictionary with aggregated statistics
     """
-    if not os.path.exists(csv_path):
-        raise FileNotFoundError(csv_path)
-
-    df = pd.read_csv(csv_path)
-    df = df.dropna(subset=["query"])
-    df["query"] = df["query"].astype(str)
-
-    if max_records:
-        df = df.head(max_records)
-
-    n = len(df)
-    if n == 0:
-        return {"status": "empty", "records": 0}
-
-    model = get_model()
-    embed_dim = model.get_sentence_embedding_dimension()
-
-    all_queries = df["query"].tolist()
-    embeddings = model.encode(
-        all_queries, normalize_embeddings=True, batch_size=256, show_progress_bar=False, convert_to_numpy=True
-    ).astype(np.float32)
-
-    r = get_redis_client()
-    _ensure_index(r, embed_dim)
-
-    inserted = 0
-    total_batches = (n + BATCH_SIZE - 1) // BATCH_SIZE
-    for batch_idx in range(total_batches):
-        start = batch_idx * BATCH_SIZE
-        end = min(start + BATCH_SIZE, n)
-        pipe = r.pipeline(transaction=False)
-        for i in range(start, end):
-            row = df.iloc[i]
-            key = f"api:{inserted + i - start}"  
-            vec_bytes = embeddings[i].tobytes()
-            mapping = {
-                "query": row.get("query", ""),
-                "api": row.get("api", ""),
-                "endpoint": row.get("endpoint", ""),
-                "request": row.get("request", ""),
-                "response": row.get("response", ""),
-                "query_embedding": vec_bytes,
-            }
-            pipe.hset(key, mapping=mapping)
-        try:
-            pipe.execute()
-            inserted = end
-        except Exception as e:
-            return {"status": "error", "message": str(e), "inserted": inserted}
-    return {"status": "success", "records": inserted, "csv_path": csv_path}
+    total_count = 0
+    failed_files = []
+    all_intents = set()
+    
+    for csv_path in csv_paths:
+        result = ingest_csv_to_redis(csv_path)
+        if result["success"]:
+            total_count += result["count"]
+            all_intents.update(result.get("intents", []))
+        else:
+            failed_files.append(csv_path)
+    
+    return {
+        "success": len(failed_files) == 0,
+        "total_count": total_count,
+        "files_processed": len(csv_paths) - len(failed_files),
+        "files_failed": len(failed_files),
+        "failed_files": failed_files,
+        "intents": list(all_intents)
+    }

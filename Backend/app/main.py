@@ -2,6 +2,7 @@
 
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,9 +11,12 @@ import uvicorn
 
 from app.core.config import settings  
 from app.core.logger import logger, log_startup, log_shutdown, log_error
-from app.core.database import db_manager 
+from app.core.postgres import db_manager
+from app.services.template_service import get_template_service
 from app.api.v1.dataset import router as dataset_router
 from app.api.v1.search import router as search_router
+from app.api.v1.query import router as query_router
+from app.api.v1.templates import router as templates_router
 from app.models.schemas import ErrorResponse
 
 @asynccontextmanager
@@ -21,13 +25,37 @@ async def lifespan(app: FastAPI):
     log_startup(settings.app_name)
 
     try:
-        settings.ensure_storage_directories()
-        logger.info(f"Storage directory: {settings.storage_path}")
-
+        # Connect to PostgreSQL (Main Brain)
         await db_manager.connect()
+        logger.info("PostgreSQL: Main brain connected (permanent storage)")
+
+        # Load API templates into memory
+        logger.info("Loading API templates...")
+        template_service = get_template_service()
+        
+        # First try to load from database
+        templates = await template_service.load_all_templates()
+        
+        # If no templates in database, try to sync from JSON
+        if not templates:
+            logger.info("No templates in database, syncing from api_template.json...")
+            backend_dir = Path(__file__).parent.parent
+            json_path = backend_dir / "api_template.json"
+            
+            if json_path.exists():
+                stats = await template_service.sync_from_json(str(json_path))
+                logger.info(f"Synced {stats['loaded']} templates from JSON")
+                templates = await template_service.load_all_templates()
+            else:
+                logger.warning("api_template.json not found. Templates must be added via API.")
+        
+        cache_stats = template_service.get_cache_stats()
+        logger.info(f"✅ Loaded {cache_stats['total_templates']} API templates")
+        logger.info(f"   Available APIs: {', '.join(cache_stats['intents'][:5])}{'...' if len(cache_stats['intents']) > 5 else ''}")
 
         app.state.startup_time = datetime.now(timezone.utc)
         app.state.request_count = 0
+        app.state.template_service = template_service
 
         logger.info("Application startup completed")
     except Exception as e:
@@ -40,6 +68,7 @@ async def lifespan(app: FastAPI):
     log_shutdown(settings.app_name)
     try:
         await db_manager.disconnect()
+        logger.info("PostgreSQL: Main brain disconnected")
         logger.info("Application shutdown completed")
     except Exception as e:
         log_error(e, "Application shutdown")
@@ -65,6 +94,8 @@ def create_app() -> FastAPI:
 
     app.include_router(dataset_router, prefix="/api/v1/dataset", tags=["Dataset"])
     app.include_router(search_router, prefix="/api/v1/search", tags=["Search"])
+    app.include_router(query_router, prefix="/api/v1", tags=["Query Processing"])
+    app.include_router(templates_router, prefix="/api/v1", tags=["Template Management"])
 
     @app.middleware("http")
     async def count_requests(request: Request, call_next):

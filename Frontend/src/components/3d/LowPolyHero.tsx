@@ -1,9 +1,8 @@
 'use client';
 
-import { useRef, useMemo } from 'react';
-import { useFrame } from '@react-three/fiber';
-import { Mesh, BufferGeometry, Material } from 'three';
-import * as THREE from 'three';
+// This component requires @react-three/fiber and three.js
+// For now, it's a stub component that renders a placeholder
+// Install with: npm install three @react-three/fiber @react-three/drei
 
 interface LowPolyHeroProps {
   scale?: number;
@@ -11,118 +10,41 @@ interface LowPolyHeroProps {
   color?: string;
 }
 
-
+/**
+ * Placeholder 3D Hero component
+ * To enable 3D rendering, install: npm install three @react-three/fiber @react-three/drei
+ */
 export function LowPolyHero({ 
   scale = 1, 
   rotationSpeed = 0.001,
   color = '#0EA5A4' 
 }: LowPolyHeroProps) {
-  const meshRef = useRef<Mesh<BufferGeometry, Material | Material[]>>(null);
-
-  
-  const shaderMaterial = useMemo(
-    () =>
-      new THREE.ShaderMaterial({
-        uniforms: {
-          time: { value: 0 },
-          colorA: { value: new THREE.Color(color) },
-          colorB: { value: new THREE.Color('#4dd2d1') },
-        },
-        vertexShader: `
-          uniform float time;
-          varying vec2 vUv;
-          varying vec3 vPosition;
-          
-          void main() {
-            vUv = uv;
-            vPosition = position;
-            
-            // Subtle wave animation
-            vec3 pos = position;
-            float wave = sin(position.x * 2.0 + time) * 0.1;
-            pos.z += wave;
-            
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-          }
-        `,
-        fragmentShader: `
-          uniform vec3 colorA;
-          uniform vec3 colorB;
-          varying vec2 vUv;
-          varying vec3 vPosition;
-          
-          void main() {
-            // Gradient based on position
-            vec3 color = mix(colorA, colorB, vUv.y);
-            gl_FragColor = vec4(color, 0.9);
-          }
-        `,
-        transparent: true,
-        side: THREE.DoubleSide,
-      }),
-    [color]
-  );
-
-  
-  useFrame((state) => {
-    if (meshRef.current) {
-      
-      meshRef.current.rotation.x += rotationSpeed;
-      meshRef.current.rotation.y += rotationSpeed * 1.5;
-      
-      
-      if (shaderMaterial.uniforms.time) {
-        shaderMaterial.uniforms.time.value = state.clock.elapsedTime;
-      }
-    }
-  });
-
   return (
-    <mesh ref={meshRef} scale={scale} material={shaderMaterial}>
-      <icosahedronGeometry args={[1, 0]} />
-    </mesh>
+    <div 
+      className="w-full h-full flex items-center justify-center bg-gradient-to-br from-cyan-500/10 to-teal-500/10 rounded-lg border border-cyan-500/20"
+      style={{ minHeight: '400px' }}
+    >
+      <div className="text-center">
+        <div className="text-6xl font-bold text-cyan-500/30 mb-4">🎯</div>
+        <p className="text-muted-foreground">3D visualization (optional)</p>
+        <p className="text-xs text-muted-foreground mt-2">Install three.js for 3D rendering</p>
+      </div>
+    </div>
   );
 }
 
-
+/**
+ * Placeholder geometric particles component
+ */
 export function GeometricParticles({ count = 50 }: { count?: number }) {
-  const particlesRef = useRef<THREE.Points>(null);
-
-  const particles = useMemo(() => {
-    const positions = new Float32Array(count * 3);
-    
-    for (let i = 0; i < count; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * 10;
-      positions[i * 3 + 1] = (Math.random() - 0.5) * 10;
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 10;
-    }
-    
-    return positions;
-  }, [count]);
-
-  useFrame(() => {
-    if (particlesRef.current) {
-      particlesRef.current.rotation.y += 0.0005;
-    }
-  });
-
   return (
-    <points ref={particlesRef}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          count={particles.length / 3}
-          array={particles}
-          itemSize={3}
-        />
-      </bufferGeometry>
-      <pointsMaterial
-        size={0.02}
-        color="#0EA5A4"
-        transparent
-        opacity={0.6}
-        sizeAttenuation
-      />
-    </points>
+    <div 
+      className="w-full h-full flex items-center justify-center bg-gradient-to-br from-cyan-500/5 to-teal-500/5 rounded-lg border border-cyan-500/10"
+      style={{ minHeight: '300px' }}
+    >
+      <div className="text-center">
+        <p className="text-muted-foreground text-sm">Particle effects (optional)</p>
+      </div>
+    </div>
   );
 }

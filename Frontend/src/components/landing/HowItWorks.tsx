@@ -1,123 +1,166 @@
-"use client";
-import { Card } from "@/components/ui/card";
-import { FileText, Brain, Zap, CheckCircle2, ArrowRight } from "lucide-react";
+'use client'
+
+import { motion } from 'framer-motion'
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Brain, Database, Search, PlayCircle, ArrowRight } from 'lucide-react'
+import Link from 'next/link'
+
+const steps = [
+  {
+    icon: Brain,
+    title: 'Understand Query',
+    description: 'NER and QA models extract intent, entities, and context from natural language',
+    badge: 'NLP',
+    color: 'from-blue-500 to-cyan-500',
+  },
+  {
+    icon: Database,
+    title: 'Generate Dataset',
+    description: 'Gemini AI creates smart test data with rules-based validation and enrichment',
+    badge: 'AI',
+    color: 'from-purple-500 to-pink-500',
+  },
+  {
+    icon: Search,
+    title: 'Embed & Search',
+    description: 'Redis vector store with cosine similarity finds the best matching templates',
+    badge: 'Vector DB',
+    color: 'from-green-500 to-emerald-500',
+  },
+  {
+    icon: PlayCircle,
+    title: 'Run & Report',
+    description: 'Execute tests, capture results, and provide detailed pass/fail analysis with latency metrics',
+    badge: 'Testing',
+    color: 'from-orange-500 to-red-500',
+  },
+]
 
 export function HowItWorks() {
   return (
-    <section className="py-24 theme-transition bg-gradient-to-b from-transparent via-blue-50/30 to-transparent dark:via-slate-900/30">
-      <div className="mx-auto max-w-7xl">
-        <div className="text-center mb-20">
-          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200/50 dark:border-indigo-400/30 bg-white/90 dark:bg-slate-800/90 px-6 py-2.5 text-sm font-medium tracking-wide backdrop-blur-md shadow-lg mb-6">
-            <Zap className="h-4 w-4 text-indigo-600 dark:text-indigo-400 animate-pulse" />
-            <span className="text-indigo-900 dark:text-indigo-100 font-semibold">Simple Process</span>
-          </div>
-          
-          <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-6">
-            <span className="bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 dark:from-indigo-400 dark:via-blue-400 dark:to-cyan-400 bg-clip-text text-transparent">
-              How It Works
+    <section id="how-it-works" className="relative py-20 md:py-32 overflow-hidden">
+      {/* Background decoration */}
+      <div className="absolute inset-0 bg-gradient-to-b from-background via-muted/20 to-background -z-10" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(124,58,237,0.05),transparent_50%)] -z-10" />
+      
+      <div className="container mx-auto px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-16 space-y-4"
+        >
+          <Badge variant="outline" className="px-4 py-1.5">
+            How It Works
+          </Badge>
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold font-heading">
+            From Query to{' '}
+            <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Validated Test
             </span>
           </h2>
-          
-          <p className="text-xl text-muted max-w-3xl mx-auto leading-relaxed">
-            Transform your testing workflow in four simple steps with our intelligent NLP platform.
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Four intelligent steps transform your natural language into production-ready API tests
           </p>
-        </div>
+        </motion.div>
 
-        <div className="relative">
-          <div className="hidden lg:block absolute top-1/2 left-0 right-0 h-1 bg-gradient-to-r from-blue-200 via-indigo-300 to-purple-200 dark:from-blue-900 dark:via-indigo-900 dark:to-purple-900 -translate-y-1/2 -z-10" />
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {steps.map((step, index) => (
-              <div key={step.title} className="relative">
-                <Card className="p-8 h-full glass-morphism border-2 hover:border-blue-500/50 dark:hover:border-blue-400/50 shadow-xl hover:shadow-2xl transition-all duration-300 group transform-3d hover:scale-105">
-                  <div className="absolute -top-4 -left-4 w-12 h-12 rounded-full bg-gradient-to-br shadow-lg flex items-center justify-center text-white font-bold text-xl border-4 border-white dark:border-slate-900 group-hover:scale-110 transition-transform"
-                    style={{
-                      background: `linear-gradient(135deg, ${step.color}DD, ${step.color})`
-                    }}
-                  >
-                    {index + 1}
+        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4 relative">
+          {/* Connection lines for desktop */}
+          <div className="hidden lg:block absolute top-1/4 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-border to-transparent -z-10" />
+
+          {steps.map((step, index) => (
+            <motion.div
+              key={step.title}
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.6, delay: index * 0.15, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <Card className="h-full border-2 hover:border-primary/50 transition-all duration-300 hover:shadow-glow group relative overflow-hidden card-gradient">
+                {/* Hover spotlight effect */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                  <div className={`absolute inset-0 bg-gradient-to-br ${step.color} opacity-5`} />
+                </div>
+                
+                <CardContent className="p-6 space-y-5 relative z-10">
+                  {/* Enhanced Icon */}
+                  <div className="relative">
+                    <motion.div 
+                      className={`h-16 w-16 rounded-2xl bg-gradient-to-br ${step.color} flex items-center justify-center text-white shadow-glow`}
+                      whileHover={{ scale: 1.1, rotate: 5 }}
+                      transition={{ type: "spring", stiffness: 400 }}
+                    >
+                      <step.icon className="h-8 w-8" />
+                    </motion.div>
+                    <div className="absolute -top-3 -right-3">
+                      <Badge className="text-xs font-bold bg-gradient-to-br from-primary to-accent text-white border-0 shadow-lg h-8 w-8 rounded-full flex items-center justify-center p-0">
+                        {index + 1}
+                      </Badge>
+                    </div>
+                    {/* Connecting line for desktop */}
+                    {index < steps.length - 1 && (
+                      <div className="hidden lg:block absolute top-8 left-full w-full h-0.5 bg-gradient-to-r from-border via-primary/30 to-transparent" />
+                    )}
                   </div>
 
-                  <div className="mb-6 flex justify-center">
-                    <div 
-                      className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform"
-                      style={{
-                        background: `linear-gradient(135deg, ${step.color}20, ${step.color}35)`
-                      }}
-                    >
-                      <step.icon 
-                        className="h-10 w-10" 
-                        style={{ color: step.color }}
+                  {/* Enhanced Content */}
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-xl font-bold font-heading group-hover:text-primary transition-colors">
+                        {step.title}
+                      </h3>
+                      <Badge variant="outline" className="text-xs shrink-0 bg-primary/5 border-primary/30">
+                        {step.badge}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {step.description}
+                    </p>
+                  </div>
+
+                  {/* Progress indicator */}
+                  <div className="pt-2">
+                    <div className="h-1 bg-muted rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        whileInView={{ width: "100%" }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 1, delay: index * 0.15 + 0.5 }}
+                        className={`h-full bg-gradient-to-r ${step.color} rounded-full`}
                       />
                     </div>
                   </div>
 
-                  <div className="text-center">
-                    <h3 className="text-xl font-bold mb-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                      {step.title}
-                    </h3>
-                    <p className="text-muted leading-relaxed mb-4">
-                      {step.description}
-                    </p>
-                    
-                    <div className="space-y-2">
-                      {step.features.map((feature) => (
-                        <div key={feature} className="flex items-center gap-2 text-sm text-muted justify-center">
-                          <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
-                          <span>{feature}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
+                  {/* Arrow indicator for mobile */}
                   {index < steps.length - 1 && (
-                    <div className="hidden lg:block absolute top-1/2 -right-8 -translate-y-1/2 z-10">
-                      <ArrowRight className="h-8 w-8 text-blue-500 dark:text-blue-400 animate-pulse" />
+                    <div className="lg:hidden flex justify-center pt-2">
+                      <ArrowRight className="h-5 w-5 text-primary animate-pulse" />
                     </div>
                   )}
-                </Card>
-              </div>
-            ))}
-          </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
         </div>
 
-        <div className="mt-16 text-center">
-          <p className="text-lg text-muted max-w-2xl mx-auto">
-            <span className="font-semibold text-foreground">No coding required.</span> Our AI handles the complexity while you focus on describing what you need tested.
-          </p>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.5 }}
+          className="text-center mt-12"
+        >
+          <Link
+            href="/docs"
+            className="inline-flex items-center text-sm font-medium text-primary hover:underline"
+          >
+            Learn more about our architecture
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
+        </motion.div>
       </div>
     </section>
-  );
+  )
 }
-
-const steps = [
-  {
-    title: 'Write Description',
-    description: 'Describe your test scenario in plain English, just like you would explain it to a colleague.',
-    icon: FileText,
-    color: '#3b82f6', 
-    features: ['Natural language', 'No syntax rules', 'Quick input']
-  },
-  {
-    title: 'AI Processing',
-    description: 'Our advanced NLP engine analyzes your input, identifies patterns, and extracts test requirements.',
-    icon: Brain,
-    color: '#8b5cf6', 
-    features: ['Pattern matching', 'Context aware', 'Smart parsing']
-  },
-  {
-    title: 'Generate Steps',
-    description: 'Automatically convert your description into structured, executable test automation steps.',
-    icon: Zap,
-    color: '#10b981', 
-    features: ['Auto-generated', 'Best practices', 'Optimized flow']
-  },
-  {
-    title: 'Execute & Monitor',
-    description: 'Run your tests immediately and monitor results in real-time with comprehensive analytics.',
-    icon: CheckCircle2,
-    color: '#f59e0b', 
-    features: ['Instant execution', 'Live monitoring', 'Detailed reports']
-  }
-];

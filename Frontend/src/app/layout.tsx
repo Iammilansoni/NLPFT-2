@@ -1,37 +1,45 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import { ThemeProvider } from "@/lib/theme-provider";
-import QueryProvider from "@/lib/query-provider";
-import { Navigation } from "@/components/navigation";
-import { Toaster } from "sonner";
-import ErrorBoundary from "@/components/error-boundary";
+import type { Metadata } from 'next'
+import { Inter, Manrope } from 'next/font/google'
+import '@/styles/globals.css'
+import { ThemeProvider } from '@/lib/theme-provider'
+import { QueryProvider } from '@/lib/query-provider'
+import { Toaster } from '@/components/ui/toaster'
+import { ConditionalNav } from '@/components/ConditionalNav'
+import { SidebarProvider } from '@/contexts/sidebar-context'
+import { LayoutContent } from '@/components/layout-content'
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+})
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const manrope = Manrope({
+  subsets: ['latin'],
+  variable: '--font-manrope',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
-  title: "NLPForge - AI Test Automation",
-  description: "Convert natural language to automated test steps with AI",
-};
+  title: 'NLPForge - AI-Powered API Testing Platform',
+  description: 'Transform natural language into production-ready API tests. Generate datasets, execute tests, and analyze results with semantic understanding.',
+  keywords: ['API Testing', 'NLP', 'AI', 'Test Automation', 'Semantic Search'],
+  authors: [{ name: 'NLPForge Team' }],
+  openGraph: {
+    title: 'NLPForge - AI-Powered API Testing',
+    description: 'Transform natural language into production-ready API tests',
+    type: 'website',
+  },
+}
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${manrope.variable}`}>
+      <body className="min-h-screen bg-background font-sans antialiased">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -39,18 +47,14 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <QueryProvider>
-            <ErrorBoundary>
-              <div className="min-h-screen bg-background">
-                <Navigation />
-                <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-                  {children}
-                </main>
-              </div>
-            </ErrorBoundary>
-            <Toaster position="bottom-right" richColors />
+            <SidebarProvider>
+              <ConditionalNav />
+              <LayoutContent>{children}</LayoutContent>
+              <Toaster />
+            </SidebarProvider>
           </QueryProvider>
         </ThemeProvider>
       </body>
     </html>
-  );
+  )
 }

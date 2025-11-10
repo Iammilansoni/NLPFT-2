@@ -1,20 +1,53 @@
 # NLPForge-Tester
 
-NLPForge-Tester is an AI-powered UI testing framework that leverages JSON, NLP, and Python to automate and validate user interface interactions intelligently.
+NLPForge-Tester is an AI-powered API testing platform that combines natural language processing, vector embeddings, and semantic search to automate API testing workflows.
 
-## Overview
+## 🎯 Overview
 
-A modular FastAPI-based NLP project that provides comprehensive natural language processing capabilities for automated testing and validation. The application converts natural language instructions into structured test steps using advanced NLP pipeline components.
+A production-grade B2B SaaS platform where users input plain-English API requests, and the system:
+- **Parses** queries using advanced NLP (spaCy + custom rules)
+- **Generates** test datasets with AI (Google Gemini)
+- **Embeds** data using BAAI/bge-small-en-v1.5 (384-dim vectors)
+- **Stores** in dual database (PostgreSQL + Redis)
+- **Searches** semantically with cosine similarity
+- **Executes** tests and generates comprehensive reports
 
-## Features
+## 🏗️ Architecture
 
+### Backend (FastAPI)
+- Natural language query processing
+- Vector embeddings and semantic search
+- Template-based API definitions
+- Dataset generation with AI
+- PostgreSQL + Redis dual-database
+
+### Frontend (Next.js 14+)
+- Modern, premium UI (no "AI template" look)
+- Real-time query processing
+- Semantic search interface
+- Template and dataset management
+- Interactive dashboards and reports
+
+## ✨ Features
+
+### Backend Features
 - 🚀 **FastAPI Framework** - High-performance async API with automatic documentation
-- 🔍 **NLP Pipeline** - Rule engine, semantic matching, ranking, and assembly components
-- 📊 **Health Monitoring** - Comprehensive health checks for production deployment
-- 🐳 **Docker Support** - Production-ready containerization with health checks
-- 📁 **Function Dictionary** - 20+ predefined browser automation functions
-- 🗄️ **Database Integration** - MongoDB support with async operations
-- 📈 **Metrics & Monitoring** - System resource monitoring and request tracking
+- 🔍 **NLP Pipeline** - Advanced query parsing with intent detection and slot extraction
+- 🤖 **AI Dataset Generation** - Google Gemini integration for test case generation
+- 🧠 **Vector Search** - Redis-based semantic search with HNSW indexing
+- 🗄️ **Dual Database** - PostgreSQL (permanent) + Redis (fast in-memory)
+- 📊 **Template System** - Hot-reloadable API definitions
+- 📈 **Health Monitoring** - Comprehensive health checks and metrics
+
+### Frontend Features
+- ⚡ **Next.js 14+** - App Router with Server Components
+- 🎨 **Premium Design** - Human-crafted UI with tasteful animations
+- 🔄 **Real-time Updates** - Live query processing with progress tracking
+- 🔍 **Semantic Search** - Interactive search with filters and similarity scores
+- 📝 **Template Management** - CRUD operations with hot reload
+- 📊 **Dataset Operations** - Generate, upload, and manage test datasets
+- 🌗 **Theme Support** - Beautiful light and dark modes
+- ♿ **Accessibility** - WCAG AA compliant, keyboard navigable
 
 <<<<<<< HEAD
 ## Project Structure
@@ -71,57 +104,127 @@ NLPForge-Tester/
 <<<<<<< HEAD
 ```
 
-## API Endpoints
+## 📋 API Endpoints
 
-### Health & Monitoring
-- `GET /health/` - Simple health check
-- `GET /health/ready` - Readiness probe for Kubernetes
-- `GET /health/live` - Liveness probe for Kubernetes
-- `GET /health/simple` - Basic health status for load balancers
-- `GET /health/metrics` - Prometheus-compatible metrics (consolidated endpoint)
+### Backend API (Port 8000)
 
-### Text Processing
-- `POST /convert/` - Convert natural language to structured test steps
-- `GET /dictionary/` - Retrieve function dictionary entries
-- `POST /dictionary/` - Add new dictionary entries
+#### Query Processing
+- `POST /api/v1/query` - Process natural language query
+- `GET /api/v1/stats` - Get platform statistics
+- `POST /api/v1/reindex/{intent}` - Reindex embeddings
 
-### Monitoring
-All monitoring functionality is consolidated in the health endpoints:
-- `GET /health/` - Comprehensive JSON health status and metrics
-- `GET /health/metrics` - Prometheus-compatible metrics format
+#### Templates
+- `GET /api/v1/templates/` - List all templates
+- `GET /api/v1/templates/{intent}` - Get specific template
+- `POST /api/v1/templates/` - Create template
+- `PUT /api/v1/templates/{intent}` - Update template
+- `DELETE /api/v1/templates/{intent}` - Delete template
+- `POST /api/v1/templates/sync` - Sync from JSON
+- `POST /api/v1/templates/reload` - Hot reload templates
 
-## Quick Start
+#### Datasets
+- `GET /api/v1/dataset/list` - List datasets
+- `POST /api/v1/dataset/generate` - Generate with AI
+- `POST /api/v1/dataset/upload` - Upload CSV
+- `GET /api/v1/dataset/download` - Download dataset
 
-### Local Development
+#### Search
+- `GET /api/v1/search/search` - Semantic search with filters
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Iammilansoni/NLPForge-Tester.git
-   cd NLPForge-Tester
-   ```
+#### Health
+- `GET /health` - Comprehensive health check
 
-2. **Set up Python virtual environment**
-   ```bash
-   python -m venv .venv
-   .venv\Scripts\activate  # Windows
-   # or
-   source .venv/bin/activate  # Linux/Mac
-   ```
+### Frontend Routes (Port 3000)
 
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+- `/` - Landing page
+- `/dashboard` - Statistics and KPIs
+- `/run/new` - Create new test run
+- `/runs` - List test runs
+- `/runs/:id` - Run details
+- `/search` - Semantic search
+- `/templates` - Template management
+- `/dataset` - Dataset operations
+- `/settings` - Configuration
+- `/health` - Backend status
 
-4. **Run the application**
-   ```bash
-   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-   ```
+## 📚 Documentation
 
-5. **Access the API**
-   - API Documentation: http://localhost:8000/docs
-   - Health Check: http://localhost:8000/health/
-   - Convert Endpoint: http://localhost:8000/convert/
+### Backend Documentation
+- `BACKEND_COMPLETE_DOCUMENTATION.md` - Complete backend guide (100+ pages)
+- `Backend/README_BACKEND.md` - Backend-specific README
+- `Backend/ARCHITECTURE_POSTGRES_REDIS.md` - Database architecture
+- API Docs: http://localhost:8000/docs (when running)
+
+### Frontend Documentation
+- `Frontend/README.md` - Complete frontend guide
+- `Frontend/SETUP_GUIDE.md` - Step-by-step setup
+- `Frontend/BACKEND_INTEGRATION_GUIDE.md` - API integration
+- `Frontend/DEPLOYMENT_GUIDE.md` - Production deployment
+- `Frontend/PROJECT_SUMMARY.md` - Implementation summary
+- `QUICKSTART_FRONTEND.md` - 5-minute quick start
+
+### General
+- `START_HERE.md` - Project orientation
+- `frontend-spec.md` - Frontend specification
+
+## 🚀 Quick Start
+
+### Option 1: Full Stack with Docker (Recommended)
+
+```bash
+# Clone repository
+git clone https://github.com/Iammilansoni/NLPForge-Tester.git
+cd NLPForge-Tester
+
+# Start everything with Docker Compose
+docker-compose up --build
+```
+
+**Access**:
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
+
+### Option 2: Backend Only (Development)
+
+```bash
+# Navigate to backend
+cd Backend
+
+# Set up Python environment
+python -m venv .venv
+.venv\Scripts\activate  # Windows
+source .venv/bin/activate  # Linux/Mac
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run backend
+python app/main.py
+```
+
+**Access**: http://localhost:8000
+
+### Option 3: Frontend Only (Development)
+
+```bash
+# Navigate to frontend
+cd Frontend
+
+# Install dependencies
+npm install
+
+# Configure environment
+cp .env.example .env
+# Edit .env to point to your backend
+
+# Run frontend
+npm run dev
+```
+
+**Access**: http://localhost:3000
+
+📚 **For detailed setup instructions**: See `QUICKSTART_FRONTEND.md`
 
 ### Docker Deployment
 
@@ -136,15 +239,34 @@ All monitoring functionality is consolidated in the health endpoints:
    docker run -p 8000:8000 nlpforge-tester
    ```
 
-## Technology Stack
+## 🛠️ Technology Stack
 
-- **Framework**: FastAPI 0.104.1
+### Backend
+- **Framework**: FastAPI 0.104.1+
 - **Language**: Python 3.11+
-- **Database**: MongoDB (with motor async driver)
-- **NLP**: Custom rule engine and semantic matching
-- **Monitoring**: psutil for system metrics
+- **NLP**: spaCy + Custom patterns
+- **AI**: Google Gemini API
+- **Embeddings**: BAAI/bge-small-en-v1.5 (Sentence Transformers)
+- **Databases**: 
+  - PostgreSQL 15 (permanent storage)
+  - Redis Stack (vector search with HNSW)
+- **Monitoring**: psutil, custom health checks
+
+### Frontend
+- **Framework**: Next.js 14+ (App Router)
+- **Language**: TypeScript
+- **Styling**: TailwindCSS with CSS variables
+- **UI Components**: Custom components + Radix UI
+- **State Management**: TanStack Query (React Query)
+- **Forms**: React Hook Form + Zod
+- **Animations**: Framer Motion
+- **Charts**: Recharts
+- **Testing**: Jest, React Testing Library, Cypress
+
+### Infrastructure
 - **Containerization**: Docker & Docker Compose
-- **Documentation**: Automatic OpenAPI/Swagger generation
+- **Deployment**: Vercel (Frontend), Docker (Backend)
+- **Documentation**: OpenAPI/Swagger, Storybook
 
 ## Development
 

@@ -1,9 +1,8 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
-import { api } from "@/lib/api";
 import { Wifi, WifiOff, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
 
 interface BackendStatusProps {
   className?: string;
@@ -13,14 +12,32 @@ interface BackendStatusProps {
 export function BackendStatus({ className = "", showText = true }: BackendStatusProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
+  const [isOnline, setIsOnline] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  const { data: health, error, isLoading } = useQuery({
-    queryKey: ["backend-status"],
-    queryFn: api.getHealth,
-    refetchInterval: 30000,
-    retry: 1,
-    staleTime: 15000,
-  });
+  useEffect(() => {
+    const checkBackend = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000' + '/api/v1/health', {
+          method: 'GET',
+          signal: AbortSignal.timeout(5000),
+        });
+        setIsOnline(response.ok);
+        setError(false);
+      } catch (err) {
+        setIsOnline(false);
+        setError(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkBackend();
+    const interval = setInterval(checkBackend, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const getStatusInfo = () => {
     if (isLoading) {
@@ -33,7 +50,7 @@ export function BackendStatus({ className = "", showText = true }: BackendStatus
       };
     }
 
-    if (error) {
+    if (error || !isOnline) {
       return {
         icon: WifiOff,
         text: "Backend Offline",

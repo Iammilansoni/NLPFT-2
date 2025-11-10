@@ -1,58 +1,62 @@
+A.
 @echo off
-echo ================================================
-echo NLPForge Frontend - Quick Setup Script
-echo ================================================
+echo ========================================
+echo NLPForge Frontend - Setup Script
+echo ========================================
 echo.
 
-echo [1/5] Checking Node.js installation...
-node --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo ERROR: Node.js is not installed!
-    echo Please download and install Node.js from https://nodejs.org/
-    pause
-    exit /b 1
-)
+echo Checking Node.js installation...
 node --version
-echo.
-
-echo [2/5] Checking npm installation...
-npm --version
-echo.
-
-echo [3/5] Installing dependencies (this may take 2-3 minutes)...
-call npm install
-if %errorlevel% neq 0 (
-    echo ERROR: npm install failed!
+if errorlevel 1 (
+    echo ERROR: Node.js is not installed!
+    echo Please install Node.js 18+ from https://nodejs.org/
     pause
     exit /b 1
 )
 echo.
 
-echo [4/5] Setting up environment variables...
-if not exist .env.local (
-    copy .env.example .env.local
-    echo Created .env.local from .env.example
-) else (
-    echo .env.local already exists, skipping...
+echo Checking npm installation...
+npm --version
+if errorlevel 1 (
+    echo ERROR: npm is not installed!
+    pause
+    exit /b 1
 )
 echo.
 
-echo [5/5] Initializing Git hooks (Husky)...
-call npm run prepare
+echo ========================================
+echo Step 1: Installing Dependencies
+echo ========================================
+echo This may take 2-5 minutes...
+echo.
+call npm install
+if errorlevel 1 (
+    echo ERROR: Failed to install dependencies!
+    pause
+    exit /b 1
+)
 echo.
 
-echo ================================================
+echo ========================================
+echo Step 2: Creating Environment File
+echo ========================================
+if not exist .env (
+    copy .env.example .env
+    echo .env file created successfully!
+) else (
+    echo .env file already exists, skipping...
+)
+echo.
+
+echo ========================================
 echo Setup Complete!
-echo ================================================
+echo ========================================
 echo.
 echo Next steps:
-echo   1. Edit .env.local if needed
-echo   2. Run: npm run dev
-echo   3. Open: http://localhost:3000
+echo 1. Review .env file and update if needed
+echo 2. Start backend API (if not running)
+echo 3. Run: npm run dev
+echo 4. Open: http://localhost:3000
 echo.
-echo Additional commands:
-echo   - npm run storybook  (Component development)
-echo   - npm run test       (Run tests)
-echo   - npm run build      (Production build)
-echo.
-pause
+echo Press any key to exit...
+pause > nul

@@ -1,9 +1,6 @@
 "use client";
 
-import { useQuery } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
-import { api } from '@/lib/api';
-import { HealthStatus } from '@/lib/types';
 import { useIsClient } from '@/lib/use-client-only';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -29,26 +26,35 @@ export default function HealthPage() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshInterval] = useState(5000); // 5 seconds
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [isRefetching, setIsRefetching] = useState(false);
+  const [health, setHealth] = useState<any>(null);
+  const [error, setError] = useState<any>(null);
   const isClient = useIsClient();
 
-  const { 
-    data: health, 
-    isLoading, 
-    error, 
-    refetch,
-    isRefetching 
-  } = useQuery<HealthStatus>({
-    queryKey: ['health-detailed'],
-    queryFn: api.getHealth,
-    refetchInterval: autoRefresh ? refreshInterval : false,
-    refetchIntervalInBackground: true,
-  });
+  const fetchHealth = async () => {
+    try {
+      setIsRefetching(true);
+      const response = await fetch('http://localhost:8000/api/v1/health');
+      if (!response.ok) {
+        throw new Error('Failed to fetch health');
+      }
+      const data = await response.json();
+      setHealth(data);
+      setLastRefresh(new Date());
+      setError(null);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setIsRefetching(false);
+    }
+  };
 
   useEffect(() => {
-    if (health) {
-      setLastRefresh(new Date());
-    }
-  }, [health]);
+    fetchHealth();
+    if (!autoRefresh) return;
+    const interval = setInterval(fetchHealth, refreshInterval);
+    return () => clearInterval(interval);
+  }, [autoRefresh, refreshInterval]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -95,7 +101,7 @@ export default function HealthPage() {
           <p className="text-muted-foreground mb-4">
             Unable to connect to the NLP service health endpoint.
           </p>
-          <Button onClick={() => refetch()}>
+          <Button onClick={() => fetchHealth()}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Retry Connection
           </Button>
@@ -130,7 +136,7 @@ export default function HealthPage() {
           <Button 
             variant="outline" 
             size="sm"
-            onClick={() => refetch()}
+            onClick={() => fetchHealth()}
             disabled={isRefetching}
           >
             {isRefetching ? (
@@ -160,7 +166,7 @@ export default function HealthPage() {
             <div className="space-y-2">
               {getStatusBadge(health?.status || 'unknown')}
               <p className="text-xs text-muted-foreground">
-                Last check: {isClient ? api.formatTime(lastRefresh) : '--:--:--'}
+                Last check: {isClient ? lastRefresh.toLocaleTimeString() : '--:--:--'}
               </p>
             </div>
           </CardContent>
@@ -410,7 +416,7 @@ export default function HealthPage() {
               <div className="flex justify-between items-center py-2 border-b border-border/50">
                 <span className="text-muted-foreground">Startup Time</span>
                 <span className="font-mono">
-                  {isClient && health?.timestamp ? api.formatDateTime(health.timestamp) : '--'}
+                  {isClient && health?.timestamp ? new Date(health.timestamp).toLocaleString() : '--'}
                 </span>
               </div>
               
@@ -429,7 +435,7 @@ export default function HealthPage() {
       </div>
 
       {/* Loading State Overlay */}
-      {isLoading && (
+      {!health && !error && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
