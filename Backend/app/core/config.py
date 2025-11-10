@@ -59,3 +59,6 @@ BATCH_SIZE = int(os.getenv("BATCH_SIZE", "32"))
 
 # Gemini API key for dataset generation
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
+# Intent detection method: "vector_search" or "pattern_matching"
+INTENT_DETECTION_METHOD = os.getenv("INTENT_DETECTION_METHOD", "vector_search")

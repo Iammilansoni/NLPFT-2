@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from app.services.template_service import get_template_service
 from app.core.logger import logger
 from app.nlp.query_parser import get_query_parser
-from app.nlp.smart_dataset_generator import SmartDatasetGenerator
+from app.nlp.dataset_generator import DatasetGenerator
 
 router = APIRouter(prefix="/templates", tags=["templates"])
 
@@ -209,7 +209,7 @@ async def reload_services():
         # Reload dataset generator
         # Note: We create a new instance to reload templates
         # In production, you'd want a global instance with reload method
-        dataset_generator = SmartDatasetGenerator()
+        dataset_generator = DatasetGenerator()
         dataset_generator.reload_templates()
         
         logger.info(f"✅ Hot reload complete: {len(templates)} templates loaded")
