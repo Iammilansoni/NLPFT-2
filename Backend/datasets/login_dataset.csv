@@ -1,11 +1,4 @@
 query,intent,slots,api_name,endpoint,method,slots_json
-Login with {username} and {password},login,{},login,<base_url>/api/login,POST,{}
-Authenticate credentials for {username},login,{},login,<base_url>/api/login,POST,{}
-Sign in as {username} with password {password},login,{},login,<base_url>/api/login,POST,{}
-Login with {username} and {password},login,{},login,<base_url>/api/login,POST,{}
-Authenticate credentials for {username},login,{},login,<base_url>/api/login,POST,{}
-Sign in as {username} with password {password},login,{},login,<base_url>/api/login,POST,{}
-Login with {username} and {password},login,{},login,<base_url>/api/login,POST,{}
 Authenticate credentials for {username},login,{},login,<base_url>/api/login,POST,{}
 Sign in as {username} with password {password},login,{},login,<base_url>/api/login,POST,{}
 Login with {username} and {password},login,{},login,<base_url>/api/login,POST,{}

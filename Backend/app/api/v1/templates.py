@@ -13,6 +13,10 @@ from app.nlp.smart_dataset_generator import SmartDatasetGenerator
 
 router = APIRouter(prefix="/templates", tags=["templates"])
 
+# NOTE: Route order matters in FastAPI!
+# Specific routes (like /stats, /sync, /reload) MUST come before /{intent}
+# Otherwise FastAPI will treat "stats" as an intent parameter
+
 
 # Pydantic models for request/response
 class ParameterModel(BaseModel):
@@ -114,6 +118,113 @@ async def list_templates():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list templates: {str(e)}"
+        )
+
+
+@router.get("/stats", response_model=StatsResponse)
+async def get_statistics():
+    """
+    Get template statistics
+    
+    Returns:
+        Statistics about templates and cache
+    """
+    try:
+        template_service = get_template_service()
+        templates = template_service.get_all_templates()
+        
+        cache_stats = {
+            "template_count": len(templates),
+            "cache_enabled": True,
+            "source": "database"
+        }
+        
+        return StatsResponse(
+            total_templates=len(templates),
+            template_names=list(templates.keys()),
+            cache_stats=cache_stats
+        )
+    except Exception as e:
+        logger.error(f"Error getting statistics: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get statistics: {str(e)}"
+        )
+
+
+@router.post("/sync", response_model=SyncResponse)
+async def sync_from_json():
+    """
+    Sync templates from api_template.json to database
+    
+    Returns:
+        Sync statistics
+    """
+    try:
+        template_service = get_template_service()
+        
+        # Sync from JSON
+        stats = template_service.sync_from_json()
+        
+        logger.info(f"✅ Synced templates from JSON: {stats}")
+        
+        # Trigger hot reload
+        await reload_services()
+        
+        return SyncResponse(
+            success=True,
+            message="Templates synced successfully from JSON",
+            added=stats.get("added", 0),
+            updated=stats.get("updated", 0),
+            total=stats.get("total", 0)
+        )
+    except Exception as e:
+        logger.error(f"Error syncing templates from JSON: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to sync templates: {str(e)}"
+        )
+
+
+@router.post("/reload", response_model=ReloadResponse)
+async def reload_services():
+    """
+    Hot reload all services (query parser, dataset generator)
+    No server restart required
+    
+    Returns:
+        Reload status
+    """
+    try:
+        template_service = get_template_service()
+        
+        # Reload template service from database
+        template_service.reload_templates()
+        templates = template_service.get_all_templates()
+        
+        # Reload query parser
+        query_parser = get_query_parser()
+        query_parser.reload_patterns()
+        
+        # Reload dataset generator
+        # Note: We create a new instance to reload templates
+        # In production, you'd want a global instance with reload method
+        dataset_generator = SmartDatasetGenerator()
+        dataset_generator.reload_templates()
+        
+        logger.info(f"✅ Hot reload complete: {len(templates)} templates loaded")
+        
+        return ReloadResponse(
+            success=True,
+            message=f"Successfully reloaded {len(templates)} templates",
+            services_reloaded=["template_service", "query_parser", "dataset_generator"],
+            templates_count=len(templates)
+        )
+    except Exception as e:
+        logger.error(f"Error reloading services: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to reload services: {str(e)}"
         )
 
 
@@ -346,111 +457,4 @@ async def delete_template(intent: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete template: {str(e)}"
-        )
-
-
-@router.post("/sync", response_model=SyncResponse)
-async def sync_from_json():
-    """
-    Sync templates from api_template.json to database
-    
-    Returns:
-        Sync statistics
-    """
-    try:
-        template_service = get_template_service()
-        
-        # Sync from JSON
-        stats = template_service.sync_from_json()
-        
-        logger.info(f"✅ Synced templates from JSON: {stats}")
-        
-        # Trigger hot reload
-        await reload_services()
-        
-        return SyncResponse(
-            success=True,
-            message="Templates synced successfully from JSON",
-            added=stats.get("added", 0),
-            updated=stats.get("updated", 0),
-            total=stats.get("total", 0)
-        )
-    except Exception as e:
-        logger.error(f"Error syncing templates from JSON: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to sync templates: {str(e)}"
-        )
-
-
-@router.post("/reload", response_model=ReloadResponse)
-async def reload_services():
-    """
-    Hot reload all services (query parser, dataset generator)
-    No server restart required
-    
-    Returns:
-        Reload status
-    """
-    try:
-        template_service = get_template_service()
-        
-        # Reload template service from database
-        template_service.reload_templates()
-        templates = template_service.get_all_templates()
-        
-        # Reload query parser
-        query_parser = get_query_parser()
-        query_parser.reload_patterns()
-        
-        # Reload dataset generator
-        # Note: We create a new instance to reload templates
-        # In production, you'd want a global instance with reload method
-        dataset_generator = SmartDatasetGenerator()
-        dataset_generator.reload_templates()
-        
-        logger.info(f"✅ Hot reload complete: {len(templates)} templates loaded")
-        
-        return ReloadResponse(
-            success=True,
-            message=f"Successfully reloaded {len(templates)} templates",
-            services_reloaded=["template_service", "query_parser", "dataset_generator"],
-            templates_count=len(templates)
-        )
-    except Exception as e:
-        logger.error(f"Error reloading services: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to reload services: {str(e)}"
-        )
-
-
-@router.get("/stats", response_model=StatsResponse)
-async def get_statistics():
-    """
-    Get template statistics
-    
-    Returns:
-        Statistics about templates and cache
-    """
-    try:
-        template_service = get_template_service()
-        templates = template_service.get_all_templates()
-        
-        cache_stats = {
-            "template_count": len(templates),
-            "cache_enabled": True,
-            "source": "database"
-        }
-        
-        return StatsResponse(
-            total_templates=len(templates),
-            template_names=list(templates.keys()),
-            cache_stats=cache_stats
-        )
-    except Exception as e:
-        logger.error(f"Error getting statistics: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get statistics: {str(e)}"
         )

@@ -62,12 +62,12 @@ export default function DashboardPage() {
   const { data: templateStats, isLoading: templatesLoading, error: templatesError } = useTemplateStats()
 
   // Calculate detailed health status
-  const backendHealthy = !error && stats
-  const databaseHealthy = stats && stats.total_embeddings >= 0
-  const templatesHealthy = !templatesError && templateStats
+  const backendHealthy = !error && !!stats
+  const databaseHealthy = !!stats && typeof stats.total_embeddings === 'number' && stats.total_embeddings >= 0
+  const templatesHealthy = !templatesError && !!templateStats
 
   const allHealthy = backendHealthy && databaseHealthy && templatesHealthy
-  const anyIssues = error || templatesError || !stats
+  const anyIssues = !!error || !!templatesError || !stats
   const isLoading_ = isLoading || templatesLoading
 
   const recentRuns = [
@@ -291,7 +291,7 @@ export default function DashboardPage() {
         >
           <StatCard
             title="Total Vectors"
-            value={stats?.total_embeddings.toLocaleString() ?? '0'}
+            value={stats?.total_embeddings?.toLocaleString() ?? '0'}
             change="+12%"
             trend="up"
             icon={<Database className="h-5 w-5" />}

@@ -17,7 +17,7 @@ redis==5.0.1  # Redis client
 redis[hiredis]==5.0.1  # Redis with C parser for performance
 
 # NLP and ML dependencies
-sentence_transformers==2.2.2  # Sentence embeddings
+sentence_transformers==2.3.1  # Sentence embeddings (updated for compatibility)
 spacy==3.7.2  # NLP library for NER
 transformers==4.35.2  # HuggingFace transformers for QA models
 torch==2.1.1  # PyTorch backend
