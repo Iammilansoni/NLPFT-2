@@ -37,13 +37,25 @@ class SearchResponse(BaseModel):
     results: List[ResultItem] = Field(..., description="List of search results")
 
 class DatasetGenerateRequest(BaseModel):
-    seed_query: str
-    api: str
-    endpoint: str
-    request: Dict[str, Any]
-    response: Dict[str, Any]
-    examples: int = 50
+    """Request schema for dataset generation from plain English query"""
+    api_count: Optional[int] = Field(10, description="Number of APIs to generate")
+    nl_variations_per_api: Optional[int] = Field(20, description="Number of natural language variations per API")
+    use_llm: Optional[bool] = Field(True, description="Use LLM-based paraphrasing")
+    embedding_model: Optional[str] = Field("sentence-transformers/all-MiniLM-L6-v2", description="Embedding model to use")
+    llm_model: Optional[str] = Field("microsoft/Phi-3-mini-4k-instruct", description="LLM model for generation")
+    redis_host: Optional[str] = Field("redis", description="Redis host")
+    redis_port: Optional[int] = Field(6379, description="Redis port")
+    api_context: Optional[str] = Field("", description="Context for domain-specific APIs")
+    # Legacy fields for backward compatibility
+    seed_query: Optional[str] = None
+    api: Optional[str] = None
+    endpoint: Optional[str] = None
+    request: Optional[Dict[str, Any]] = None
+    response: Optional[Dict[str, Any]] = None
+    examples: Optional[int] = None
 
 class UploadResponse(BaseModel):
     message: str
-    filename: str
+    filename: Optional[str] = None
+    task_id: Optional[str] = None
+    dataset_id: Optional[str] = None

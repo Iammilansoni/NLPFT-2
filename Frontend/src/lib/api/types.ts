@@ -21,6 +21,7 @@ export interface QueryResponse {
   dataset_generated: boolean
   dataset_info?: DatasetInfo
   search_results: SearchResult[]
+  dataset_download_url?: string
 }
 
 export interface BestMatch {
@@ -182,4 +183,41 @@ export interface HealthResponse {
   status: string
   docs: string
   health: string
+}
+
+// ============= Test Runs API Types =============
+
+export interface TestRun {
+  id: number
+  query: string
+  intent: string | null
+  status: 'passed' | 'failed' | 'running' | 'pending'
+  confidence: number | null
+  tests_count: number
+  processing_time_ms: number | null
+  best_match_api: string | null
+  best_match_score: number | null
+  search_results_count: number
+  dataset_generated: boolean
+  error_message: string | null
+  created_at: string
+  updated_at: string
+  time_ago: string
+}
+
+export interface TestRunCreateRequest {
+  query: string
+  intent?: string
+  status: 'passed' | 'failed' | 'running' | 'pending'
+  confidence?: number
+  tests_count?: number
+  processing_time_ms?: number
+  best_match_api?: string
+  best_match_score?: number
+  search_results_count?: number
+  dataset_generated?: boolean
+  error_message?: string
+  user_id?: string
+  session_id?: string
+  metadata?: Record<string, any>
 }

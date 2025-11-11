@@ -16,7 +16,7 @@ load_dotenv()
 # Database URL
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql+asyncpg://nlpforge:nlpforge_password@localhost:5432/nlpforge"
+    "postgresql+asyncpg://nlpforge:nlpforge_secure_password@localhost:5432/nlpforge"
 )
 
 # Create async engine
@@ -24,8 +24,16 @@ engine = create_async_engine(
     DATABASE_URL,
     echo=False,  # Set to True for SQL debugging
     pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20
+    pool_size=5,
+    max_overflow=10,
+    pool_timeout=30,
+    connect_args={
+        "timeout": 10,
+        "command_timeout": 60,
+        "server_settings": {
+            "application_name": "nlpforge_backend"
+        }
+    }
 )
 
 # Create async session factory
@@ -78,6 +86,31 @@ class QueryLog(Base):
     dataset_generated = Column(Boolean, default=False)
     processing_time_ms = Column(Float)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    user_id = Column(String(100), index=True)  # For future authentication
+    session_id = Column(String(100), index=True)
+    metadata_ = Column("metadata", JSON)  # Use metadata_ to avoid SQLAlchemy reserved keyword
+
+
+class TestRun(Base):
+    """
+    Test run model - stores test execution results for dashboard
+    """
+    __tablename__ = "test_runs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    query = Column(Text, nullable=False)
+    intent = Column(String(50), index=True)
+    status = Column(String(20), nullable=False, index=True)  # 'passed', 'failed', 'running', 'pending'
+    confidence = Column(Float)
+    tests_count = Column(Integer, default=0)  # Number of tests executed
+    processing_time_ms = Column(Float)
+    best_match_api = Column(String(100))
+    best_match_score = Column(Float)
+    search_results_count = Column(Integer, default=0)
+    dataset_generated = Column(Boolean, default=False)
+    error_message = Column(Text)  # Error message if failed
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     user_id = Column(String(100), index=True)  # For future authentication
     session_id = Column(String(100), index=True)
     metadata_ = Column("metadata", JSON)  # Use metadata_ to avoid SQLAlchemy reserved keyword
@@ -193,8 +226,19 @@ class DatabaseManager:
     
     async def connect(self):
         """Connect to database and create tables"""
-        await init_db()
-        logger.info("PostgreSQL: Main brain connected")
+        try:
+            # Test connection first with a simple query
+            from sqlalchemy import text
+            async with self.session_factory() as session:
+                await session.execute(text("SELECT 1"))
+            
+            # If connection works, initialize tables
+            await init_db()
+            logger.info("PostgreSQL: Main brain connected")
+        except Exception as e:
+            logger.warning(f"PostgreSQL connection failed: {e}")
+            logger.warning("Running without PostgreSQL - templates will be memory-only")
+            # Don't raise - allow app to continue without PostgreSQL
     
     async def disconnect(self):
         """Close database connections"""
@@ -204,8 +248,9 @@ class DatabaseManager:
     async def health_check(self) -> bool:
         """Check database health"""
         try:
+            from sqlalchemy import text
             async with self.session_factory() as session:
-                await session.execute("SELECT 1")
+                await session.execute(text("SELECT 1"))
             return True
         except Exception as e:
             logger.error(f"PostgreSQL health check failed: {e}")

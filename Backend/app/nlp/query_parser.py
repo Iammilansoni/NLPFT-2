@@ -360,7 +360,7 @@ class QueryParser:
             matches = sum(1 for w in words if w in q)
             return matches >= max(1, int(0.6 * len(words)))
 
-        return len(value) <= 3  # allow tiny tokens
+        return len(value) <= 3  
 
     def _merge_slots_intelligently(
         self,
@@ -421,7 +421,7 @@ class QueryParser:
         """
         use_vector = INTENT_DETECTION_METHOD == "vector_search"
         method_name = "Vector Search" if use_vector else "Pattern Matching"
-        logger.info(f"🔍 Parsing query (HYBRID {method_name} + NER + Llama): {query}")
+        logger.info(f" Parsing query (HYBRID {method_name} + NER + Llama): {query}")
 
         # 1) Detect intent
         intent, confidence = self.detect_intent(query, use_vector_search=use_vector)
@@ -430,12 +430,12 @@ class QueryParser:
         # 2) spaCy NER
         slots_spacy = self.extract_slots_spacy(query)
         if slots_spacy:
-            logger.debug(f"  ✅ spaCy NER found: {_redact(slots_spacy)}")
+            logger.debug(f" spaCy NER found: {_redact(slots_spacy)}")
 
         # 3) Llama (with spaCy hints)
         slots_llama = self.extract_slots_llama(query, intent, spacy_hints=slots_spacy)
         if slots_llama:
-            logger.info(f"  🤖 Llama extracted: {_redact(slots_llama)}")
+            logger.info(f" Llama extracted: {_redact(slots_llama)}")
 
         # 4) Merge & normalize
         slots = self._merge_slots_intelligently(
@@ -444,7 +444,7 @@ class QueryParser:
             query=query
         )
         slots = _normalize_slots(slots)
-        logger.info(f"  ✨ Final merged slots: {_redact(slots)}")
+        logger.info(f" Final merged slots: {_redact(slots)}")
 
         return {
             "intent": intent,

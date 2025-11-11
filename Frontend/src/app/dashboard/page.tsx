@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import Link from 'next/link'
 import {
   BarChart3,
@@ -35,6 +35,7 @@ import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { useQueryStats } from '@/hooks/useQuery'
 import { useTemplateStats } from '@/hooks/useTemplates'
+import { useRecentRuns } from '@/hooks/useRuns'
 
 const TrendChart = dynamic(
   () => import('@/components/dashboard/trend-chart').then((m) => m.TrendChart),
@@ -60,50 +61,26 @@ export default function DashboardPage() {
   // Use our custom hooks for backend data
   const { data: stats, isLoading, error } = useQueryStats()
   const { data: templateStats, isLoading: templatesLoading, error: templatesError } = useTemplateStats()
+  const { data: recentRunsData, isLoading: runsLoading, error: runsError } = useRecentRuns(10)
 
-  // Calculate detailed health status
+  // Calculate detailed health status with safe defaults
   const backendHealthy = !error && !!stats
-  const databaseHealthy = !!stats && typeof stats.total_embeddings === 'number' && stats.total_embeddings >= 0
+  const databaseHealthy = !!stats && typeof stats?.total_embeddings === 'number' && stats.total_embeddings >= 0
   const templatesHealthy = !templatesError && !!templateStats
 
   const allHealthy = backendHealthy && databaseHealthy && templatesHealthy
   const anyIssues = !!error || !!templatesError || !stats
-  const isLoading_ = isLoading || templatesLoading
+  const isLoading_ = isLoading || templatesLoading || runsLoading
 
-  const recentRuns = [
-    {
-      id: '1',
-      query: 'Login with email and password',
-      status: 'passed',
-      time: '2m ago',
-      tests: 12,
-      confidence: 95,
-    },
-    {
-      id: '2',
-      query: 'Create new user account',
-      status: 'failed',
-      time: '15m ago',
-      tests: 8,
-      confidence: 87,
-    },
-    {
-      id: '3',
-      query: 'Update user profile',
-      status: 'passed',
-      time: '1h ago',
-      tests: 15,
-      confidence: 92,
-    },
-    {
-      id: '4',
-      query: 'Delete user by ID',
-      status: 'passed',
-      time: '2h ago',
-      tests: 6,
-      confidence: 89,
-    },
-  ]
+  // Transform API data to match component format
+  const recentRuns = recentRunsData?.map((run) => ({
+    id: run.id.toString(),
+    query: run.query,
+    status: run.status,
+    time: run.time_ago,
+    tests: run.tests_count,
+    confidence: run.confidence ? Math.round(run.confidence * 100) : 0,
+  })) || []
 
   const quickActions = [
     { label: 'Login test', icon: '🔐', query: 'Test login with credentials' },
@@ -124,6 +101,26 @@ export default function DashboardPage() {
       .sort((a, b) => (b[1] as number) - (a[1] as number))
       .slice(0, 5)
   }, [stats])
+
+  // Show loading state while data is being fetched
+  if (isLoading_) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Activity className="w-12 h-12 animate-pulse mx-auto text-primary" />
+          <p className="text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Handle critical errors gracefully
+  if (error && !stats) {
+    console.error('Dashboard error:', error)
+  }
+  if (templatesError && !templateStats) {
+    console.error('Templates error:', templatesError)
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
@@ -348,50 +345,63 @@ export default function DashboardPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                {recentRuns.map((run) => (
-                  <Link key={run.id} href={`/runs/${run.id}`}>
-                    <motion.div
-                      whileHover={{ x: 4 }}
-                      className="group flex items-center gap-4 p-4 rounded-xl border-2 border-transparent hover:border-primary/20 hover:bg-muted/50 transition-all cursor-pointer"
-                    >
-                      <div
-                        className={cn(
-                          'h-12 w-12 rounded-xl flex items-center justify-center text-white shadow-md',
-                          run.status === 'passed'
-                            ? 'bg-gradient-to-br from-emerald-500 to-green-500'
-                            : 'bg-gradient-to-br from-red-500 to-rose-500'
-                        )}
+                {runsLoading ? (
+                  <>
+                    {[...Array(4)].map((_, i) => (
+                      <Skeleton key={i} className="h-20 w-full" />
+                    ))}
+                  </>
+                ) : recentRuns.length > 0 ? (
+                  recentRuns.map((run) => (
+                    <Link key={run.id} href={`/runs/${run.id}`}>
+                      <motion.div
+                        whileHover={{ x: 4 }}
+                        className="group flex items-center gap-4 p-4 rounded-xl border-2 border-transparent hover:border-primary/20 hover:bg-muted/50 transition-all cursor-pointer"
                       >
-                        {run.status === 'passed' ? (
-                          <CheckCircle2 className="h-6 w-6" />
-                        ) : (
-                          <AlertCircle className="h-6 w-6" />
-                        )}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold group-hover:text-primary transition-colors truncate">
-                          {run.query}
-                        </p>
-                        <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            <span>{run.time}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <FileCode className="h-3 w-3" />
-                            <span>{run.tests} tests</span>
-                          </div>
-                          <Badge variant="secondary" className="text-xs">
-                            {run.confidence}% confidence
-                          </Badge>
+                        <div
+                          className={cn(
+                            'h-12 w-12 rounded-xl flex items-center justify-center text-white shadow-md',
+                            run.status === 'passed'
+                              ? 'bg-gradient-to-br from-emerald-500 to-green-500'
+                              : 'bg-gradient-to-br from-red-500 to-rose-500'
+                          )}
+                        >
+                          {run.status === 'passed' ? (
+                            <CheckCircle2 className="h-6 w-6" />
+                          ) : (
+                            <AlertCircle className="h-6 w-6" />
+                          )}
                         </div>
-                      </div>
 
-                      <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                    </motion.div>
-                  </Link>
-                ))}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold group-hover:text-primary transition-colors truncate">
+                            {run.query}
+                          </p>
+                          <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              <span>{run.time}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <FileCode className="h-3 w-3" />
+                              <span>{run.tests} tests</span>
+                            </div>
+                            <Badge variant="secondary" className="text-xs">
+                              {run.confidence}% confidence
+                            </Badge>
+                          </div>
+                        </div>
+
+                        <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                      </motion.div>
+                    </Link>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p className="text-sm">No recent test runs</p>
+                    <p className="text-xs mt-2">Run a query to see test results here</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

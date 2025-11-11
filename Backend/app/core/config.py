@@ -52,7 +52,7 @@ DATASETS_DIR.mkdir(exist_ok=True, parents=True)
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 MODEL_NAME = os.getenv("MODEL_NAME", "BAAI/bge-small-en-v1.5")
-INDEX_NAME = os.getenv("INDEX_NAME", "idx:apis")
+INDEX_NAME = os.getenv("INDEX_NAME", "idx:api")
 TOP_K = int(os.getenv("TOP_K", "5"))
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "32"))
 

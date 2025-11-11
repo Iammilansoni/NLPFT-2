@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
   Download,
@@ -98,6 +98,7 @@ export default function DatasetGeneratorPage() {
   const [apiContext, setApiContext] = useState('')
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -118,22 +119,21 @@ export default function DatasetGeneratorPage() {
     return 'An unexpected error occurred'
   }
 
-  useEffect(() => {
-    fetchAllTasks().catch(() => {
-      // Silently fail if backend is not available
-    })
-  }, [])
-
-  useEffect(() => {
-    if (currentTask && currentTask.status === 'running') {
-      const interval = setInterval(() => {
-        fetchTaskStatus(currentTask.task_id)
-      }, 2000)
-      return () => clearInterval(interval)
+  const fetchPreview = useCallback(async (taskId: string, limit: number = 100, offset: number = 0) => {
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/v1/dataset/preview/${taskId}?limit=${limit}&offset=${offset}`
+      )
+      const data = await response.json()
+      setPreviewData(data)
+      setCurrentPage(Math.floor(offset / pageSize))
+    } catch (err) {
+      console.error('Error fetching preview:', err)
+      setError(formatError(err))
     }
-  }, [currentTask])
+  }, [API_BASE, pageSize])
 
-  const fetchAllTasks = async () => {
+  const fetchAllTasks = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/api/v1/dataset/list`)
       if (!response.ok) throw new Error('Failed to fetch')
@@ -142,10 +142,12 @@ export default function DatasetGeneratorPage() {
     } catch (err) {
       // Backend not available - this is expected in development
       console.log('Backend API not available')
+    } finally {
+      setIsLoading(false)
     }
-  }
+  }, [API_BASE])
 
-  const fetchTaskStatus = async (taskId: string) => {
+  const fetchTaskStatus = useCallback(async (taskId: string) => {
     try {
       const response = await fetch(`${API_BASE}/api/v1/dataset/status/${taskId}`)
       const data = await response.json()
@@ -163,21 +165,26 @@ export default function DatasetGeneratorPage() {
       console.error('Error fetching task status:', err)
       setError(formatError(err))
     }
-  }
+  }, [API_BASE, fetchPreview, fetchAllTasks])
 
-  const fetchPreview = async (taskId: string, limit: number = 100, offset: number = 0) => {
-    try {
-      const response = await fetch(
-        `${API_BASE}/api/v1/dataset/preview/${taskId}?limit=${limit}&offset=${offset}`
-      )
-      const data = await response.json()
-      setPreviewData(data)
-      setCurrentPage(Math.floor(offset / pageSize))
-    } catch (err) {
-      console.error('Error fetching preview:', err)
-      setError(formatError(err))
+  useEffect(() => {
+    // Only fetch on client side
+    if (typeof window !== 'undefined') {
+      fetchAllTasks().catch((err) => {
+        // Silently fail if backend is not available
+        console.log('Backend not available:', err)
+      })
     }
-  }
+  }, [fetchAllTasks])
+
+  useEffect(() => {
+    if (currentTask && currentTask.status === 'running') {
+      const interval = setInterval(() => {
+        fetchTaskStatus(currentTask.task_id)
+      }, 2000)
+      return () => clearInterval(interval)
+    }
+  }, [currentTask, fetchTaskStatus])
 
   const handleGenerate = async () => {
     setIsGenerating(true)
@@ -197,7 +204,6 @@ export default function DatasetGeneratorPage() {
           llm_model: 'microsoft/Phi-3-mini-4k-instruct',
           redis_host: 'redis',
           redis_port: 6379,
-          clear_existing_embeddings: clearExistingEmbeddings,
           api_context: apiContext,
         }),
       })
@@ -294,6 +300,17 @@ export default function DatasetGeneratorPage() {
       default:
         return <Clock className="w-5 h-5 text-gray-500" />
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-12 h-12 animate-spin mx-auto text-primary" />
+          <p className="text-muted-foreground">Loading datasets...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -482,24 +499,6 @@ export default function DatasetGeneratorPage() {
                         Fast offline variations
                       </>
                     )}
-                  </p>
-                </div>
-              </div>
-
-              {/* Redis Cleanup */}
-              <div className="flex items-start gap-3 p-4 rounded-lg border bg-muted/50">
-                <Switch
-                  id="clear-redis"
-                  checked={clearExistingEmbeddings}
-                  onCheckedChange={setClearExistingEmbeddings}
-                  disabled={isGenerating}
-                />
-                <div className="flex-1">
-                  <Label htmlFor="clear-redis" className="cursor-pointer">
-                    Clear existing Redis embeddings
-                  </Label>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Remove previous embeddings before storing new ones to avoid duplicates
                   </p>
                 </div>
               </div>

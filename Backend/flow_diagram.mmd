@@ -1,0 +1,81 @@
+flowchart TD
+    Start([User Types Query]) --> Frontend[Frontend: Next.js]
+    Frontend -->|HTTP POST /api/v1/query| API[API Layer: FastAPI]
+    
+    API --> QueryParser{Query Parser<br/>Hybrid NER + Llama}
+    
+    QueryParser -->|Step 1| IntentDetect[Intent Detection<br/>Pattern Matching]
+    IntentDetect -->|Load Templates| TemplateDB[(PostgreSQL<br/>API Templates)]
+    TemplateDB -->|intent_keywords| IntentDetect
+    IntentDetect -->|intent + confidence| SlotExtract
+    
+    QueryParser -->|Step 2| SlotExtract[Slot Extraction Pipeline]
+    
+    SlotExtract --> SpaCy[spaCy NER<br/>en_core_web_md]
+    SpaCy -->|PERSON, EMAIL, PHONE| SpaCyResult[entities]
+    
+    SlotExtract --> Llama[Llama 3.2 3B<br/>+ JSON Schema]
+    TemplateDB -->|slot definitions| Llama
+    Llama -->|structured JSON| LlamaResult[slots]
+    
+    SlotExtract --> Regex[Regex Patterns<br/>username:, password:]
+    Regex -->|explicit matches| RegexResult[slots]
+    
+    SlotExtract --> Context[Contextual Rules<br/>'for X and Y']
+    Context -->|domain patterns| ContextResult[slots]
+    
+    SpaCyResult --> Merge[Intelligent Merge<br/>Priority: Context > Regex > Llama > spaCy]
+    LlamaResult --> Merge
+    RegexResult --> Merge
+    ContextResult --> Merge
+    
+    Merge -->|Validate| AntiHallucinate{Anti-Hallucination<br/>Check}
+    AntiHallucinate -->|Valid| ParsedResult[Parsed Result:<br/>intent + slots + confidence]
+    AntiHallucinate -->|Invalid| Merge
+    
+    ParsedResult --> CheckDataset{Dataset Exists?<br/>embeddings >= 10}
+    
+    CheckDataset -->|No| GenDataset[Dataset Generator<br/>Generate 50 Variations]
+    GenDataset -->|CSV + JSON| DatasetFiles[(datasets/<br/>intent_xxx.csv)]
+    
+    CheckDataset -->|Yes| Search
+    DatasetFiles -. optional .-> ResponseBuilder
+    
+    Embed[Embedding Manager<br/>Sentence Transformers]
+    DatasetFiles --> Embed
+    Embed -->|384-dim vectors| Redis[(Redis Vector DB<br/>idx:apis)]
+    
+    Redis --> Search[Vector Search<br/>Cosine Similarity]
+    ParsedResult -->|user query vector| Search
+    
+    Search -->|top_k matches| Results[Search Results<br/>with similarity scores]
+    
+    Results --> ResponseBuilder[Response Builder<br/>Format JSON]
+    ParsedResult --> ResponseBuilder
+    
+    ResponseBuilder -->|HTTP 200 OK| Response{JSON Response}
+    
+    Response -->|Display| Frontend
+    
+    Response --> IntentOut[intent: 'update_profile']
+    Response --> SlotsOut[slots: username, password]
+    Response --> ConfOut[confidence: 0.95]
+    Response --> MatchesOut[best_matches: Array]
+    Response --> SearchOut[search_results: Array]
+    
+    IntentOut --> UI[Frontend UI]
+    SlotsOut --> UI
+    ConfOut --> UI
+    MatchesOut --> UI
+    SearchOut --> UI
+    
+    UI --> End([Display Results to User])
+    
+    style Start fill:#e1f5e1
+    style End fill:#e1f5e1
+    style QueryParser fill:#fff3cd
+    style Llama fill:#d1ecf1
+    style SpaCy fill:#d1ecf1
+    style Redis fill:#f8d7da
+    style TemplateDB fill:#f8d7da
+    style Response fill:#d4edda

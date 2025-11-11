@@ -3,14 +3,18 @@ Query API endpoint - Main entry point for natural language queries
 Handles the complete pipeline: parse -> generate dataset -> embed -> search
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, List
+from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime
+import os
 from app.nlp.query_parser import parse_query
 from app.nlp.dataset_generator import get_dataset_generator
 from app.nlp.embedding_manager import get_embedding_manager
 from app.services.template_service import get_template_service
 from app.core.logger import logger
+from app.core.postgres import get_db, TestRun
 
 router = APIRouter()
 
@@ -33,10 +37,15 @@ class QueryResponse(BaseModel):
     dataset_generated: bool
     dataset_info: Optional[Dict] = None
     search_results: List[Dict]
+    dataset_download_url: Optional[str] = None  # URL to download generated CSV
 
 
 @router.post("/query", response_model=QueryResponse)
-async def process_query(request: QueryRequest, background_tasks: BackgroundTasks):
+async def process_query(
+    request: QueryRequest, 
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db)
+):
     """
     Process natural language query through complete pipeline
     
@@ -55,6 +64,9 @@ async def process_query(request: QueryRequest, background_tasks: BackgroundTasks
             "best_matches": [...]
         }
     """
+    start_time = datetime.utcnow()
+    test_run_id = None
+    
     try:
         logger.info(f"Processing query: {request.query}")
         
@@ -65,6 +77,28 @@ async def process_query(request: QueryRequest, background_tasks: BackgroundTasks
         confidence = parsed["confidence"]
         
         logger.info(f"Parsed - Intent: {intent}, Confidence: {confidence:.2f}, Slots: {slots}")
+        
+        # Create test run record with 'running' status
+        try:
+            test_run = TestRun(
+                query=request.query,
+                intent=intent if intent != "unknown" else None,
+                status="running",
+                confidence=confidence,
+                tests_count=0,
+                best_match_api=None,
+                best_match_score=None,
+                search_results_count=0,
+                dataset_generated=False
+            )
+            db.add(test_run)
+            await db.commit()
+            await db.refresh(test_run)
+            test_run_id = test_run.id
+            logger.info(f"Created test run {test_run_id} with status 'running'")
+        except Exception as e:
+            logger.warning(f"Failed to create test run record: {e}")
+            # Continue processing even if test run creation fails
         
         if intent == "unknown" or confidence < 0.3:
             # Provide helpful error with available intents
@@ -125,34 +159,51 @@ async def process_query(request: QueryRequest, background_tasks: BackgroundTasks
                 csv_path = dataset_info["paths"]["csv"]
                 df = pd.read_csv(csv_path)
                 
-                # Prepare data for embedding
-                queries = df['query'].tolist()
-                intents = df['intent'].tolist()
+                # Validate required columns (unified format: query,api,endpoint,request,response)
+                if 'api' not in df.columns:
+                    raise ValueError(f"Generated CSV missing 'api' column. Expected format: query,api,endpoint,request,response")
                 
-                # Parse slots from JSON string
+                # Prepare data for embedding (using unified format: query,api,endpoint,request,response)
+                queries = df['query'].tolist()
+                intents = df['api'].tolist()  # 'api' column contains the intent
+                
+                # Parse slots from 'request' column
                 slots_list = []
+                responses = []
                 for idx, row in df.iterrows():
-                    if 'slots_json' in df.columns:
-                        slots_list.append(json.loads(row['slots_json']))
-                    elif 'slots' in df.columns:
-                        if isinstance(row['slots'], str):
-                            slots_list.append(json.loads(row['slots']))
-                        else:
-                            slots_list.append(row['slots'])
+                    # Parse request (slots) from JSON string
+                    slots = {}
+                    if 'request' in df.columns and pd.notna(row['request']):
+                        try:
+                            if isinstance(row['request'], str):
+                                request_data = json.loads(row['request'])
+                                if isinstance(request_data, dict):
+                                    slots = request_data
+                        except json.JSONDecodeError:
+                            logger.warning(f"Invalid JSON in request at row {idx}: {row['request']}")
+                            slots = {}
+                    slots_list.append(slots)
+                    
+                    # Get response field
+                    if 'response' in df.columns and pd.notna(row['response']):
+                        responses.append(row['response'])
                     else:
-                        slots_list.append({})
+                        responses.append(json.dumps({"definition": f"API endpoint for {intents[idx]}"}))
                 
                 # Batch upsert to Redis
-                redis_keys = embedder.upsert_batch(
+                upsert_result = embedder.upsert_batch(
                     queries=queries,
                     intents=intents,
                     slots_list=slots_list,
-                    api_names=df['api_name'].tolist() if 'api_name' in df.columns else None,
-                    endpoints=df['endpoint'].tolist() if 'endpoint' in df.columns else None
+                    api_names=intents,  # Use api column value
+                    endpoints=df['endpoint'].tolist() if 'endpoint' in df.columns else None,
+                    responses=responses
                 )
                 
-                dataset_info["redis_keys"] = len(redis_keys)
-                logger.info(f"Embedded {len(redis_keys)} entries to Redis")
+                dataset_info["redis_keys"] = upsert_result["total"]
+                dataset_info["new_embeddings"] = upsert_result["new_count"]
+                dataset_info["skipped_duplicates"] = upsert_result["skipped_count"]
+                logger.info(f"Embedded {upsert_result['total']} entries to Redis ({upsert_result['new_count']} new, {upsert_result['skipped_count']} skipped)")
             else:
                 logger.info(f"Sufficient embeddings exist for {intent}. Skipping generation.")
         
@@ -183,7 +234,13 @@ async def process_query(request: QueryRequest, background_tasks: BackgroundTasks
         
         logger.info(f"Found {len(unique_matches)} unique API matches")
         
-        # Step 7: Build response
+        # Step 7: Build response with download URL if dataset was generated
+        dataset_download_url = None
+        if dataset_generated and dataset_info:
+            # Create download URL for the generated CSV
+            csv_filename = os.path.basename(dataset_info["paths"]["csv"])
+            dataset_download_url = f"/api/v1/dataset/download-file/{csv_filename}"
+        
         response = QueryResponse(
             query=request.query,
             intent=intent,
@@ -192,15 +249,64 @@ async def process_query(request: QueryRequest, background_tasks: BackgroundTasks
             best_matches=unique_matches,
             dataset_generated=dataset_generated,
             dataset_info=dataset_info,
-            search_results=search_results[:request.top_k]
+            search_results=search_results[:request.top_k],
+            dataset_download_url=dataset_download_url
         )
+        
+        # Step 8: Update test run with results
+        if test_run_id:
+            try:
+                processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
+                best_match = unique_matches[0] if unique_matches else None
+                
+                test_run = await db.get(TestRun, test_run_id)
+                if test_run:
+                    test_run.status = "passed"
+                    test_run.confidence = confidence
+                    test_run.tests_count = len(unique_matches)
+                    test_run.processing_time_ms = processing_time
+                    test_run.best_match_api = best_match["api"] if best_match else None
+                    test_run.best_match_score = best_match["score"] if best_match else None
+                    test_run.search_results_count = len(search_results)
+                    test_run.dataset_generated = dataset_generated
+                    test_run.updated_at = datetime.utcnow()
+                    
+                    await db.commit()
+                    logger.info(f"Updated test run {test_run_id} with status 'passed'")
+            except Exception as e:
+                logger.warning(f"Failed to update test run {test_run_id}: {e}")
+                # Don't fail the request if test run update fails
         
         return response
         
     except HTTPException:
+        # Update test run with failed status
+        if test_run_id:
+            try:
+                test_run = await db.get(TestRun, test_run_id)
+                if test_run:
+                    test_run.status = "failed"
+                    test_run.error_message = "Query processing failed"
+                    test_run.updated_at = datetime.utcnow()
+                    await db.commit()
+            except Exception as e:
+                logger.warning(f"Failed to update test run status: {e}")
         raise
     except Exception as e:
         logger.error(f"Error processing query: {e}", exc_info=True)
+        
+        # Update test run with failed status
+        if test_run_id:
+            try:
+                test_run = await db.get(TestRun, test_run_id)
+                if test_run:
+                    test_run.status = "failed"
+                    test_run.error_message = str(e)[:500]  # Limit error message length
+                    test_run.updated_at = datetime.utcnow()
+                    await db.commit()
+            except Exception as db_error:
+                logger.warning(f"Failed to update test run status: {db_error}")
+        
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 
@@ -250,38 +356,58 @@ async def reindex_intent(intent: str, background_tasks: BackgroundTasks):
             merge_existing=False
         )
         
-        # Re-embed
+        # Re-embed (using unified format: query,api,endpoint,request,response)
         import pandas as pd
         import json
         csv_path = dataset_info["paths"]["csv"]
         df = pd.read_csv(csv_path)
         
+        # Validate required columns
+        if 'api' not in df.columns:
+            raise ValueError(f"Generated CSV missing 'api' column. Expected format: query,api,endpoint,request,response")
+        
         queries = df['query'].tolist()
-        intents = df['intent'].tolist()
+        intents = df['api'].tolist()  # 'api' column contains the intent
+        
+        # Parse slots from 'request' column
         slots_list = []
-        
+        responses = []
         for idx, row in df.iterrows():
-            if 'slots_json' in df.columns:
-                slots_list.append(json.loads(row['slots_json']))
-            elif 'slots' in df.columns:
-                if isinstance(row['slots'], str):
-                    slots_list.append(json.loads(row['slots']))
-                else:
-                    slots_list.append(row['slots'])
+            # Parse request (slots) from JSON string
+            slots = {}
+            if 'request' in df.columns and pd.notna(row['request']):
+                try:
+                    if isinstance(row['request'], str):
+                        request_data = json.loads(row['request'])
+                        if isinstance(request_data, dict):
+                            slots = request_data
+                except json.JSONDecodeError:
+                    logger.warning(f"Invalid JSON in request at row {idx}: {row['request']}")
+                    slots = {}
+            slots_list.append(slots)
+            
+            # Get response field
+            if 'response' in df.columns and pd.notna(row['response']):
+                responses.append(row['response'])
             else:
-                slots_list.append({})
+                responses.append(json.dumps({"definition": f"API endpoint for {intents[idx]}"}))
         
-        redis_keys = embedder.upsert_batch(
+        upsert_result = embedder.upsert_batch(
             queries=queries,
             intents=intents,
-            slots_list=slots_list
+            slots_list=slots_list,
+            api_names=intents,  # Use api column value
+            endpoints=df['endpoint'].tolist() if 'endpoint' in df.columns else None,
+            responses=responses
         )
         
         return {
             "message": f"Reindexed {intent}",
             "deleted": deleted,
             "generated": len(df),
-            "embedded": len(redis_keys)
+            "embedded": upsert_result["total"],
+            "new_embeddings": upsert_result["new_count"],
+            "skipped_duplicates": upsert_result["skipped_count"]
         }
         
     except Exception as e:

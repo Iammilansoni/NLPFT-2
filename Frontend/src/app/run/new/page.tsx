@@ -36,6 +36,7 @@ export default function NewRunPage() {
 
   const [query, setQuery] = useState(initialQuery)
   const [generatedJson, setGeneratedJson] = useState<any>(null)
+  const [queryResult, setQueryResult] = useState<any>(null)
   const [copied, setCopied] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [numExamples, setNumExamples] = useState(50)
@@ -60,6 +61,9 @@ export default function NewRunPage() {
         num_examples: numExamples,
         top_k: topK,
       })
+
+      // Store the full query result
+      setQueryResult(result)
 
       // Extract the API structure from search results
       const apiStructure = result.search_results[0]
@@ -408,21 +412,43 @@ export default function NewRunPage() {
                 ) : generatedJson ? (
                   <div className="space-y-4">
                     {/* Confidence Badge */}
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant={
-                          generatedJson.confidence > 0.9
-                            ? 'default'
-                            : generatedJson.confidence > 0.7
-                            ? 'secondary'
-                            : 'outline'
-                        }
-                        className="gap-1"
-                      >
-                        <Zap className="h-3 w-3" />
-                        {Math.round(generatedJson.confidence * 100)}% Confidence
-                      </Badge>
-                      <Badge variant="outline">{generatedJson.intent}</Badge>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={
+                            generatedJson.confidence > 0.9
+                              ? 'default'
+                              : generatedJson.confidence > 0.7
+                              ? 'secondary'
+                              : 'outline'
+                          }
+                          className="gap-1"
+                        >
+                          <Zap className="h-3 w-3" />
+                          {Math.round(generatedJson.confidence * 100)}% Confidence
+                        </Badge>
+                        <Badge variant="outline">{generatedJson.intent}</Badge>
+                        {queryResult?.dataset_generated && (
+                          <Badge variant="secondary" className="gap-1">
+                            <FileJson className="h-3 w-3" />
+                            Dataset Generated
+                          </Badge>
+                        )}
+                      </div>
+                      {queryResult?.dataset_download_url && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+                            window.open(`${apiBase}${queryResult.dataset_download_url}`, '_blank')
+                          }}
+                          className="gap-2"
+                        >
+                          <Download className="h-4 w-4" />
+                          Download CSV
+                        </Button>
+                      )}
                     </div>
 
                     {/* JSON Display */}

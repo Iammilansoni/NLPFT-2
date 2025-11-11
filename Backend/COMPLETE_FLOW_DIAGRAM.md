@@ -23,7 +23,7 @@ This document explains the **complete end-to-end flow** of how NLPForge processe
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                  QUERY PARSER (Hybrid NER + Llama)              │
-│              Intent Detection + Slot Extraction                 │
+│              Intent Detection + Slot Extraction                  │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                              ▼
@@ -574,38 +574,39 @@ Response: List of similar queries with scores
         ┌────────────────────┴────────────────────┐
         │                                         │
         ▼                                         ▼
-┌──────────────────┐                    ┌─────────────────┐
-│  Query Endpoint  │                    │ Search Endpoint │
-│  /api/v1/query   │                    │/api/v1/search   │
-│ (Full Pipeline)  │                    │ (Direct Search) │
-└────────┬─────────┘                    └───────┬─────────┘
-         │                                      │
-         ▼                                      │
+┌──────────────────┐                    ┌──────────────────┐
+│  Query Endpoint  │                    │ Search Endpoint  │
+│  /api/v1/query   │                    │/api/v1/search    │
+│ (Full Pipeline)  │                    │ (Direct Search)  │
+└────────┬─────────┘                    └────────┬─────────┘
+         │                                       │
+         ▼                                       │
 ┌──────────────────────────────────────┐        │
 │  Query Parser (Hybrid NER + Llama)   │        │
 │  ├─ Intent Detection                 │        │
-│  ├─ spaCy NER                        │        │  ├─ Llama 3.2 3B Extraction          │        │
+│  ├─ spaCy NER                        │        │
+│  ├─ Llama 3.2 3B Extraction          │        │
 │  ├─ Regex Patterns                   │        │
 │  └─ Contextual Rules                 │        │
 └────────┬─────────────────────────────┘        │
-         │                                      │
-         ▼                                      │
+         │                                       │
+         ▼                                       │
 ┌──────────────────────────────────────┐        │
 │  Template Service (PostgreSQL)       │        │
 │  - Load API templates                │        │
 │  - Get slot definitions              │        │
 │  - Validate intent                   │        │
 └────────┬─────────────────────────────┘        │
-         │                                      │
-         ▼                                      │
+         │                                       │
+         ▼                                       │
 ┌──────────────────────────────────────┐        │
 │  Dataset Generator (Optional)        │        │
 │  - Check existing embeddings         │        │
 │  - Generate variations if needed     │        │
 │  - Save to CSV/JSON                  │        │
 └────────┬─────────────────────────────┘        │
-         │                                      │
-         ▼                                      │
+         │                                       │
+         ▼                                       │
 ┌──────────────────────────────────────┐        │
 │  Embedding Manager                   │◄───────┘
 │  - Sentence Transformer              │
