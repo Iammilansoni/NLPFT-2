@@ -5,7 +5,7 @@ from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException,
 from fastapi.responses import FileResponse
 from typing import Optional
 from app.nlp.dataset_ingestor import ingest_csv_to_redis
-from app.nlp.dataset_generator import generate_dataset_from_prompt
+from app.nlp.dataset_generator import get_dataset_generator
 from app.core.config import DATASETS_DIR
 from app.models.schemas import DatasetGenerateRequest, UploadResponse
 
@@ -35,18 +35,27 @@ async def upload_dataset(file: UploadFile = File(...), background_tasks: Backgro
 @router.post("/generate", response_model=UploadResponse)
 async def generate_dataset(request: DatasetGenerateRequest, background_tasks: BackgroundTasks = BackgroundTasks()):
     try:
-        # Use user-provided api and endpoint
-        res = generate_dataset_from_prompt(
-            seed_prompt=request.seed_query,
-            api_name=request.api,
-            endpoint=request.endpoint,
-            num_examples=request.examples
+        # Use DatasetGenerator for intelligent dataset creation
+        generator = get_dataset_generator()
+        
+        result = generator.generate_dataset(
+            intent=request.api,
+            num_examples=request.examples,
+            use_gemini=True,
+            merge_existing=False
         )
-        csv_path = res["csv_path"]
-        if not res.get("ingestion"):
+        
+        csv_path = result["paths"]["csv"]
+        
+        # Ingest to Redis in background
+        if not result.get("already_ingested"):
             background_tasks.add_task(ingest_csv_to_redis, csv_path)
+        
         filename = os.path.basename(csv_path)
-        return UploadResponse(message="Dataset generated and ingestion started.", filename=filename)
+        return UploadResponse(
+            message=f"Dataset generated with {result['total_examples']} examples. Ingestion started.",
+            filename=filename
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

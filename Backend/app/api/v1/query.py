@@ -7,8 +7,9 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, List
 from app.nlp.query_parser import parse_query
-from app.nlp.smart_dataset_generator import get_dataset_generator
+from app.nlp.dataset_generator import get_dataset_generator
 from app.nlp.embedding_manager import get_embedding_manager
+from app.services.template_service import get_template_service
 from app.core.logger import logger
 
 router = APIRouter()
@@ -65,11 +66,29 @@ async def process_query(request: QueryRequest, background_tasks: BackgroundTasks
         
         logger.info(f"Parsed - Intent: {intent}, Confidence: {confidence:.2f}, Slots: {slots}")
         
-        if intent == "unknown":
-            raise HTTPException(
-                status_code=400,
-                detail="Could not determine API intent from query. Please be more specific."
-            )
+        if intent == "unknown" or confidence < 0.3:
+            # Provide helpful error with available intents
+            template_service = get_template_service()
+            templates = template_service.get_all_templates()
+            available_intents = list(templates.keys()) if templates else []
+            
+            error_detail = {
+                "error": "Could not determine API intent from query",
+                "message": "Your query didn't match any known API patterns. Please try to be more specific.",
+                "query": request.query,
+                "confidence": confidence,
+                "detected_intent": intent if intent != "unknown" else None,
+                "available_intents": available_intents[:10],  # Show first 10
+                "suggestions": [
+                    "Include API-related keywords like 'login', 'signup', 'update', etc.",
+                    "Provide clear action words in your query",
+                    f"Try using one of these APIs: {', '.join(available_intents[:5])}"
+                ] if available_intents else [
+                    "No API templates are loaded. Please sync templates first."
+                ]
+            }
+            
+            raise HTTPException(status_code=400, detail=error_detail)
         
         # Step 2: Get managers
         generator = get_dataset_generator()
