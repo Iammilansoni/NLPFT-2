@@ -8,6 +8,11 @@ from sentence_transformers import SentenceTransformer
 
 from app.core.config import REDIS_HOST, REDIS_PORT
 from app.core.logger import logger
+from app.core.redis_security import (
+    RedisKeyValidator, 
+    validate_embedding_access, 
+    RedisAccessDeniedError
+)
 
 
 class RedisVectorService:
@@ -30,7 +35,8 @@ class RedisVectorService:
     def _generate_redis_key(self, user_id: uuid.UUID, t_id: Optional[uuid.UUID] = None, 
                            csv_id: Optional[uuid.UUID] = None) -> str:
         """Generate Redis key: embedding:{user_id}:{t_id}:{csv_id}"""
-        return f"embedding:{user_id}:{t_id or 'none'}:{csv_id or 'none'}"
+        validator = RedisKeyValidator()
+        return validator.generate_safe_embedding_key(user_id, t_id, csv_id)
     
     def create_vector_index(self) -> bool:
         """Create Redis HNSW vector index"""
@@ -73,8 +79,22 @@ class RedisVectorService:
         logger.info(f"Stored: {redis_key}")
         return redis_key, vector
     
-    def get_embedding(self, redis_key: str) -> Optional[Dict]:
-        """Retrieve embedding from Redis"""
+    def get_embedding(self, redis_key: str, user_id: Optional[uuid.UUID] = None) -> Optional[Dict]:
+        """
+        Retrieve embedding from Redis
+        
+        Args:
+            redis_key: Redis key to retrieve
+            user_id: User ID for access validation (optional but recommended)
+        """
+        # Validate access if user_id provided
+        if user_id:
+            try:
+                validate_embedding_access(redis_key, user_id)
+            except RedisAccessDeniedError as e:
+                logger.error(f"Access denied: {e}")
+                return None
+        
         data = self.redis_client.hgetall(redis_key)
         if not data:
             return None
@@ -88,8 +108,22 @@ class RedisVectorService:
                 result[key_str] = value.decode('utf-8') if isinstance(value, bytes) else value
         return result
     
-    def delete_embedding(self, redis_key: str) -> bool:
-        """Delete embedding from Redis"""
+    def delete_embedding(self, redis_key: str, user_id: Optional[uuid.UUID] = None) -> bool:
+        """
+        Delete embedding from Redis
+        
+        Args:
+            redis_key: Redis key to delete
+            user_id: User ID for access validation (optional but recommended)
+        """
+        # Validate access if user_id provided
+        if user_id:
+            try:
+                validate_embedding_access(redis_key, user_id)
+            except RedisAccessDeniedError as e:
+                logger.error(f"Access denied: {e}")
+                return False
+        
         result = self.redis_client.delete(redis_key) > 0
         if result:
             logger.info(f"Deleted: {redis_key}")

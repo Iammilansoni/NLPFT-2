@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func, delete
 
-from app.models.enterprise_models import User, Template, Parameter, ExpectedResponse, Metadata, CSVData, Embedding
+from app.models.database_models import User, Template, Parameter, ExpectedResponse, Metadata, CSVData, Embedding
 from app.core.logger import logger
 
 

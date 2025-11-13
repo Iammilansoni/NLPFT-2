@@ -3,7 +3,7 @@ Database Models
 SQLAlchemy ORM models for PostgreSQL
 """
 
-from .enterprise_models import (
+from .database_models import (
     User,
     Template,
     Parameter,

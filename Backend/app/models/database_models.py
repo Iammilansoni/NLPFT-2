@@ -1,10 +1,19 @@
 """
-Enterprise Multi-Tenant PostgreSQL Models - FINAL OPTIMIZED VERSION
-Production-ready SAAS schema with Redis vector storage
+PostgreSQL Database Models - All Tables
+Production-ready multi-tenant schema with Redis vector storage
 
 Architecture:
-- PostgreSQL: Structured data + metadata (6 main tables)
+- PostgreSQL: Structured data + metadata (7 main tables)
 - Redis: Vector embeddings with HNSW index
+
+Tables:
+1. users - User authentication
+2. templates - API templates
+3. parameters - API parameters
+4. expected_responses - Expected API responses
+5. metadata - Template metadata & confidence scores
+6. csv_data - Test data (millions of rows)
+7. embeddings - Vector embedding metadata (vectors in Redis)
 
 Optimized for:
 ✅ Multi-tenant isolation (user_id in every table)
@@ -46,7 +55,6 @@ class User(Base):
 class Template(Base):
     """
     Templates table - API templates per user
-    Simplified: removed expected_response_id and metadata_id
     """
     __tablename__ = "templates"
     
@@ -75,7 +83,6 @@ class Template(Base):
 class Parameter(Base):
     """
     Parameters table - API parameters
-    Added user_id for multi-tenancy
     """
     __tablename__ = "parameters"
     
@@ -99,7 +106,6 @@ class Parameter(Base):
 class ExpectedResponse(Base):
     """
     Expected responses table - API response schemas
-    Added user_id for multi-tenancy
     """
     __tablename__ = "expected_responses"
     
@@ -122,7 +128,6 @@ class ExpectedResponse(Base):
 class Metadata(Base):
     """
     Metadata table - Template metadata and confidence scores
-    Added user_id and remarks field
     """
     __tablename__ = "metadata"
     
@@ -145,9 +150,7 @@ class Metadata(Base):
 
 class CSVData(Base):
     """
-    CSV Data table - Optimized for lakhs/millions of rows
-    Changed request and response to JSONB for better querying
-    Added created_at for tracking
+    CSV Data table - Test data storage (optimized for millions of rows)
     """
     __tablename__ = "csv_data"
     
@@ -157,8 +160,8 @@ class CSVData(Base):
     query = Column(Text, nullable=True)
     api_name = Column(Text, nullable=True)
     endpoint = Column(Text, nullable=True)
-    request = Column(JSONB, nullable=True)  # Changed from Text to JSONB
-    response = Column(JSONB, nullable=True)  # Changed from Text to JSONB
+    request = Column(JSONB, nullable=True)
+    response = Column(JSONB, nullable=True)
     description = Column(Text, nullable=True)
     created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
     
@@ -176,10 +179,10 @@ class CSVData(Base):
 
 class Embedding(Base):
     """
-    Embeddings table - Metadata for vector embeddings stored in Redis
+    Embeddings table - Vector embedding metadata (vectors stored in Redis)
     
-    Simplified: Only tracks Redis key and relationships
-    Actual vectors stored in Redis with format: embedding:{user_id}:{t_id}:{csv_id}
+    Redis Key Format: embedding:{user_id}:{t_id}:{csv_id}
+    Actual vectors stored in Redis, this table only tracks metadata
     """
     __tablename__ = "embeddings"
     
@@ -187,7 +190,7 @@ class Embedding(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     t_id = Column(UUID(as_uuid=True), ForeignKey("templates.t_id"), nullable=True)
     csv_id = Column(UUID(as_uuid=True), ForeignKey("csv_data.csv_id"), nullable=True)
-    redis_key = Column(Text, nullable=False, unique=True)  # e.g. "embedding:uid:t_id:csv"
+    redis_key = Column(Text, nullable=False, unique=True)
     created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
     
     # Relationships

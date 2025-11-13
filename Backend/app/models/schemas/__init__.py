@@ -46,6 +46,18 @@ from .embedding_schemas import (
     VectorSearchResult,
 )
 
+# Search schemas
+from .search_schemas import (
+    SearchRequest,
+    SearchResponse,
+)
+
+# Dataset schemas
+from .dataset_schemas import (
+    DatasetGenerateRequest,
+    UploadResponse,
+)
+
 # Common schemas
 from .common_schemas import (
     ErrorResponse,
@@ -85,6 +97,15 @@ __all__ = [
     "EmbeddingResponse",
     "VectorSearchRequest",
     "VectorSearchResult",
+    # Search
+    "SearchRequest",
+    "SearchResponse",
+    # Query
+    "QueryRequest",
+    "QueryResponse",
+    # Dataset
+    "DatasetGenerateRequest",
+    "UploadResponse",
     # Common
     "ErrorResponse",
     "MessageResponse",

@@ -4,7 +4,6 @@ Handles the complete pipeline: parse -> generate dataset -> embed -> search
 """
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
-from pydantic import BaseModel, Field
 from typing import Optional, Dict, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
@@ -14,30 +13,10 @@ from app.nlp.dataset_generator import get_dataset_generator
 from app.nlp.embedding_manager import get_embedding_manager
 from app.services.template_service import get_template_service
 from app.core.logger import logger
-from app.core.postgres import get_db, TestRun
+from app.core.postgres import get_db
+from app.models.schemas import QueryRequest, QueryResponse
 
 router = APIRouter()
-
-
-class QueryRequest(BaseModel):
-    """Request model for query endpoint"""
-    query: str = Field(..., description="Natural language query", min_length=1)
-    generate_dataset: bool = Field(True, description="Whether to generate dataset if needed")
-    num_examples: int = Field(50, description="Number of examples to generate", ge=10, le=200)
-    top_k: int = Field(5, description="Number of similar results to return", ge=1, le=20)
-
-
-class QueryResponse(BaseModel):
-    """Response model for query endpoint"""
-    query: str
-    intent: str
-    slots: Dict
-    confidence: float
-    best_matches: List[Dict]
-    dataset_generated: bool
-    dataset_info: Optional[Dict] = None
-    search_results: List[Dict]
-    dataset_download_url: Optional[str] = None  # URL to download generated CSV
 
 
 @router.post("/query", response_model=QueryResponse)
@@ -64,9 +43,6 @@ async def process_query(
             "best_matches": [...]
         }
     """
-    start_time = datetime.utcnow()
-    test_run_id = None
-    
     try:
         logger.info(f"Processing query: {request.query}")
         
@@ -77,28 +53,6 @@ async def process_query(
         confidence = parsed["confidence"]
         
         logger.info(f"Parsed - Intent: {intent}, Confidence: {confidence:.2f}, Slots: {slots}")
-        
-        # Create test run record with 'running' status
-        try:
-            test_run = TestRun(
-                query=request.query,
-                intent=intent if intent != "unknown" else None,
-                status="running",
-                confidence=confidence,
-                tests_count=0,
-                best_match_api=None,
-                best_match_score=None,
-                search_results_count=0,
-                dataset_generated=False
-            )
-            db.add(test_run)
-            await db.commit()
-            await db.refresh(test_run)
-            test_run_id = test_run.id
-            logger.info(f"Created test run {test_run_id} with status 'running'")
-        except Exception as e:
-            logger.warning(f"Failed to create test run record: {e}")
-            # Continue processing even if test run creation fails
         
         if intent == "unknown" or confidence < 0.3:
             # Provide helpful error with available intents
@@ -253,60 +207,12 @@ async def process_query(
             dataset_download_url=dataset_download_url
         )
         
-        # Step 8: Update test run with results
-        if test_run_id:
-            try:
-                processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
-                best_match = unique_matches[0] if unique_matches else None
-                
-                test_run = await db.get(TestRun, test_run_id)
-                if test_run:
-                    test_run.status = "passed"
-                    test_run.confidence = confidence
-                    test_run.tests_count = len(unique_matches)
-                    test_run.processing_time_ms = processing_time
-                    test_run.best_match_api = best_match["api"] if best_match else None
-                    test_run.best_match_score = best_match["score"] if best_match else None
-                    test_run.search_results_count = len(search_results)
-                    test_run.dataset_generated = dataset_generated
-                    test_run.updated_at = datetime.utcnow()
-                    
-                    await db.commit()
-                    logger.info(f"Updated test run {test_run_id} with status 'passed'")
-            except Exception as e:
-                logger.warning(f"Failed to update test run {test_run_id}: {e}")
-                # Don't fail the request if test run update fails
-        
         return response
         
     except HTTPException:
-        # Update test run with failed status
-        if test_run_id:
-            try:
-                test_run = await db.get(TestRun, test_run_id)
-                if test_run:
-                    test_run.status = "failed"
-                    test_run.error_message = "Query processing failed"
-                    test_run.updated_at = datetime.utcnow()
-                    await db.commit()
-            except Exception as e:
-                logger.warning(f"Failed to update test run status: {e}")
         raise
     except Exception as e:
         logger.error(f"Error processing query: {e}", exc_info=True)
-        
-        # Update test run with failed status
-        if test_run_id:
-            try:
-                test_run = await db.get(TestRun, test_run_id)
-                if test_run:
-                    test_run.status = "failed"
-                    test_run.error_message = str(e)[:500]  # Limit error message length
-                    test_run.updated_at = datetime.utcnow()
-                    await db.commit()
-            except Exception as db_error:
-                logger.warning(f"Failed to update test run status: {db_error}")
-        
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 

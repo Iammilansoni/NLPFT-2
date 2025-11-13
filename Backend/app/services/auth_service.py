@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from dotenv import load_dotenv
 
-from app.models.enterprise_models import User
+from app.models.database_models import User
 from app.core.logger import logger
 
 load_dotenv()

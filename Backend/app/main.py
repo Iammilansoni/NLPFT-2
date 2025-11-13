@@ -18,7 +18,7 @@ from app.api.v1.dataset import router as dataset_router
 from app.api.v1.search import router as search_router
 from app.api.v1.query import router as query_router
 from app.api.v1.templates import router as templates_router
-from app.api.v1.runs import router as runs_router
+
 from app.models.schemas import ErrorResponse
 
 @asynccontextmanager
@@ -158,19 +158,18 @@ def create_app() -> FastAPI:
 
     # Import enterprise routers
     from app.api.v1.auth import router as auth_router
-    from app.api.v1.enterprise import router as enterprise_router
+    from app.api.v1.user_data import router as user_data_router
     from app.api.v1.embeddings import router as embeddings_router
     
     app.include_router(dataset_router, prefix="/api/v1/dataset", tags=["Dataset"])
     app.include_router(search_router, prefix="/api/v1/search", tags=["Search"])
     app.include_router(query_router, prefix="/api/v1", tags=["Query Processing"])
     app.include_router(templates_router, prefix="/api/v1", tags=["Template Management"])
-    app.include_router(runs_router, prefix="/api/v1", tags=["Test Runs"])
     
     # Enterprise multi-tenant routes
     app.include_router(auth_router, prefix="/api/v1/auth", tags=["Authentication"])
-    app.include_router(enterprise_router, prefix="/api/v1/enterprise", tags=["Enterprise Multi-Tenant"])
-    app.include_router(embeddings_router, prefix="/api/v1/embeddings", tags=["Vector Embeddings"])
+    app.include_router(user_data_router, prefix="/api/v1/user-data", tags=["User Data Management"])
+    app.include_router(embeddings_router, prefix="/api/v1/embeddings", tags=["Vector Embeddings & Search"])
 
     @app.middleware("http")
     async def count_requests(request: Request, call_next):

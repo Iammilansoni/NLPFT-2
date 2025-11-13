@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.postgres import get_db
-from app.models.enterprise_models import User
+from app.models.database_models import User
 from app.models.schemas.auth_schemas import TokenData
 
 # Security configuration

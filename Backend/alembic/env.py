@@ -17,9 +17,9 @@ backend_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(backend_dir))
 
 from app.core.postgres import Base
-from app.models.enterprise_models import (
+from app.models.database_models import (
     User, Template, Parameter, ExpectedResponse, 
-    Metadata, CSVData, Embedding, TestRun
+    Metadata, CSVData, Embedding
 )
 
 # this is the Alembic Config object
