@@ -1,41 +1,18 @@
-import uuid
-from datetime import datetime
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from nlpforge.config.core.database import get_db
-from nlpforge.storage.models import APITemplateModel
-from mlpforge.storage.schemas import APITemplate, APITemplateResponse
+from app.database.connection import get_db
+from app.schemas.api_template_schema import APITemplateCreate
+from app.services.api_template_service import create_api_template
 
-router = APIRouter()
+router = APIRouter(prefix="/api-template", tags=["API Template"])
 
-@router.post("/create", response_model=APITemplateResponse)
-async def create_api_template(template: APITemplate, db: Session = Depends(get_db)):
-    if len(template.description.split()) < 500:
-        raise HTTPException(status_code=400, detail="Description must contain at least 500 words.")
-
+@router.post("/create")
+def create_api_template_endpoint(template: APITemplateCreate, db: Session = Depends(get_db)):
+    """
+    Create a new API template with detailed description and structured body.
+    """
     try:
-        template_id = str(uuid.uuid4())
-
-        db_entry = APITemplateModel(
-            id=template_id,
-            api_name=template.api_name,
-            description=template.description,
-            base_url=template.base_url,
-            method=template.method,
-            template_json=template.dict(),
-            created_at=datetime.utcnow()
-        )
-
-        db.add(db_entry)
-        db.commit()
-        db.refresh(db_entry)
-
-        return {
-            "message": "API Template created successfully.",
-            "template_id": template_id,
-            "stored_template": db_entry.template_json
-        }
-
+        created_template = create_api_template(db, template)
+        return {"status": "success", "data": created_template}
     except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
