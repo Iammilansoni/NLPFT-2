@@ -357,7 +357,7 @@ class EmbeddingManager:
             logger.error(f"Search error: {e}")
             return []
         
-        # Parse results
+       
         matches = []
         for doc in results.docs:
             try:
