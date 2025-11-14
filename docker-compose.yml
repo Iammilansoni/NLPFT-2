@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   # PostgreSQL Database - Primary data storage
   postgres:
@@ -40,7 +42,21 @@ services:
     networks:
       - nlpforge-network
 
-  # Backend FastAPI service
+  # Redis Commander - Alternative Web UI
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: nlpforge-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - nlpforge-network
+
+  # Backend FastAPI service (canonical API)
   backend:
     build:
       context: ./Backend
@@ -56,12 +72,12 @@ services:
       - POSTGRES_USER=nlpforge
       - POSTGRES_PASSWORD=nlpforge_secure_password
       - POSTGRES_DB=nlpforge
-      
+
       # Redis Configuration
       - REDIS_URL=redis://redis:6379/0
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      
+
       # Application Configuration
       - ENVIRONMENT=production
       - LOG_LEVEL=INFO
@@ -99,7 +115,7 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
       - NEXT_PUBLIC_WS_URL=ws://localhost:8000
-      
+
       # Server-side environment variables (Next.js SSR)
       - API_URL=http://backend:8000
       - NODE_ENV=production
