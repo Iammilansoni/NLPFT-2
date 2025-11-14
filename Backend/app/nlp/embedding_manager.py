@@ -78,21 +78,27 @@ class EmbeddingManager:
             logger.info(f"Creating index {self.index_name}")
             
             schema = (
+                TextField("query"),
+                TextField("api"),
+                TextField("endpoint"),
+                TextField("request"),
+                TextField("response"),
                 VectorField(
-                    "embedding",
+                    "query_embedding",
                     "HNSW",
                     {
                         "TYPE": "FLOAT32",
                         "DIM": self.embedding_dim,
-                        "DISTANCE_METRIC": "COSINE"
+                        "DISTANCE_METRIC": "COSINE",
+                        "M": 16,
+                        "EF_CONSTRUCTION": 200
                     }
                 ),
-                TextField("intent"),
-                TextField("slots_json"),
-                TextField("query"),
-                TextField("hash_id"),
-                TextField("api_name"),
-                TextField("endpoint"),
+                # Additional fields for compatibility and metadata
+                TextField("intent"),  # Alias for 'api' for backward compatibility
+                TextField("slots_json"),  # Alias for 'request' for backward compatibility
+                TextField("hash_id"),  # For deduplication
+                TextField("api_name"),  # Alias for 'api'
                 NumericField("template_version"),
                 TextField("created_at"),
                 NumericField("confidence")
@@ -184,15 +190,20 @@ class EmbeddingManager:
         # Generate embedding
         embedding = self.embed_text(query)
         
-        # Prepare data
+        # Prepare data in unified schema format (matching csv_dataset.csv structure)
+        # Primary fields (matching csv_dataset.csv format)
         data = {
-            "embedding": embedding.astype(np.float32).tobytes(),
-            "intent": intent,
-            "slots_json": json.dumps(slots),
             "query": query,
+            "api": intent,  # 'api' is the primary field, 'intent' is alias
+            "endpoint": endpoint or f"<base_url>/api/{intent}",
+            "request": json.dumps(slots),  # 'request' contains slots as JSON
+            "response": json.dumps({"definition": f"API endpoint for {intent}"}),  # Default response
+            "query_embedding": embedding.astype(np.float32).tobytes(),  # Vector field name matching old schema
+            # Additional fields for compatibility
+            "intent": intent,  # Alias for backward compatibility
+            "slots_json": json.dumps(slots),  # Alias for backward compatibility
             "hash_id": hash_id,
             "api_name": api_name or intent,
-            "endpoint": endpoint or f"<base_url>/api/{intent}",
             "template_version": template_version,
             "created_at": datetime.utcnow().isoformat(),
             "confidence": confidence
@@ -211,8 +222,9 @@ class EmbeddingManager:
         slots_list: List[Dict],
         api_names: Optional[List[str]] = None,
         endpoints: Optional[List[str]] = None,
+        responses: Optional[List[str]] = None,
         batch_size: int = 32
-    ) -> List[str]:
+    ) -> Dict:
         """
         Insert or update multiple embeddings in batch
         
@@ -222,17 +234,22 @@ class EmbeddingManager:
             slots_list: List of slot dictionaries
             api_names: List of API names
             endpoints: List of endpoints
+            responses: List of response JSON strings (optional)
             batch_size: Batch size for processing
             
         Returns:
-            List of Redis keys
+            Dictionary with redis_keys, new_count, and skipped_count
         """
         if api_names is None:
             api_names = intents
         if endpoints is None:
             endpoints = [f"<base_url>/api/{intent}" for intent in intents]
+        if responses is None:
+            responses = [json.dumps({"definition": f"API endpoint for {intent}"}) for intent in intents]
         
         redis_keys = []
+        new_count = 0
+        skipped_count = 0
         total = len(queries)
         
         logger.info(f"Upserting {total} embeddings in batches of {batch_size}")
@@ -243,6 +260,7 @@ class EmbeddingManager:
             batch_slots = slots_list[i:i+batch_size]
             batch_api_names = api_names[i:i+batch_size]
             batch_endpoints = endpoints[i:i+batch_size]
+            batch_responses = responses[i:i+batch_size]
             
             # Generate embeddings for batch
             embeddings = self.embed_batch(batch_queries)
@@ -256,16 +274,27 @@ class EmbeddingManager:
                 if self.redis_client.exists(redis_key):
                     logger.debug(f"Skipping existing: {hash_id}")
                     redis_keys.append(redis_key)
+                    skipped_count += 1
                     continue
                 
+                # Prepare data in unified schema format (matching csv_dataset.csv structure)
+                slots_json = json.dumps(batch_slots[j])
+                # Use provided response or generate default
+                response_data = batch_responses[j] if isinstance(batch_responses[j], str) else json.dumps(batch_responses[j])
+                
                 data = {
-                    "embedding": embeddings[j].astype(np.float32).tobytes(),
-                    "intent": batch_intents[j],
-                    "slots_json": json.dumps(batch_slots[j]),
+                    # Primary fields (matching csv_dataset.csv format)
                     "query": query,
+                    "api": batch_intents[j],  # 'api' is the primary field
+                    "endpoint": batch_endpoints[j],
+                    "request": slots_json,  # 'request' contains slots as JSON
+                    "response": response_data,  # Response field matching csv_dataset.csv
+                    "query_embedding": embeddings[j].astype(np.float32).tobytes(),  # Vector field matching old schema
+                    # Additional fields for compatibility
+                    "intent": batch_intents[j],  # Alias for backward compatibility
+                    "slots_json": slots_json,  # Alias for backward compatibility
                     "hash_id": hash_id,
                     "api_name": batch_api_names[j],
-                    "endpoint": batch_endpoints[j],
                     "template_version": 1,
                     "created_at": datetime.utcnow().isoformat(),
                     "confidence": 1.0
@@ -273,11 +302,17 @@ class EmbeddingManager:
                 
                 self.redis_client.hset(redis_key, mapping=data)
                 redis_keys.append(redis_key)
+                new_count += 1
             
             logger.info(f"Processed batch {i//batch_size + 1}/{(total + batch_size - 1)//batch_size}")
         
-        logger.info(f"Upserted {len(redis_keys)} embeddings")
-        return redis_keys
+        logger.info(f"Upserted {len(redis_keys)} embeddings ({new_count} new, {skipped_count} skipped)")
+        return {
+            "redis_keys": redis_keys,
+            "new_count": new_count,
+            "skipped_count": skipped_count,
+            "total": len(redis_keys)
+        }
     
     def search(
         self,
@@ -299,14 +334,14 @@ class EmbeddingManager:
         # Generate query embedding
         query_embedding = self.embed_text(query)
         
-        # Build Redis query
-        base_query = f"*=>[KNN {top_k} @embedding $vec AS score]"
+        # Build Redis query (using query_embedding field name matching csv_dataset.csv schema)
+        base_query = f"*=>[KNN {top_k} @query_embedding $vec AS score]"
         if intent_filter:
-            base_query = f"@intent:{intent_filter} =>[KNN {top_k} @embedding $vec AS score]"
+            base_query = f"@api:{intent_filter} =>[KNN {top_k} @query_embedding $vec AS score]"
         
         redis_query = (
             Query(base_query)
-            .return_fields("intent", "slots_json", "query", "api_name", "endpoint", "confidence", "score")
+            .return_fields("query", "api", "endpoint", "request", "response", "intent", "slots_json", "api_name", "confidence", "score")
             .sort_by("score")
             .dialect(2)
         )
@@ -322,7 +357,7 @@ class EmbeddingManager:
             logger.error(f"Search error: {e}")
             return []
         
-        # Parse results
+       
         matches = []
         for doc in results.docs:
             try:
@@ -330,12 +365,29 @@ class EmbeddingManager:
                 distance = float(doc.score)
                 similarity = 1 - distance  # Cosine similarity
                 
+                # Extract data - support both old schema (api, request) and new schema (intent, slots_json)
+                intent = getattr(doc, 'api', None) or getattr(doc, 'intent', 'unknown')
+                request_data = getattr(doc, 'request', None) or getattr(doc, 'slots_json', '{}')
+                
+                # Parse slots from request field
+                try:
+                    if isinstance(request_data, str):
+                        slots = json.loads(request_data)
+                    else:
+                        slots = request_data
+                except:
+                    slots = {}
+                
                 matches.append({
-                    "intent": doc.intent,
-                    "slots": json.loads(doc.slots_json),
                     "query": doc.query,
-                    "api_name": doc.api_name,
+                    "api": intent,  # Primary field matching csv_dataset.csv
+                    "intent": intent,  # Alias for backward compatibility
                     "endpoint": doc.endpoint,
+                    "request": request_data,  # Primary field matching csv_dataset.csv
+                    "slots": slots,  # Parsed slots
+                    "slots_json": request_data,  # Alias for backward compatibility
+                    "api_name": getattr(doc, 'api_name', intent),
+                    "response": getattr(doc, 'response', '{}'),
                     "confidence": float(doc.confidence) if hasattr(doc, 'confidence') else 1.0,
                     "similarity": similarity,
                     "score": similarity
@@ -357,26 +409,36 @@ class EmbeddingManager:
         try:
             info = self.redis_client.ft(self.index_name).info()
             
-            # Count documents by intent
+            # Count documents by intent/api using aggregation (much faster)
             intents = {}
             cursor = 0
-            while True:
+            sample_limit = 1000  # Only sample first 1000 for intent breakdown
+            count = 0
+            
+            while count < sample_limit:
                 cursor, keys = self.redis_client.scan(cursor, match="api:*", count=100)
                 for key in keys:
-                    data = self.redis_client.hgetall(key)
-                    if b'intent' in data:
-                        intent = data[b'intent'].decode('utf-8')
+                    if count >= sample_limit:
+                        break
+                    # Only get the intent field, not all data
+                    intent_value = self.redis_client.hget(key, b'api') or self.redis_client.hget(key, b'intent')
+                    if intent_value:
+                        intent = intent_value.decode('utf-8')
                         intents[intent] = intents.get(intent, 0) + 1
+                    count += 1
                 
                 if cursor == 0:
                     break
             
             return {
                 "index_name": self.index_name,
-                "total_documents": info.get('num_docs', 0),
+                "total_embeddings": info.get('num_docs', 0),  # Frontend expects this field name
+                "total_documents": info.get('num_docs', 0),  # Keep for backward compatibility
                 "embedding_dimension": self.embedding_dim,
                 "model_name": self.model_name,
-                "intents": intents
+                "model": self.model_name,  # Frontend expects this field name
+                "intents": intents,
+                "intents_sampled": count < info.get('num_docs', 0)  # Indicate if this is a sample
             }
         except Exception as e:
             logger.error(f"Error getting stats: {e}")
@@ -399,7 +461,14 @@ class EmbeddingManager:
             cursor, keys = self.redis_client.scan(cursor, match="api:*", count=100)
             for key in keys:
                 data = self.redis_client.hgetall(key)
-                if b'intent' in data and data[b'intent'].decode('utf-8') == intent:
+                # Support both 'api' (primary) and 'intent' (alias) fields
+                api_value = None
+                if b'api' in data:
+                    api_value = data[b'api'].decode('utf-8')
+                elif b'intent' in data:
+                    api_value = data[b'intent'].decode('utf-8')
+                
+                if api_value == intent:
                     self.redis_client.delete(key)
                     deleted += 1
             
@@ -407,6 +476,30 @@ class EmbeddingManager:
                 break
         
         logger.info(f"Deleted {deleted} embeddings for intent: {intent}")
+        return deleted
+    
+    def clear_all_embeddings(self) -> int:
+        """
+        Clear all embeddings from Redis (use with caution!)
+        
+        Returns:
+            Number of deleted documents
+        """
+        deleted = 0
+        cursor = 0
+        
+        logger.warning("Clearing all embeddings from Redis...")
+        
+        while True:
+            cursor, keys = self.redis_client.scan(cursor, match="api:*", count=100)
+            if keys:
+                deleted += len(keys)
+                self.redis_client.delete(*keys)
+            
+            if cursor == 0:
+                break
+        
+        logger.warning(f"Cleared {deleted} embeddings from Redis")
         return deleted
 
 

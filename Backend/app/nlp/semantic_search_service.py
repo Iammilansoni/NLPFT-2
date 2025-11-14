@@ -12,7 +12,7 @@ from app.nlp.embedding_model import get_model
 # ===============================================================
 # Defines constants used across the module for model loading,
 # Redis index name, and number of top search results to retrieve.
-INDEX_NAME = "idx:apis"
+INDEX_NAME = "idx:api"
 TOP_K = 5
 
 # ===============================================================

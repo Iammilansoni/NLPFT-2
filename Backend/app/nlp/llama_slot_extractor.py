@@ -50,13 +50,13 @@ class LlamaSlotExtractor:
         self.temperature = temperature
         self.top_p = top_p
         
-        # Check if model exists
+        
         self.enabled = self._check_availability()
         
         if self.enabled:
-            logger.info(f"✅ Llama 3.2 3B slot extractor initialized: {self.model_path}")
+            logger.info(f" Llama 3.2 3B slot extractor initialized: {self.model_path}")
         else:
-            logger.warning("⚠️ Llama 3.2 3B model not found. Slot extraction will use fallback methods.")
+            logger.warning(" Llama 3.2 3B model not found. Slot extraction will use fallback methods.")
     
     def _check_availability(self) -> bool:
         """Check if Llama model and llama.cpp are available"""
@@ -222,15 +222,27 @@ Return only the JSON object, no additional text.<|eot_id|>
                 schema_file = f.name
             
             try:
-                cmd.extend(["--json-schema", schema_file])
+                # Try --json-schema first (llama.cpp v2.0+)
+                # Fallback to --grammar if not supported
+                cmd_with_schema = cmd + ["--json-schema", schema_file]
                 
                 # Run inference
                 result = subprocess.run(
-                    cmd,
+                    cmd_with_schema,
                     capture_output=True,
                     text=True,
                     timeout=30  # 30 second timeout
                 )
+                
+                # If --json-schema fails, try without it (some versions don't support it)
+                if result.returncode != 0 and "--json-schema" in result.stderr:
+                    logger.warning("--json-schema not supported, running without grammar constraint")
+                    result = subprocess.run(
+                        cmd,  # Run without schema
+                        capture_output=True,
+                        text=True,
+                        timeout=30
+                    )
                 
                 if result.returncode != 0:
                     logger.error(f"Llama inference failed: {result.stderr}")
