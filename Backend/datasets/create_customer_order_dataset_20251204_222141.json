@@ -1,0 +1,2160 @@
+[
+  {
+    "query": "Create a new customer order with valid details",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0001",
+      "total_amount": 2599,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer and payment details"
+  },
+  {
+    "query": "Create order with teypod product id and valdid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0001",
+      "total_amount": 2599,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Test creating a new order with a typo in the product id"
+  },
+  {
+    "query": "Create order with insufficient stock",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 100
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Insufficient stock for product prod_ABC123. Available: 5, requested: 100"
+      ],
+      "simulation": true
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with insufficient stock"
+  },
+  {
+    "query": "Create order with valdid payment method and shipping adress",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0001",
+      "total_amount": 2599,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Test creating a new order with a typo in the shipping address"
+  },
+  {
+    "query": "Create order with missing payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Payment method is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with missing payment method"
+  },
+  {
+    "query": "Create order with invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "invalid",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid payment method"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with invalid payment method"
+  },
+  {
+    "query": "Create order with missing shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Shipping address is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with missing shipping address"
+  },
+  {
+    "query": "Create order with invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "",
+        "line1": "",
+        "state": "",
+        "country": "",
+        "postal_code": ""
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid shipping address"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with invalid shipping address"
+  },
+  {
+    "query": "Create order with missing customer id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Customer id is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with missing customer id"
+  },
+  {
+    "query": "Create order with invalid customer id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid customer id"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with invalid customer id"
+  },
+  {
+    "query": "Create order with missing items",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Items are required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with missing items"
+  },
+  {
+    "query": "Create order with invalid items",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "",
+          "quantity": 0
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid items"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with invalid items"
+  },
+  {
+    "query": "Create order with missing payment token",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Payment token is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with missing payment token"
+  },
+  {
+    "query": "Create order with invalid payment token",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "invalid"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid payment token"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with invalid payment token"
+  },
+  {
+    "query": "Create order with missing customer name",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Customer name is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with missing customer name"
+  },
+  {
+    "query": "Create order with invalid customer name",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "customer_name": "invalid",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid customer name"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with invalid customer name"
+  },
+  {
+    "query": "Create order with missing email",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Email is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with missing email"
+  },
+  {
+    "query": "Create order with invalid email",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "email": "invalid",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid email"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with invalid email"
+  },
+  {
+    "query": "Create order with missing phone number",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Phone number is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with missing phone number"
+  },
+  {
+    "query": "Create order with invalid phone number",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "phone_number": "invalid",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid phone number"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with invalid phone number"
+  },
+  {
+    "query": "Create order with missing product id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Product id is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with missing product id"
+  },
+  {
+    "query": "Create order with invalid product id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "invalid",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid product id"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with invalid product id"
+  },
+  {
+    "query": "Create order with missing quantity",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123"
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Quantity is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with missing quantity"
+  },
+  {
+    "query": "Create order with invalid quantity",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": "invalid"
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid quantity"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with invalid quantity"
+  },
+  {
+    "query": "Create order with missing payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Payment method is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with missing payment method"
+  },
+  {
+    "query": "Create order with invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "invalid"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid payment method"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with invalid payment method"
+  },
+  {
+    "query": "Create order with missing card token",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Card token is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with missing card token"
+  },
+  {
+    "query": "Create order with invalid card token",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "invalid"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid card token"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with invalid card token"
+  },
+  {
+    "query": "Create order with missing upi id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "upi"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "UPI id is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with missing upi id"
+  },
+  {
+    "query": "Create order with invalid upi id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "upi",
+        "upi_id": "invalid"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid upi id"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with invalid upi id"
+  },
+  {
+    "query": "Create order with missing netbanking id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "netbanking"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Netbanking id is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with missing netbanking id"
+  },
+  {
+    "query": "Create order with invalid netbanking id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "invalid"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid netbanking id"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with invalid netbanking id"
+  },
+  {
+    "query": "Create order with missing cod",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "cod"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "COD is not a valid payment method"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with missing cod"
+  },
+  {
+    "query": "Create order with invalid cod",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "cod",
+        "cod": "invalid"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid cod"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with invalid cod"
+  },
+  {
+    "query": "Create order with valid details and simulation mode",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0001",
+      "total_amount": 2599,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid details and simulation mode"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and typo in product id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0001",
+      "total_amount": 2599,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Test creating a new order with valid details and simulation mode and typo in product id"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and typo in shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0001",
+      "total_amount": 2599,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Test creating a new order with valid details and simulation mode and typo in shipping address"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and typo in payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0001",
+      "total_amount": 2599,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Test creating a new order with valid details and simulation mode and typo in payment method"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and typo in card token",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0001",
+      "total_amount": 2599,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Test creating a new order with valid details and simulation mode and typo in card token"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and typo in upi id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "upi",
+        "upi_id": "milan@upi"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0001",
+      "total_amount": 2599,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Test creating a new order with valid details and simulation mode and typo in upi id"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and typo in netbanking id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "milan@netbanking"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0001",
+      "total_amount": 2599,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Test creating a new order with valid details and simulation mode and typo in netbanking id"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and typo in cod",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "cod",
+        "cod": "milan@cod"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0001",
+      "total_amount": 2599,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Test creating a new order with valid details and simulation mode and typo in cod"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and missing customer name",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Customer name is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with valid details and simulation mode and missing customer name"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and invalid customer name",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "customer_name": "invalid",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid customer name"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with valid details and simulation mode and invalid customer name"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and missing email",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Email is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with valid details and simulation mode and missing email"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and invalid email",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "email": "invalid",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid email"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with valid details and simulation mode and invalid email"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and missing phone number",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Phone number is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with valid details and simulation mode and missing phone number"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and invalid phone number",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "phone_number": "invalid",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid phone number"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with valid details and simulation mode and invalid phone number"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and missing product id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Product id is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with valid details and simulation mode and missing product id"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and invalid product id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "invalid",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid product id"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with valid details and simulation mode and invalid product id"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and missing quantity",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123"
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Quantity is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with valid details and simulation mode and missing quantity"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and invalid quantity",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": "invalid"
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid quantity"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with valid details and simulation mode and invalid quantity"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and missing payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Payment method is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with valid details and simulation mode and missing payment method"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "invalid"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid payment method"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with valid details and simulation mode and invalid payment method"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and missing card token",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Card token is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with valid details and simulation mode and missing card token"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and invalid card token",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "invalid"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid card token"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with valid details and simulation mode and invalid card token"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and missing upi id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "upi"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "UPI id is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with valid details and simulation mode and missing upi id"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and invalid upi id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "upi",
+        "upi_id": "invalid"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid upi id"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with valid details and simulation mode and invalid upi id"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and missing netbanking id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "netbanking"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Netbanking id is required"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with valid details and simulation mode and missing netbanking id"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and invalid netbanking id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "invalid"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid netbanking id"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with valid details and simulation mode and invalid netbanking id"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and missing cod",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "cod"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "COD is not a valid payment method"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with valid details and simulation mode and missing cod"
+  },
+  {
+    "query": "Create order with valid details and simulation mode and invalid cod",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Jaipur",
+        "line1": "12 Park Lane",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "cod",
+        "cod": "invalid"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid cod"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test creating a new order with valid details and simulation mode and invalid cod"
+  }
+]

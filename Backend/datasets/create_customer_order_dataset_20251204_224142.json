@@ -1,0 +1,4636 @@
+[
+  {
+    "query": "Create order with valid customer ID and payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":2}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "success",
+      "data": {
+        "order_id": "ord_20251129_0001"
+      }
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test case to verify order creation with valid customer ID and payment method"
+  },
+  {
+    "query": "Attempt to create order with invalid customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_invalid",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":2}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid customer ID"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with invalid customer ID"
+  },
+  {
+    "query": "Create order with valid customer ID and payment method, but with a typo in the product ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC1234\",\"quantity\":2}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid product ID"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test case to verify order creation fails with a typo in the product ID"
+  },
+  {
+    "query": "Create order with a large number of items",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1000},{\"product_id\":\"prod_XYZ789\",\"quantity\":500}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "success",
+      "data": {
+        "order_id": "ord_20251129_0002"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test case to verify order creation with a large number of items"
+  },
+  {
+    "query": "Create order with a small number of items",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "success",
+      "data": {
+        "order_id": "ord_20251129_0003"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test case to verify order creation with a small number of items"
+  },
+  {
+    "query": "Create order with a large payment amount",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":10},{\"product_id\":\"prod_XYZ789\",\"quantity\":10}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "success",
+      "data": {
+        "order_id": "ord_20251129_0004"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test case to verify order creation with a large payment amount"
+  },
+  {
+    "query": "Create order with a small payment amount",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "success",
+      "data": {
+        "order_id": "ord_20251129_0005"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test case to verify order creation with a small payment amount"
+  },
+  {
+    "query": "Create order with a long shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "line2": "456 Elm St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "success",
+      "data": {
+        "order_id": "ord_20251129_0006"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test case to verify order creation with a long shipping address"
+  },
+  {
+    "query": "Create order with a null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": null
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null shipping address"
+  },
+  {
+    "query": "Create order with an empty payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {},
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty payment method"
+  },
+  {
+    "query": "Create order with an invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "invalid",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid payment method"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid payment method"
+  },
+  {
+    "query": "Create order with a null payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": null,
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null payment method"
+  },
+  {
+    "query": "Create order with an empty customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Customer ID is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty customer ID"
+  },
+  {
+    "query": "Create order with a null customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": null,
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Customer ID is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null customer ID"
+  },
+  {
+    "query": "Create order with an invalid customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid customer ID"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid customer ID"
+  },
+  {
+    "query": "Create order with a null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": null
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null shipping address"
+  },
+  {
+    "query": "Create order with an empty shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {}
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty shipping address"
+  },
+  {
+    "query": "Create order with an invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "invalid",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid shipping address"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid shipping address"
+  },
+  {
+    "query": "Create order with a null payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": null,
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null payment method"
+  },
+  {
+    "query": "Create order with an empty payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {},
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty payment method"
+  },
+  {
+    "query": "Create order with an invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "invalid",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid payment method"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid payment method"
+  },
+  {
+    "query": "Create order with a large number of items",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1000},{\"product_id\":\"prod_XYZ789\",\"quantity\":500}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "success",
+      "data": {
+        "order_id": "ord_20251129_0007"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test case to verify order creation with a large number of items"
+  },
+  {
+    "query": "Create order with a small number of items",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "success",
+      "data": {
+        "order_id": "ord_20251129_0008"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test case to verify order creation with a small number of items"
+  },
+  {
+    "query": "Create order with a large payment amount",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":10},{\"product_id\":\"prod_XYZ789\",\"quantity\":10}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "success",
+      "data": {
+        "order_id": "ord_20251129_0009"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test case to verify order creation with a large payment amount"
+  },
+  {
+    "query": "Create order with a small payment amount",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "success",
+      "data": {
+        "order_id": "ord_20251129_0010"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test case to verify order creation with a small payment amount"
+  },
+  {
+    "query": "Create order with a long shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "line2": "456 Elm St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "success",
+      "data": {
+        "order_id": "ord_20251129_0011"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Test case to verify order creation with a long shipping address"
+  },
+  {
+    "query": "Create order with a null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": null
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null shipping address"
+  },
+  {
+    "query": "Create order with an empty payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {},
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty payment method"
+  },
+  {
+    "query": "Create order with an invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "invalid",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid payment method"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid payment method"
+  },
+  {
+    "query": "Create order with a null payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": null,
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null payment method"
+  },
+  {
+    "query": "Create order with an empty customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Customer ID is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty customer ID"
+  },
+  {
+    "query": "Create order with a null customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": null,
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Customer ID is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null customer ID"
+  },
+  {
+    "query": "Create order with an invalid customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid customer ID"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid customer ID"
+  },
+  {
+    "query": "Create order with a null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": null
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null shipping address"
+  },
+  {
+    "query": "Create order with an empty shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {}
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty shipping address"
+  },
+  {
+    "query": "Create order with an invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "invalid",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid shipping address"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid shipping address"
+  },
+  {
+    "query": "Create order with a null payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": null,
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null payment method"
+  },
+  {
+    "query": "Create order with an empty payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {},
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty payment method"
+  },
+  {
+    "query": "Create order with an invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "invalid",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid payment method"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid payment method"
+  },
+  {
+    "query": "Create order with a null customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": null,
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Customer ID is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null customer ID"
+  },
+  {
+    "query": "Create order with an invalid customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid customer ID"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid customer ID"
+  },
+  {
+    "query": "Create order with a null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": null
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null shipping address"
+  },
+  {
+    "query": "Create order with an empty shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {}
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty shipping address"
+  },
+  {
+    "query": "Create order with an invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "invalid",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid shipping address"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid shipping address"
+  },
+  {
+    "query": "Create order with a null payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": null,
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null payment method"
+  },
+  {
+    "query": "Create order with an empty payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {},
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty payment method"
+  },
+  {
+    "query": "Create order with an invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "invalid",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid payment method"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid payment method"
+  },
+  {
+    "query": "Create order with a null customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": null,
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Customer ID is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null customer ID"
+  },
+  {
+    "query": "Create order with an invalid customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid customer ID"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid customer ID"
+  },
+  {
+    "query": "Create order with a null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": null
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null shipping address"
+  },
+  {
+    "query": "Create order with an empty shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {}
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty shipping address"
+  },
+  {
+    "query": "Create order with an invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "invalid",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid shipping address"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid shipping address"
+  },
+  {
+    "query": "Create order with a null payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": null,
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null payment method"
+  },
+  {
+    "query": "Create order with an empty payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {},
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty payment method"
+  },
+  {
+    "query": "Create order with an invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "invalid",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid payment method"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid payment method"
+  },
+  {
+    "query": "Create order with a null customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": null,
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Customer ID is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null customer ID"
+  },
+  {
+    "query": "Create order with an invalid customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid customer ID"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid customer ID"
+  },
+  {
+    "query": "Create order with a null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": null
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null shipping address"
+  },
+  {
+    "query": "Create order with an empty shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {}
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty shipping address"
+  },
+  {
+    "query": "Create order with an invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "invalid",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid shipping address"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid shipping address"
+  },
+  {
+    "query": "Create order with a null payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": null,
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null payment method"
+  },
+  {
+    "query": "Create order with an empty payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {},
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty payment method"
+  },
+  {
+    "query": "Create order with an invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "invalid",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid payment method"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid payment method"
+  },
+  {
+    "query": "Create order with a null customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": null,
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Customer ID is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null customer ID"
+  },
+  {
+    "query": "Create order with an invalid customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid customer ID"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid customer ID"
+  },
+  {
+    "query": "Create order with a null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": null
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null shipping address"
+  },
+  {
+    "query": "Create order with an empty shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {}
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty shipping address"
+  },
+  {
+    "query": "Create order with an invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "invalid",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid shipping address"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid shipping address"
+  },
+  {
+    "query": "Create order with a null payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": null,
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null payment method"
+  },
+  {
+    "query": "Create order with an empty payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {},
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty payment method"
+  },
+  {
+    "query": "Create order with an invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "invalid",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid payment method"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid payment method"
+  },
+  {
+    "query": "Create order with a null customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": null,
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Customer ID is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null customer ID"
+  },
+  {
+    "query": "Create order with an invalid customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid customer ID"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid customer ID"
+  },
+  {
+    "query": "Create order with a null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": null
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null shipping address"
+  },
+  {
+    "query": "Create order with an empty shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {}
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty shipping address"
+  },
+  {
+    "query": "Create order with an invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "invalid",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid shipping address"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid shipping address"
+  },
+  {
+    "query": "Create order with a null payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": null,
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null payment method"
+  },
+  {
+    "query": "Create order with an empty payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {},
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty payment method"
+  },
+  {
+    "query": "Create order with an invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "invalid",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid payment method"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid payment method"
+  },
+  {
+    "query": "Create order with a null customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": null,
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Customer ID is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null customer ID"
+  },
+  {
+    "query": "Create order with an invalid customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid customer ID"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid customer ID"
+  },
+  {
+    "query": "Create order with a null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": null
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null shipping address"
+  },
+  {
+    "query": "Create order with an empty shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {}
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty shipping address"
+  },
+  {
+    "query": "Create order with an invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "invalid",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid shipping address"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid shipping address"
+  },
+  {
+    "query": "Create order with a null payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": null,
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null payment method"
+  },
+  {
+    "query": "Create order with an empty payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {},
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty payment method"
+  },
+  {
+    "query": "Create order with an invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "invalid",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid payment method"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid payment method"
+  },
+  {
+    "query": "Create order with a null customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": null,
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Customer ID is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null customer ID"
+  },
+  {
+    "query": "Create order with an invalid customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid customer ID"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid customer ID"
+  },
+  {
+    "query": "Create order with a null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": null
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null shipping address"
+  },
+  {
+    "query": "Create order with an empty shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {}
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty shipping address"
+  },
+  {
+    "query": "Create order with an invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "invalid",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid shipping address"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid shipping address"
+  },
+  {
+    "query": "Create order with a null payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": null,
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null payment method"
+  },
+  {
+    "query": "Create order with an empty payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {},
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty payment method"
+  },
+  {
+    "query": "Create order with an invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "invalid",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid payment method"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid payment method"
+  },
+  {
+    "query": "Create order with a null customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": null,
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Customer ID is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null customer ID"
+  },
+  {
+    "query": "Create order with an invalid customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid customer ID"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid customer ID"
+  },
+  {
+    "query": "Create order with a null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": null
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null shipping address"
+  },
+  {
+    "query": "Create order with an empty shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {}
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty shipping address"
+  },
+  {
+    "query": "Create order with an invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "invalid",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid shipping address"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid shipping address"
+  },
+  {
+    "query": "Create order with a null payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": null,
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null payment method"
+  },
+  {
+    "query": "Create order with an empty payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {},
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty payment method"
+  },
+  {
+    "query": "Create order with an invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "invalid",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid payment method"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid payment method"
+  },
+  {
+    "query": "Create order with a null customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": null,
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Customer ID is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null customer ID"
+  },
+  {
+    "query": "Create order with an invalid customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid customer ID"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid customer ID"
+  },
+  {
+    "query": "Create order with a null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": null
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null shipping address"
+  },
+  {
+    "query": "Create order with an empty shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {}
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty shipping address"
+  },
+  {
+    "query": "Create order with an invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "invalid",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid shipping address"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid shipping address"
+  },
+  {
+    "query": "Create order with a null payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": null,
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null payment method"
+  },
+  {
+    "query": "Create order with an empty payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {},
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty payment method"
+  },
+  {
+    "query": "Create order with an invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "invalid",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid payment method"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid payment method"
+  },
+  {
+    "query": "Create order with a null customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": null,
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Customer ID is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null customer ID"
+  },
+  {
+    "query": "Create order with an invalid customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid customer ID"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid customer ID"
+  },
+  {
+    "query": "Create order with a null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": null
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null shipping address"
+  },
+  {
+    "query": "Create order with an empty shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {}
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty shipping address"
+  },
+  {
+    "query": "Create order with an invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "invalid",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid shipping address"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid shipping address"
+  },
+  {
+    "query": "Create order with a null payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": null,
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null payment method"
+  },
+  {
+    "query": "Create order with an empty payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {},
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty payment method"
+  },
+  {
+    "query": "Create order with an invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "invalid",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid payment method"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid payment method"
+  },
+  {
+    "query": "Create order with a null customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": null,
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Customer ID is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null customer ID"
+  },
+  {
+    "query": "Create order with an invalid customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid customer ID"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid customer ID"
+  },
+  {
+    "query": "Create order with a null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": null
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null shipping address"
+  },
+  {
+    "query": "Create order with an empty shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {}
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty shipping address"
+  },
+  {
+    "query": "Create order with an invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "invalid",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid shipping address"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid shipping address"
+  },
+  {
+    "query": "Create order with a null payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": null,
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null payment method"
+  },
+  {
+    "query": "Create order with an empty payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {},
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty payment method"
+  },
+  {
+    "query": "Create order with an invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "invalid",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid payment method"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid payment method"
+  },
+  {
+    "query": "Create order with a null customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": null,
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Customer ID is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null customer ID"
+  },
+  {
+    "query": "Create order with an invalid customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid customer ID"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid customer ID"
+  },
+  {
+    "query": "Create order with a null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": null
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null shipping address"
+  },
+  {
+    "query": "Create order with an empty shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {}
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty shipping address"
+  },
+  {
+    "query": "Create order with an invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "invalid",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid shipping address"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid shipping address"
+  },
+  {
+    "query": "Create order with a null payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": null,
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null payment method"
+  },
+  {
+    "query": "Create order with an empty payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {},
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty payment method"
+  },
+  {
+    "query": "Create order with an invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "invalid",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid payment method"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid payment method"
+  },
+  {
+    "query": "Create order with a null customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": null,
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Customer ID is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null customer ID"
+  },
+  {
+    "query": "Create order with an invalid customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid customer ID"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid customer ID"
+  },
+  {
+    "query": "Create order with a null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": null
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null shipping address"
+  },
+  {
+    "query": "Create order with an empty shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {}
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty shipping address"
+  },
+  {
+    "query": "Create order with an invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "invalid",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid shipping address"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid shipping address"
+  },
+  {
+    "query": "Create order with a null payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": null,
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null payment method"
+  },
+  {
+    "query": "Create order with an empty payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {},
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty payment method"
+  },
+  {
+    "query": "Create order with an invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "invalid",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid payment method"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid payment method"
+  },
+  {
+    "query": "Create order with a null customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": null,
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Customer ID is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null customer ID"
+  },
+  {
+    "query": "Create order with an invalid customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid customer ID"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid customer ID"
+  },
+  {
+    "query": "Create order with a null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": null
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null shipping address"
+  },
+  {
+    "query": "Create order with an empty shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {}
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty shipping address"
+  },
+  {
+    "query": "Create order with an invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "invalid",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid shipping address"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid shipping address"
+  },
+  {
+    "query": "Create order with a null payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": null,
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null payment method"
+  },
+  {
+    "query": "Create order with an empty payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {},
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty payment method"
+  },
+  {
+    "query": "Create order with an invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "invalid",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid payment method"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid payment method"
+  },
+  {
+    "query": "Create order with a null customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": null,
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Customer ID is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null customer ID"
+  },
+  {
+    "query": "Create order with an invalid customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid customer ID"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid customer ID"
+  },
+  {
+    "query": "Create order with a null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": null
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null shipping address"
+  },
+  {
+    "query": "Create order with an empty shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {}
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty shipping address"
+  },
+  {
+    "query": "Create order with an invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "invalid",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid shipping address"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid shipping address"
+  },
+  {
+    "query": "Create order with a null payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": null,
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null payment method"
+  },
+  {
+    "query": "Create order with an empty payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {},
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty payment method"
+  },
+  {
+    "query": "Create order with an invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "invalid",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid payment method"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid payment method"
+  },
+  {
+    "query": "Create order with a null customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": null,
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Customer ID is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null customer ID"
+  },
+  {
+    "query": "Create order with an invalid customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid customer ID"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid customer ID"
+  },
+  {
+    "query": "Create order with a null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": null
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null shipping address"
+  },
+  {
+    "query": "Create order with an empty shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {}
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Shipping address is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty shipping address"
+  },
+  {
+    "query": "Create order with an invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "city": "invalid",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Invalid shipping address"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an invalid shipping address"
+  },
+  {
+    "query": "Create order with a null payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": null,
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with a null payment method"
+  },
+  {
+    "query": "Create order with an empty payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123456",
+      "items": "[{\"product_id\":\"prod_ABC123\",\"quantity\":1},{\"product_id\":\"prod_XYZ789\",\"quantity\":1}]",
+      "payment": {},
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "failure",
+      "data": {
+        "error": "Payment method is required"
+      }
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test case to verify order creation fails with an empty payment method"
+  }
+]

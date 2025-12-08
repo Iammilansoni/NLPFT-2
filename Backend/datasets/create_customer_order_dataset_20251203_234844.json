@@ -1,0 +1,2968 @@
+[
+  {
+    "query": "Create a new customer order for two items, paying by card token, with a standard shipping address.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 2,
+            "product_id": "prod_ABC123"
+          },
+          {
+            "quantity": 1,
+            "product_id": "prod_XYZ789"
+          }
+        ],
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_4242"
+        },
+        "customer_id": "cust_987654",
+        "shipping_address": {
+          "city": "Jaipur",
+          "line1": "12 Park Lane",
+          "line2": null,
+          "state": "RJ",
+          "country": "IN",
+          "postal_code": "302020"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 999,
+          "quantity": 2,
+          "product_id": "prod_ABC123"
+        },
+        {
+          "price": 601,
+          "quantity": 1,
+          "product_id": "prod_XYZ789"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0001",
+      "total_amount": 2599,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Standard order creation with multiple items and card payment."
+  },
+  {
+    "query": "Submit an order using UPI as the payment method for a single product.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_PQR456"
+          }
+        ],
+        "payment": {
+          "method": "upi",
+          "upi_id": "milan@upi"
+        },
+        "customer_id": "cust_555111",
+        "shipping_address": {
+          "city": "Bengaluru",
+          "line1": "45 MG Road",
+          "state": "KA",
+          "country": "IN",
+          "postal_code": "560001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0002",
+      "total_amount": 799,
+      "estimated_delivery": "2025-12-06"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Order with UPI payment, expecting pending status."
+  },
+  {
+    "query": "Process a new order for a customer paying via netbanking, including a special note.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 3,
+            "product_id": "prod_DEF456"
+          }
+        ],
+        "notes": "Gift wrapping requested for this order.",
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_hbfc_123"
+        },
+        "customer_id": "cust_112233",
+        "shipping_address": {
+          "city": "Mumbai",
+          "line1": "789 Ocean Drive",
+          "line2": "Apt 5B",
+          "state": "MH",
+          "country": "IN",
+          "postal_code": "400001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 450,
+          "quantity": 3,
+          "product_id": "prod_DEF456"
+        }
+      ],
+      "status": "created",
+      "message": "Order placed successfully via Netbanking.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0003",
+      "total_amount": 1350,
+      "estimated_delivery": "2025-12-05"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Order with netbanking payment and an optional note."
+  },
+  {
+    "query": "Initiate an order with Cash on Delivery (COD) as the payment option for a single item.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_GHI789"
+          }
+        ],
+        "payment": {
+          "method": "cod"
+        },
+        "customer_id": "cust_445566",
+        "shipping_address": {
+          "city": "Delhi",
+          "line1": "10 Civil Lines",
+          "line2": null,
+          "state": "DL",
+          "country": "IN",
+          "postal_code": "110001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 250,
+          "quantity": 1,
+          "product_id": "prod_GHI789"
+        }
+      ],
+      "status": "confirmed",
+      "message": "Order confirmed for Cash on Delivery.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0004",
+      "total_amount": 250,
+      "estimated_delivery": "2025-12-07"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Order with COD payment, expecting confirmed status."
+  },
+  {
+    "query": "Place an order for a single product with card payment, using a different currency for calculation.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_JKL012"
+          }
+        ],
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_1111"
+        },
+        "customer_id": "cust_778899",
+        "shipping_address": {
+          "city": "Chennai",
+          "line1": "5 Anna Salai",
+          "state": "TN",
+          "country": "IN",
+          "postal_code": "600002"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {
+        "currency": "USD"
+      }
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 15,
+          "quantity": 1,
+          "product_id": "prod_JKL012"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "USD",
+      "order_id": "ord_20251129_0005",
+      "total_amount": 15,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Order with currency override in query parameters."
+  },
+  {
+    "query": "Place an order with a minimal shipping address, using shortest valid string lengths for fields like country.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_MINLEN"
+          }
+        ],
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_2222"
+        },
+        "customer_id": "cust_MINID",
+        "shipping_address": {
+          "city": "A",
+          "line1": "1",
+          "state": "B",
+          "country": "US",
+          "postal_code": "1"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 10,
+          "quantity": 1,
+          "product_id": "prod_MINLEN"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "USD",
+      "order_id": "ord_20251129_0007",
+      "total_amount": 10,
+      "estimated_delivery": "2025-12-09"
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Testing minimum string lengths for shipping address fields and IDs."
+  },
+  {
+    "query": "Create an order with a single item and a valid but less common currency code in the query parameter.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_EURO"
+          }
+        ],
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_4444"
+        },
+        "customer_id": "cust_EURO_01",
+        "shipping_address": {
+          "city": "Berlin",
+          "line1": "10 Brandenburg Gate",
+          "state": "BE",
+          "country": "DE",
+          "postal_code": "10117"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {
+        "currency": "EUR"
+      }
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 25,
+          "quantity": 1,
+          "product_id": "prod_EURO"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "EUR",
+      "order_id": "ord_20251129_0010",
+      "total_amount": 25,
+      "estimated_delivery": "2025-12-06"
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Testing currency override with a different valid currency code (EUR)."
+  },
+  {
+    "query": "Submit a purchase for multiple items with a standard card payment, including a brief note.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_P101"
+          },
+          {
+            "quantity": 3,
+            "product_id": "prod_P102"
+          }
+        ],
+        "notes": "Expedited shipping requested.",
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_5555"
+        },
+        "customer_id": "cust_001ABC",
+        "shipping_address": {
+          "city": "Bangalore",
+          "line1": "10 Residency Road",
+          "line2": "Near Forum Mall",
+          "state": "KA",
+          "country": "IN",
+          "postal_code": "560025"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 1200,
+          "quantity": 1,
+          "product_id": "prod_P101"
+        },
+        {
+          "price": 300,
+          "quantity": 3,
+          "product_id": "prod_P102"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0011",
+      "total_amount": 2100,
+      "estimated_delivery": "2025-12-03"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Multiple items, card payment, and a note."
+  },
+  {
+    "query": "Create an order for a single item, paying via UPI, with a detailed shipping address.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_P103"
+          }
+        ],
+        "payment": {
+          "method": "upi",
+          "upi_id": "customer.name@bank"
+        },
+        "customer_id": "cust_002DEF",
+        "shipping_address": {
+          "city": "Hyderabad",
+          "line1": "Plot No. 123, Road No. 45",
+          "line2": "Jubilee Hills, Near Apollo Hospital",
+          "state": "TS",
+          "country": "IN",
+          "postal_code": "500033"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0012",
+      "total_amount": 850,
+      "estimated_delivery": "2025-12-06"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Single item, UPI payment, detailed address."
+  },
+  {
+    "query": "Place an order using netbanking for two different products, without any additional notes.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_P104"
+          },
+          {
+            "quantity": 2,
+            "product_id": "prod_P105"
+          }
+        ],
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_icici_789"
+        },
+        "customer_id": "cust_003GHI",
+        "shipping_address": {
+          "city": "Pune",
+          "line1": "20 MG Road",
+          "state": "MH",
+          "country": "IN",
+          "postal_code": "411001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 600,
+          "quantity": 1,
+          "product_id": "prod_P104"
+        },
+        {
+          "price": 250,
+          "quantity": 2,
+          "product_id": "prod_P105"
+        }
+      ],
+      "status": "created",
+      "message": "Order placed successfully via Netbanking.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0013",
+      "total_amount": 1100,
+      "estimated_delivery": "2025-12-05"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Two items, netbanking payment, no notes."
+  },
+  {
+    "query": "Initiate a Cash on Delivery order for a single product with a simple address.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_P106"
+          }
+        ],
+        "payment": {
+          "method": "cod"
+        },
+        "customer_id": "cust_004JKL",
+        "shipping_address": {
+          "city": "Surat",
+          "line1": "15 Ring Road",
+          "state": "GJ",
+          "country": "IN",
+          "postal_code": "395002"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 400,
+          "quantity": 1,
+          "product_id": "prod_P106"
+        }
+      ],
+      "status": "confirmed",
+      "message": "Order confirmed for Cash on Delivery.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0014",
+      "total_amount": 400,
+      "estimated_delivery": "2025-12-08"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Single item, COD payment, simple address."
+  },
+  {
+    "query": "Create an order for a customer with a card payment and an optional note, overriding the default currency to EUR.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_P107"
+          }
+        ],
+        "notes": "Customer prefers EUR pricing.",
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_6666"
+        },
+        "customer_id": "cust_005MNO",
+        "shipping_address": {
+          "city": "Paris",
+          "line1": "1 Rue de la Paix",
+          "state": "IDF",
+          "country": "FR",
+          "postal_code": "75002"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {
+        "currency": "EUR"
+      }
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 50,
+          "quantity": 1,
+          "product_id": "prod_P107"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "EUR",
+      "order_id": "ord_20251129_0015",
+      "total_amount": 50,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Card payment, note, and EUR currency override."
+  },
+  {
+    "query": "Submit an order for a single item with a card payment, ensuring the customer ID is alphanumeric and contains numbers and letters.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_ALPHA1"
+          }
+        ],
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_7777"
+        },
+        "customer_id": "cust_ALPHA123XYZ",
+        "shipping_address": {
+          "city": "Mumbai",
+          "line1": "10 Linking Road",
+          "state": "MH",
+          "country": "IN",
+          "postal_code": "400050"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 999,
+          "quantity": 1,
+          "product_id": "prod_ALPHA1"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0016",
+      "total_amount": 999,
+      "estimated_delivery": "2025-12-05"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Customer ID with alphanumeric characters."
+  },
+  {
+    "query": "Create an order for a customer from a different country (USA) with a card payment and two items.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_USITEM1"
+          },
+          {
+            "quantity": 2,
+            "product_id": "prod_USITEM2"
+          }
+        ],
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_8888"
+        },
+        "customer_id": "cust_US_001",
+        "shipping_address": {
+          "city": "New York",
+          "line1": "100 Broadway",
+          "line2": "Apt 10A",
+          "state": "NY",
+          "country": "US",
+          "postal_code": "10005"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {
+        "currency": "USD"
+      }
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 25,
+          "quantity": 1,
+          "product_id": "prod_USITEM1"
+        },
+        {
+          "price": 15,
+          "quantity": 2,
+          "product_id": "prod_USITEM2"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "USD",
+      "order_id": "ord_20251129_0017",
+      "total_amount": 55,
+      "estimated_delivery": "2025-12-07"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Order from USA with USD currency override."
+  },
+  {
+    "query": "Process an order for a single item with UPI payment, where the customer is from Canada.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_CAITEM"
+          }
+        ],
+        "payment": {
+          "method": "upi",
+          "upi_id": "canadian.user@bank"
+        },
+        "customer_id": "cust_CA_002",
+        "shipping_address": {
+          "city": "Toronto",
+          "line1": "1 Yonge Street",
+          "state": "ON",
+          "country": "CA",
+          "postal_code": "M5E1E5"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {
+        "currency": "CAD"
+      }
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "currency": "CAD",
+      "order_id": "ord_20251129_0018",
+      "total_amount": 40,
+      "estimated_delivery": "2025-12-09"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Order from Canada with CAD currency override and UPI payment."
+  },
+  {
+    "query": "Create an order with two items using netbanking, for a customer in Australia.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_AUITEM1"
+          },
+          {
+            "quantity": 1,
+            "product_id": "prod_AUITEM2"
+          }
+        ],
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_anz_123"
+        },
+        "customer_id": "cust_AU_003",
+        "shipping_address": {
+          "city": "Sydney",
+          "line1": "10 George Street",
+          "state": "NSW",
+          "country": "AU",
+          "postal_code": "2000"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {
+        "currency": "AUD"
+      }
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 60,
+          "quantity": 1,
+          "product_id": "prod_AUITEM1"
+        },
+        {
+          "price": 30,
+          "quantity": 1,
+          "product_id": "prod_AUITEM2"
+        }
+      ],
+      "status": "created",
+      "message": "Order placed successfully via Netbanking.",
+      "currency": "AUD",
+      "order_id": "ord_20251129_0019",
+      "total_amount": 90,
+      "estimated_delivery": "2025-12-08"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Order from Australia with AUD currency override and Netbanking."
+  },
+  {
+    "query": "Initiate a Cash on Delivery order for a single item for a customer in the UK.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_UKITEM"
+          }
+        ],
+        "payment": {
+          "method": "cod"
+        },
+        "customer_id": "cust_UK_004",
+        "shipping_address": {
+          "city": "Manchester",
+          "line1": "5 Piccadilly",
+          "state": "ENG",
+          "country": "GB",
+          "postal_code": "M11RN"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {
+        "currency": "GBP"
+      }
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 20,
+          "quantity": 1,
+          "product_id": "prod_UKITEM"
+        }
+      ],
+      "status": "confirmed",
+      "message": "Order confirmed for Cash on Delivery.",
+      "currency": "GBP",
+      "order_id": "ord_20251129_0020",
+      "total_amount": 20,
+      "estimated_delivery": "2025-12-10"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Order from UK with GBP currency override and COD payment."
+  },
+  {
+    "query": "Create an order with a single item and card payment, including a slightly longer note about delivery preferences.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_LONGNOTE"
+          }
+        ],
+        "notes": "Please deliver between 9 AM and 5 PM on weekdays. Leave at the front door if no one is home.",
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_9999"
+        },
+        "customer_id": "cust_NOTE_01",
+        "shipping_address": {
+          "city": "Chandigarh",
+          "line1": "Sector 17, Shop No. 12",
+          "state": "CH",
+          "country": "IN",
+          "postal_code": "160017"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 750,
+          "quantity": 1,
+          "product_id": "prod_LONGNOTE"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0021",
+      "total_amount": 750,
+      "estimated_delivery": "2025-12-06"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Order with a descriptive note for delivery instructions."
+  },
+  {
+    "query": "Order a single product, paying by card, with a customer ID that includes special characters and numbers.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_123-XYZ"
+          }
+        ],
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_1234"
+        },
+        "customer_id": "cust_@USER#123",
+        "shipping_address": {
+          "city": "Bengaluru",
+          "line1": "100 ITPL Road",
+          "state": "KA",
+          "country": "IN",
+          "postal_code": "560066"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 1500,
+          "quantity": 1,
+          "product_id": "prod_123-XYZ"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0026",
+      "total_amount": 1500,
+      "estimated_delivery": "2025-12-05"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Customer ID with special characters and numbers."
+  },
+  {
+    "query": "Create an order for two items, paying by netbanking, with a customer from Germany and a note.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_DE_ITEM1"
+          },
+          {
+            "quantity": 1,
+            "product_id": "prod_DE_ITEM2"
+          }
+        ],
+        "notes": "Express delivery requested.",
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_deutsche_bank_456"
+        },
+        "customer_id": "cust_DE_001",
+        "shipping_address": {
+          "city": "Munich",
+          "line1": "Marienplatz 1",
+          "state": "BY",
+          "country": "DE",
+          "postal_code": "80331"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {
+        "currency": "EUR"
+      }
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 80,
+          "quantity": 1,
+          "product_id": "prod_DE_ITEM1"
+        },
+        {
+          "price": 40,
+          "quantity": 1,
+          "product_id": "prod_DE_ITEM2"
+        }
+      ],
+      "status": "created",
+      "message": "Order placed successfully via Netbanking.",
+      "currency": "EUR",
+      "order_id": "ord_20251129_0029",
+      "total_amount": 120,
+      "estimated_delivery": "2025-12-05"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Order from Germany with EUR currency and Netbanking."
+  },
+  {
+    "query": "Submit an order for a single product with a card payment, using a specific currency for price calculation.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_CURR_TEST"
+          }
+        ],
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_5678"
+        },
+        "customer_id": "cust_CURR_01",
+        "shipping_address": {
+          "city": "Tokyo",
+          "line1": "1-1-1 Marunouchi",
+          "state": "TYO",
+          "country": "JP",
+          "postal_code": "100-0005"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {
+        "currency": "JPY"
+      }
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 2500,
+          "quantity": 1,
+          "product_id": "prod_CURR_TEST"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "JPY",
+      "order_id": "ord_20251129_0030",
+      "total_amount": 2500,
+      "estimated_delivery": "2025-12-07"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Order with JPY currency override."
+  },
+  {
+    "query": "Create an order with a single item, UPI payment, and a `upi_id` containing numbers and dots.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_UPI_DOT"
+          }
+        ],
+        "payment": {
+          "method": "upi",
+          "upi_id": "user.123@bank"
+        },
+        "customer_id": "cust_UPI_DOT",
+        "shipping_address": {
+          "city": "Bengaluru",
+          "line1": "Electronic City Phase 2",
+          "state": "KA",
+          "country": "IN",
+          "postal_code": "560100"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0031",
+      "total_amount": 900,
+      "estimated_delivery": "2025-12-06"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "UPI ID with dots and numbers."
+  },
+  {
+    "query": "Create an order for a customer from 'India' with a card payment, using a typo in the country code 'IN' to 'NI' in the query.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_TYPO_COUNTRY"
+          }
+        ],
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_TYPO"
+        },
+        "customer_id": "cust_TYPO",
+        "shipping_address": {
+          "city": "Bengaluru",
+          "line1": "100 MG Road",
+          "state": "KA",
+          "country": "IN",
+          "postal_code": "560001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 1200,
+          "quantity": 1,
+          "product_id": "prod_TYPO_COUNTRY"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0042",
+      "total_amount": 1200,
+      "estimated_delivery": "2025-12-05"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'NI' for 'IN'."
+  },
+  {
+    "query": "Submit an order using 'netbankng' (typo) as the payment method for a single item.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_TYPO_PAYMENT"
+          }
+        ],
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_typo_bank"
+        },
+        "customer_id": "cust_TYPO_PAY",
+        "shipping_address": {
+          "city": "Mumbai",
+          "line1": "Bandra Kurla Complex",
+          "state": "MH",
+          "country": "IN",
+          "postal_code": "400051"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 950,
+          "quantity": 1,
+          "product_id": "prod_TYPO_PAYMENT"
+        }
+      ],
+      "status": "created",
+      "message": "Order placed successfully via Netbanking.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0043",
+      "total_amount": 950,
+      "estimated_delivery": "2025-12-06"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'netbankng' for 'netbanking'."
+  },
+  {
+    "query": "Process a new 'cusomer' order (typo) for two items, paying by card token.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 2,
+            "product_id": "prod_TYPO_CUST"
+          },
+          {
+            "quantity": 1,
+            "product_id": "prod_TYPO_CUST2"
+          }
+        ],
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_CUST"
+        },
+        "customer_id": "cust_TYPO_CUSTOMER",
+        "shipping_address": {
+          "city": "Jaipur",
+          "line1": "12 Park Lane",
+          "state": "RJ",
+          "country": "IN",
+          "postal_code": "302020"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 999,
+          "quantity": 2,
+          "product_id": "prod_TYPO_CUST"
+        },
+        {
+          "price": 601,
+          "quantity": 1,
+          "product_id": "prod_TYPO_CUST2"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0044",
+      "total_amount": 2599,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'cusomer' for 'customer'."
+  },
+  {
+    "query": "Initiate an order with 'Cash on Delivry' (typo) as the payment option for a single item.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_TYPO_COD"
+          }
+        ],
+        "payment": {
+          "method": "cod"
+        },
+        "customer_id": "cust_TYPO_DELIVERY",
+        "shipping_address": {
+          "city": "Delhi",
+          "line1": "10 Civil Lines",
+          "state": "DL",
+          "country": "IN",
+          "postal_code": "110001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 250,
+          "quantity": 1,
+          "product_id": "prod_TYPO_COD"
+        }
+      ],
+      "status": "confirmed",
+      "message": "Order confirmed for Cash on Delivery.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0045",
+      "total_amount": 250,
+      "estimated_delivery": "2025-12-07"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'Delivry' for 'Delivery'."
+  },
+  {
+    "query": "Place an order for a single product with card payment, using a different 'curreny' (typo) for calculation.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_TYPO_CURRENCY"
+          }
+        ],
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_CURR"
+        },
+        "customer_id": "cust_TYPO_CURR",
+        "shipping_address": {
+          "city": "Chennai",
+          "line1": "5 Anna Salai",
+          "state": "TN",
+          "country": "IN",
+          "postal_code": "600002"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {
+        "currency": "USD"
+      }
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 15,
+          "quantity": 1,
+          "product_id": "prod_TYPO_CURRENCY"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "USD",
+      "order_id": "ord_20251129_0046",
+      "total_amount": 15,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'curreny' for 'currency'."
+  },
+  {
+    "query": "Submit an 'ordr' (typo) using UPI as the payment method for a single product.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_TYPO_ORDER"
+          }
+        ],
+        "payment": {
+          "method": "upi",
+          "upi_id": "order@typo"
+        },
+        "customer_id": "cust_TYPO_ORDER",
+        "shipping_address": {
+          "city": "Bengaluru",
+          "line1": "45 MG Road",
+          "state": "KA",
+          "country": "IN",
+          "postal_code": "560001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0047",
+      "total_amount": 799,
+      "estimated_delivery": "2025-12-06"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'ordr' for 'order'."
+  },
+  {
+    "query": "Process a new order for a customer paying via netbanking, including a special 'notee' (typo).",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 3,
+            "product_id": "prod_TYPO_NOTE"
+          }
+        ],
+        "notes": "Gift wrapping requested for this order.",
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_typo_note"
+        },
+        "customer_id": "cust_TYPO_NOTE",
+        "shipping_address": {
+          "city": "Mumbai",
+          "line1": "789 Ocean Drive",
+          "line2": "Apt 5B",
+          "state": "MH",
+          "country": "IN",
+          "postal_code": "400001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 450,
+          "quantity": 3,
+          "product_id": "prod_TYPO_NOTE"
+        }
+      ],
+      "status": "created",
+      "message": "Order placed successfully via Netbanking.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0048",
+      "total_amount": 1350,
+      "estimated_delivery": "2025-12-05"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'notee' for 'note'."
+  },
+  {
+    "query": "Create an order with a single item, card payment, and a `shipping_address` with a typo in 'postal_code' as 'postel_code'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_TYPO_POSTAL"
+          }
+        ],
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_POSTAL"
+        },
+        "customer_id": "cust_TYPO_POSTAL",
+        "shipping_address": {
+          "city": "Jaipur",
+          "line1": "12 Park Lane",
+          "state": "RJ",
+          "country": "IN",
+          "postal_code": "302020"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 999,
+          "quantity": 1,
+          "product_id": "prod_TYPO_POSTAL"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0049",
+      "total_amount": 999,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'postel_code' for 'postal_code'."
+  },
+  {
+    "query": "Submit an order for a single item with UPI payment, and a typo in 'shipping_address' as 'shippping_address'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_TYPO_SHIPPING"
+          }
+        ],
+        "payment": {
+          "method": "upi",
+          "upi_id": "shipping@typo"
+        },
+        "customer_id": "cust_TYPO_SHIPPING",
+        "shipping_address": {
+          "city": "Bengaluru",
+          "line1": "45 MG Road",
+          "state": "KA",
+          "country": "IN",
+          "postal_code": "560001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0050",
+      "total_amount": 799,
+      "estimated_delivery": "2025-12-06"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'shippping_address' for 'shipping_address'."
+  },
+  {
+    "query": "Create an order for a single item with netbanking payment, and a typo in 'product_id' as 'prodcut_id'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_TYPO_PRODUCT"
+          }
+        ],
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_typo_prod"
+        },
+        "customer_id": "cust_TYPO_PRODUCT",
+        "shipping_address": {
+          "city": "Mumbai",
+          "line1": "789 Ocean Drive",
+          "state": "MH",
+          "country": "IN",
+          "postal_code": "400001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 450,
+          "quantity": 1,
+          "product_id": "prod_TYPO_PRODUCT"
+        }
+      ],
+      "status": "created",
+      "message": "Order placed successfully via Netbanking.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0051",
+      "total_amount": 450,
+      "estimated_delivery": "2025-12-05"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'prodcut_id' for 'product_id'."
+  },
+  {
+    "query": "Initiate a COD order for a single item, with a typo in 'quantity' as 'quantty'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_TYPO_QUANTITY"
+          }
+        ],
+        "payment": {
+          "method": "cod"
+        },
+        "customer_id": "cust_TYPO_QUANTITY",
+        "shipping_address": {
+          "city": "Delhi",
+          "line1": "10 Civil Lines",
+          "state": "DL",
+          "country": "IN",
+          "postal_code": "110001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 250,
+          "quantity": 1,
+          "product_id": "prod_TYPO_QUANTITY"
+        }
+      ],
+      "status": "confirmed",
+      "message": "Order confirmed for Cash on Delivery.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0052",
+      "total_amount": 250,
+      "estimated_delivery": "2025-12-07"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'quantty' for 'quantity'."
+  },
+  {
+    "query": "Create an order for a single item with card payment, and a typo in 'method' as 'methd'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_TYPO_METHOD"
+          }
+        ],
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_METHOD"
+        },
+        "customer_id": "cust_TYPO_METHOD",
+        "shipping_address": {
+          "city": "Chennai",
+          "line1": "5 Anna Salai",
+          "state": "TN",
+          "country": "IN",
+          "postal_code": "600002"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 15,
+          "quantity": 1,
+          "product_id": "prod_TYPO_METHOD"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0053",
+      "total_amount": 15,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'methd' for 'method'."
+  },
+  {
+    "query": "Submit an order using UPI as the payment method for a single product, with a typo in 'upi_id' as 'upiid'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_TYPO_UPIID"
+          }
+        ],
+        "payment": {
+          "method": "upi",
+          "upi_id": "milan@upi"
+        },
+        "customer_id": "cust_TYPO_UPIID",
+        "shipping_address": {
+          "city": "Bengaluru",
+          "line1": "45 MG Road",
+          "state": "KA",
+          "country": "IN",
+          "postal_code": "560001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0054",
+      "total_amount": 799,
+      "estimated_delivery": "2025-12-06"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'upiid' for 'upi_id'."
+  },
+  {
+    "query": "Process a new order for a customer paying via netbanking, with a typo in 'netbanking_id' as 'netbnking_id'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 3,
+            "product_id": "prod_TYPO_NBID"
+          }
+        ],
+        "notes": "Gift wrapping requested for this order.",
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_hbfc_123"
+        },
+        "customer_id": "cust_TYPO_NBID",
+        "shipping_address": {
+          "city": "Mumbai",
+          "line1": "789 Ocean Drive",
+          "line2": "Apt 5B",
+          "state": "MH",
+          "country": "IN",
+          "postal_code": "400001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 450,
+          "quantity": 3,
+          "product_id": "prod_TYPO_NBID"
+        }
+      ],
+      "status": "created",
+      "message": "Order placed successfully via Netbanking.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0055",
+      "total_amount": 1350,
+      "estimated_delivery": "2025-12-05"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'netbnking_id' for 'netbanking_id'."
+  },
+  {
+    "query": "Initiate an order with Cash on Delivery as the payment option for a single item, with a typo in 'card_token' as 'card_tokn'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_TYPO_CARDTOKEN"
+          }
+        ],
+        "payment": {
+          "method": "cod"
+        },
+        "customer_id": "cust_TYPO_CARDTOKEN",
+        "shipping_address": {
+          "city": "Delhi",
+          "line1": "10 Civil Lines",
+          "state": "DL",
+          "country": "IN",
+          "postal_code": "110001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 250,
+          "quantity": 1,
+          "product_id": "prod_TYPO_CARDTOKEN"
+        }
+      ],
+      "status": "confirmed",
+      "message": "Order confirmed for Cash on Delivery.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0056",
+      "total_amount": 250,
+      "estimated_delivery": "2025-12-07"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'card_tokn' for 'card_token'."
+  },
+  {
+    "query": "Create a new customer order for two items, paying by card token, with a standard shipping address and a query parameter 'currency' with a typo 'currensy'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 2,
+            "product_id": "prod_ABC123"
+          },
+          {
+            "quantity": 1,
+            "product_id": "prod_XYZ789"
+          }
+        ],
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_4242"
+        },
+        "customer_id": "cust_987654",
+        "shipping_address": {
+          "city": "Jaipur",
+          "line1": "12 Park Lane",
+          "line2": null,
+          "state": "RJ",
+          "country": "IN",
+          "postal_code": "302020"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {
+        "currency": "INR"
+      }
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 999,
+          "quantity": 2,
+          "product_id": "prod_ABC123"
+        },
+        {
+          "price": 601,
+          "quantity": 1,
+          "product_id": "prod_XYZ789"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0057",
+      "total_amount": 2599,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'currensy' for 'currency'."
+  },
+  {
+    "query": "Submit an order with a single item, card payment, and a `customer_id` with a typo 'custumer_id'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_TYPO_CUSTID"
+          }
+        ],
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_CUSTID"
+        },
+        "customer_id": "cust_987654",
+        "shipping_address": {
+          "city": "Jaipur",
+          "line1": "12 Park Lane",
+          "state": "RJ",
+          "country": "IN",
+          "postal_code": "302020"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 999,
+          "quantity": 1,
+          "product_id": "prod_TYPO_CUSTID"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0058",
+      "total_amount": 999,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'custumer_id' for 'customer_id'."
+  },
+  {
+    "query": "Create an order for a single item with UPI payment, and a typo in 'city' as 'citty'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_TYPO_CITY"
+          }
+        ],
+        "payment": {
+          "method": "upi",
+          "upi_id": "milan@upi"
+        },
+        "customer_id": "cust_555111",
+        "shipping_address": {
+          "city": "Bengaluru",
+          "line1": "45 MG Road",
+          "state": "KA",
+          "country": "IN",
+          "postal_code": "560001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0059",
+      "total_amount": 799,
+      "estimated_delivery": "2025-12-06"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'citty' for 'city'."
+  },
+  {
+    "query": "Process a new order for a customer paying via netbanking, with a typo in 'state' as 'stae'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 3,
+            "product_id": "prod_TYPO_STATE"
+          }
+        ],
+        "notes": "Gift wrapping requested for this order.",
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_hbfc_123"
+        },
+        "customer_id": "cust_112233",
+        "shipping_address": {
+          "city": "Mumbai",
+          "line1": "789 Ocean Drive",
+          "line2": "Apt 5B",
+          "state": "MH",
+          "country": "IN",
+          "postal_code": "400001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 450,
+          "quantity": 3,
+          "product_id": "prod_TYPO_STATE"
+        }
+      ],
+      "status": "created",
+      "message": "Order placed successfully via Netbanking.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0060",
+      "total_amount": 1350,
+      "estimated_delivery": "2025-12-05"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'stae' for 'state'."
+  },
+  {
+    "query": "Initiate an order with Cash on Delivery as the payment option for a single item, with a typo in 'country' as 'contry'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_TYPO_COUNTRY_ADDR"
+          }
+        ],
+        "payment": {
+          "method": "cod"
+        },
+        "customer_id": "cust_445566",
+        "shipping_address": {
+          "city": "Delhi",
+          "line1": "10 Civil Lines",
+          "line2": null,
+          "state": "DL",
+          "country": "IN",
+          "postal_code": "110001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 250,
+          "quantity": 1,
+          "product_id": "prod_TYPO_COUNTRY_ADDR"
+        }
+      ],
+      "status": "confirmed",
+      "message": "Order confirmed for Cash on Delivery.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0061",
+      "total_amount": 250,
+      "estimated_delivery": "2025-12-07"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'contry' for 'country'."
+  },
+  {
+    "query": "Place an order for a single product with card payment, with a typo in 'line1' as 'linee1'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_TYPO_LINE1"
+          }
+        ],
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_1111"
+        },
+        "customer_id": "cust_778899",
+        "shipping_address": {
+          "city": "Chennai",
+          "line1": "5 Anna Salai",
+          "state": "TN",
+          "country": "IN",
+          "postal_code": "600002"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {
+        "currency": "USD"
+      }
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 15,
+          "quantity": 1,
+          "product_id": "prod_TYPO_LINE1"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "USD",
+      "order_id": "ord_20251129_0062",
+      "total_amount": 15,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'linee1' for 'line1'."
+  },
+  {
+    "query": "Submit an order with a single item, card payment, and a `line2` address with a typo 'linee2'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_TYPO_LINE2"
+          }
+        ],
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_4242"
+        },
+        "customer_id": "cust_987654",
+        "shipping_address": {
+          "city": "Jaipur",
+          "line1": "12 Park Lane",
+          "line2": null,
+          "state": "RJ",
+          "country": "IN",
+          "postal_code": "302020"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 999,
+          "quantity": 1,
+          "product_id": "prod_TYPO_LINE2"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0063",
+      "total_amount": 999,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'linee2' for 'line2'."
+  },
+  {
+    "query": "Create an order for a single item with UPI payment, and a typo in 'ecommerce' as 'ecommrce'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_TYPO_ECOMMERCE"
+          }
+        ],
+        "payment": {
+          "method": "upi",
+          "upi_id": "milan@upi"
+        },
+        "customer_id": "cust_555111",
+        "shipping_address": {
+          "city": "Bengaluru",
+          "line1": "45 MG Road",
+          "state": "KA",
+          "country": "IN",
+          "postal_code": "560001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0064",
+      "total_amount": 799,
+      "estimated_delivery": "2025-12-06"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'ecommrce' for 'ecommerce'."
+  },
+  {
+    "query": "Process a new order for a customer paying via netbanking, with a typo in 'payment' as 'paymnt'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 3,
+            "product_id": "prod_TYPO_PAYMENT_DOMAIN"
+          }
+        ],
+        "notes": "Gift wrapping requested for this order.",
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_hbfc_123"
+        },
+        "customer_id": "cust_112233",
+        "shipping_address": {
+          "city": "Mumbai",
+          "line1": "789 Ocean Drive",
+          "line2": "Apt 5B",
+          "state": "MH",
+          "country": "IN",
+          "postal_code": "400001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 450,
+          "quantity": 3,
+          "product_id": "prod_TYPO_PAYMENT_DOMAIN"
+        }
+      ],
+      "status": "created",
+      "message": "Order placed successfully via Netbanking.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0065",
+      "total_amount": 1350,
+      "estimated_delivery": "2025-12-05"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'paymnt' for 'payment'."
+  },
+  {
+    "query": "Initiate an order with Cash on Delivery as the payment option for a single item, with a typo in 'orders' as 'ordrs'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_TYPO_ORDERS_DOMAIN"
+          }
+        ],
+        "payment": {
+          "method": "cod"
+        },
+        "customer_id": "cust_445566",
+        "shipping_address": {
+          "city": "Delhi",
+          "line1": "10 Civil Lines",
+          "line2": null,
+          "state": "DL",
+          "country": "IN",
+          "postal_code": "110001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 250,
+          "quantity": 1,
+          "product_id": "prod_TYPO_ORDERS_DOMAIN"
+        }
+      ],
+      "status": "confirmed",
+      "message": "Order confirmed for Cash on Delivery.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0066",
+      "total_amount": 250,
+      "estimated_delivery": "2025-12-07"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Query description contains a typo 'ordrs' for 'orders'."
+  },
+  {
+    "query": "Submit an order with a single item, card payment, and a `customer_id` containing only numbers.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_NUMERIC_CUSTID"
+          }
+        ],
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_NUMCUST"
+        },
+        "customer_id": "1234567890",
+        "shipping_address": {
+          "city": "Mumbai",
+          "line1": "100 Numeric Street",
+          "state": "MH",
+          "country": "IN",
+          "postal_code": "400001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 800,
+          "quantity": 1,
+          "product_id": "prod_NUMERIC_CUSTID"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0079",
+      "total_amount": 800,
+      "estimated_delivery": "2025-12-05"
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Customer ID containing only numbers (valid)."
+  },
+  {
+    "query": "Create an order for a single item with UPI payment, and a `product_id` containing only numbers.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "1234567890"
+          }
+        ],
+        "payment": {
+          "method": "upi",
+          "upi_id": "numeric@prod"
+        },
+        "customer_id": "cust_NUMERICPROD",
+        "shipping_address": {
+          "city": "Bengaluru",
+          "line1": "200 Numeric Road",
+          "state": "KA",
+          "country": "IN",
+          "postal_code": "560001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0080",
+      "total_amount": 700,
+      "estimated_delivery": "2025-12-06"
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Product ID containing only numbers (valid)."
+  },
+  {
+    "query": "Submit an order using UPI as the payment method for a single product, with a query parameter 'simulate' set to 'false' (boolean as string).",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_PQR456"
+          }
+        ],
+        "payment": {
+          "method": "upi",
+          "upi_id": "milan@upi"
+        },
+        "customer_id": "cust_555111",
+        "shipping_address": {
+          "city": "Bengaluru",
+          "line1": "45 MG Road",
+          "state": "KA",
+          "country": "IN",
+          "postal_code": "560001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {
+        "simulate": "false"
+      }
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "currency": "INR",
+      "order_id": "ord_20251129_0091",
+      "total_amount": 799,
+      "estimated_delivery": "2025-12-06"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid order with 'simulate' query parameter explicitly set to 'false'."
+  },
+  {
+    "query": "Create a new customer order for two items, paying by card token, with a standard shipping address and a query parameter 'currency' with a valid but less common currency code like 'AUD'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 2,
+            "product_id": "prod_ABC123"
+          },
+          {
+            "quantity": 1,
+            "product_id": "prod_XYZ789"
+          }
+        ],
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_4242"
+        },
+        "customer_id": "cust_987654",
+        "shipping_address": {
+          "city": "Sydney",
+          "line1": "10 George Street",
+          "line2": null,
+          "state": "NSW",
+          "country": "AU",
+          "postal_code": "2000"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {
+        "currency": "AUD"
+      }
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 20,
+          "quantity": 2,
+          "product_id": "prod_ABC123"
+        },
+        {
+          "price": 10,
+          "quantity": 1,
+          "product_id": "prod_XYZ789"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "AUD",
+      "order_id": "ord_20251129_0092",
+      "total_amount": 50,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Order with AUD currency override."
+  },
+  {
+    "query": "Submit an order using UPI as the payment method for a single product, with a valid but less common currency code like 'NZD'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_PQR456"
+          }
+        ],
+        "payment": {
+          "method": "upi",
+          "upi_id": "milan@upi"
+        },
+        "customer_id": "cust_555111",
+        "shipping_address": {
+          "city": "Auckland",
+          "line1": "1 Queen Street",
+          "state": "AKL",
+          "country": "NZ",
+          "postal_code": "1010"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {
+        "currency": "NZD"
+      }
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "currency": "NZD",
+      "order_id": "ord_20251129_0093",
+      "total_amount": 15,
+      "estimated_delivery": "2025-12-06"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Order with NZD currency override."
+  },
+  {
+    "query": "Process a new order for a customer paying via netbanking, including a special note, and a valid but less common currency code like 'SGD'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 3,
+            "product_id": "prod_DEF456"
+          }
+        ],
+        "notes": "Gift wrapping requested for this order.",
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_hbfc_123"
+        },
+        "customer_id": "cust_112233",
+        "shipping_address": {
+          "city": "Singapore",
+          "line1": "1 Orchard Road",
+          "line2": "Unit 01-01",
+          "state": "SG",
+          "country": "SG",
+          "postal_code": "238880"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {
+        "currency": "SGD"
+      }
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 10,
+          "quantity": 3,
+          "product_id": "prod_DEF456"
+        }
+      ],
+      "status": "created",
+      "message": "Order placed successfully via Netbanking.",
+      "currency": "SGD",
+      "order_id": "ord_20251129_0094",
+      "total_amount": 30,
+      "estimated_delivery": "2025-12-05"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Order with SGD currency override."
+  },
+  {
+    "query": "Initiate an order with Cash on Delivery as the payment option for a single item, with a valid but less common currency code like 'CHF'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_GHI789"
+          }
+        ],
+        "payment": {
+          "method": "cod"
+        },
+        "customer_id": "cust_445566",
+        "shipping_address": {
+          "city": "Zurich",
+          "line1": "1 Bahnhofstrasse",
+          "line2": null,
+          "state": "ZH",
+          "country": "CH",
+          "postal_code": "8001"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {
+        "currency": "CHF"
+      }
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 5,
+          "quantity": 1,
+          "product_id": "prod_GHI789"
+        }
+      ],
+      "status": "confirmed",
+      "message": "Order confirmed for Cash on Delivery.",
+      "currency": "CHF",
+      "order_id": "ord_20251129_0095",
+      "total_amount": 5,
+      "estimated_delivery": "2025-12-07"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Order with CHF currency override."
+  },
+  {
+    "query": "Place an order for a single product with card payment, using a different currency for calculation, and a valid but less common currency code like 'SEK'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "items": [
+          {
+            "quantity": 1,
+            "product_id": "prod_JKL012"
+          }
+        ],
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_1111"
+        },
+        "customer_id": "cust_778899",
+        "shipping_address": {
+          "city": "Stockholm",
+          "line1": "1 Kungsgatan",
+          "state": "STH",
+          "country": "SE",
+          "postal_code": "11143"
+        }
+      },
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_123"
+      },
+      "query_parameters": {
+        "currency": "SEK"
+      }
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 150,
+          "quantity": 1,
+          "product_id": "prod_JKL012"
+        }
+      ],
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "SEK",
+      "order_id": "ord_20251129_0096",
+      "total_amount": 150,
+      "estimated_delivery": "2025-12-04"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Order with SEK currency override."
+  }
+]

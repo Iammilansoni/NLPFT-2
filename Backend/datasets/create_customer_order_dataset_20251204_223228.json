@@ -1,0 +1,3801 @@
+[
+  {
+    "query": "Create new order with valid customer and item details",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251129_0001"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer and item details"
+  },
+  {
+    "query": "Create new order with invalid customer id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid_cust",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid customer id"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with invalid customer id"
+  },
+  {
+    "query": "Create new order with missing shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Missing shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with missing shipping address"
+  },
+  {
+    "query": "Create new order with invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "invalid_method",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid payment method"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with invalid payment method"
+  },
+  {
+    "query": "Create new order with typo in customer id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123t",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid customer id"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating a new order with typo in customer id"
+  },
+  {
+    "query": "Create new order with duplicate items",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Duplicate items"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with duplicate items"
+  },
+  {
+    "query": "Create new order with invalid item quantity",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": -2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid item quantity"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with invalid item quantity"
+  },
+  {
+    "query": "Create new order with missing payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Missing payment method"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with missing payment method"
+  },
+  {
+    "query": "Create new order with invalid card token",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "invalid_token"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid card token"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with invalid card token"
+  },
+  {
+    "query": "Create new order with typo in payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "cardd",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid payment method"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating a new order with typo in payment method"
+  },
+  {
+    "query": "Create new order with missing item quantity",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123"
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Missing item quantity"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with missing item quantity"
+  },
+  {
+    "query": "Create new order with invalid item product id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "invalid_id",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid item product id"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with invalid item product id"
+  },
+  {
+    "query": "Create new order with typo in item product id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123t",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid item product id"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating a new order with typo in item product id"
+  },
+  {
+    "query": "Create new order with missing shipping address country",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Missing shipping address country"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with missing shipping address country"
+  },
+  {
+    "query": "Create new order with invalid shipping address country",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "invalid_country",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid shipping address country"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with invalid shipping address country"
+  },
+  {
+    "query": "Create new order with typo in shipping address country",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "Indiia",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid shipping address country"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating a new order with typo in shipping address country"
+  },
+  {
+    "query": "Create new order with missing shipping address postal code",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Missing shipping address postal code"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with missing shipping address postal code"
+  },
+  {
+    "query": "Create new order with invalid shipping address postal code",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "invalid_code"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid shipping address postal code"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with invalid shipping address postal code"
+  },
+  {
+    "query": "Create new order with typo in shipping address postal code",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "30202t"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid shipping address postal code"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating a new order with typo in shipping address postal code"
+  },
+  {
+    "query": "Create new order with missing payment card token",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Missing payment card token"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with missing payment card token"
+  },
+  {
+    "query": "Create new order with invalid payment card token",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "invalid_token"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid payment card token"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with invalid payment card token"
+  },
+  {
+    "query": "Create new order with typo in payment card token",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242t"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid payment card token"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating a new order with typo in payment card token"
+  },
+  {
+    "query": "Create new order with missing customer id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Missing customer id"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with missing customer id"
+  },
+  {
+    "query": "Create new order with invalid customer id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid_id",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid customer id"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with invalid customer id"
+  },
+  {
+    "query": "Create new order with typo in customer id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123t",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid customer id"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating a new order with typo in customer id"
+  },
+  {
+    "query": "Create new order with missing items",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Missing items"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with missing items"
+  },
+  {
+    "query": "Create new order with empty items",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Empty items"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with empty items"
+  },
+  {
+    "query": "Create new order with null items",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": null,
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Null items"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with null items"
+  },
+  {
+    "query": "Create new order with missing payment",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Missing payment"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with missing payment"
+  },
+  {
+    "query": "Create new order with empty payment",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": {}
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Empty payment"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with empty payment"
+  },
+  {
+    "query": "Create new order with null payment",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      },
+      "payment": null
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Null payment"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with null payment"
+  },
+  {
+    "query": "Create new order with missing shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Missing shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with missing shipping address"
+  },
+  {
+    "query": "Create new order with empty shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {},
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Empty shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with empty shipping address"
+  },
+  {
+    "query": "Create new order with null shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": null,
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Null shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with null shipping address"
+  },
+  {
+    "query": "Create new order with missing customer id and shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Missing customer id and shipping address"
+    },
+    "scenario_type": "extreme",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with missing customer id and shipping address"
+  },
+  {
+    "query": "Create new order with invalid customer id and shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid_id",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "invalid_country",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid customer id and shipping address"
+    },
+    "scenario_type": "extreme",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with invalid customer id and shipping address"
+  },
+  {
+    "query": "Create new order with typo in customer id and shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123t",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "Indiia",
+        "postal_code": "302020"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid customer id and shipping address"
+    },
+    "scenario_type": "extreme",
+    "test_category": "typo",
+    "notes": "Test creating a new order with typo in customer id and shipping address"
+  },
+  {
+    "query": "Create new order with missing payment and shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ]
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Missing payment and shipping address"
+    },
+    "scenario_type": "extreme",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with missing payment and shipping address"
+  },
+  {
+    "query": "Create new order with invalid payment and shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "invalid_method",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "invalid_country",
+        "postal_code": "302020"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid payment and shipping address"
+    },
+    "scenario_type": "extreme",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with invalid payment and shipping address"
+  },
+  {
+    "query": "Create new order with typo in payment and shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "cardd",
+        "card_token": "tok_test_4242t"
+      },
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "Indiia",
+        "postal_code": "30202t"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid payment and shipping address"
+    },
+    "scenario_type": "extreme",
+    "test_category": "typo",
+    "notes": "Test creating a new order with typo in payment and shipping address"
+  },
+  {
+    "query": "Create new order with missing customer id, payment, and shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ]
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Missing customer id, payment, and shipping address"
+    },
+    "scenario_type": "extreme",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with missing customer id, payment, and shipping address"
+  },
+  {
+    "query": "Create new order with invalid customer id, payment, and shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid_id",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "invalid_method",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "invalid_country",
+        "postal_code": "302020"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid customer id, payment, and shipping address"
+    },
+    "scenario_type": "extreme",
+    "test_category": "error_case",
+    "notes": "Test creating a new order with invalid customer id, payment, and shipping address"
+  },
+  {
+    "query": "Create new order with typo in customer id, payment, and shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123t",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "cardd",
+        "card_token": "tok_test_4242t"
+      },
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "Indiia",
+        "postal_code": "30202t"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Invalid customer id, payment, and shipping address"
+    },
+    "scenario_type": "extreme",
+    "test_category": "typo",
+    "notes": "Test creating a new order with typo in customer id, payment, and shipping address"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251129_0001"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251129_0002"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251129_0003"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different payment method)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123"
+      },
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251129_0004"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different payment method)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different shipping address)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251129_0005"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different shipping address)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different customer id)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251129_0006"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different customer id)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items and payment method)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123"
+      },
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251129_0007"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items and payment method)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items and different payment method)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123"
+      },
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251129_0008"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items and different payment method)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different shipping address and payment method)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251129_0009"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different shipping address and payment method)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different customer id and payment method)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123"
+      },
+      "shipping_address": {
+        "line1": "12 Park Lane",
+        "city": "Jaipur",
+        "state": "RJ",
+        "country": "IN",
+        "postal_code": "302020"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251129_0010"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different customer id and payment method)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items, payment method, and shipping address)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251129_0011"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items, payment method, and shipping address)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different payment method, and shipping address)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251129_0012"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different payment method, and shipping address)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different customer id, payment method, and shipping address)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251129_0013"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different customer id, payment method, and shipping address)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items, customer id, payment method, and shipping address)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251129_0014"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items, customer id, payment method, and shipping address)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, and shipping address)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251129_0015"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, and shipping address)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, and currency)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD"
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251129_0016"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, and currency)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, and currency)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD"
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251129_0017"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, and currency)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different customer id, payment method, shipping address, currency, and notes)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order"
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251129_0018"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different customer id, payment method, shipping address, currency, and notes)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, and notes)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order"
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251129_0019"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, and notes)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, and simulate)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0020"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, and simulate)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, and simulate)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0021"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, and simulate)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different customer id, payment method, shipping address, currency, notes, simulate, and upi payment)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "upi",
+        "upi_id": "upi_id_123"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0022"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different customer id, payment method, shipping address, currency, notes, simulate, and upi payment)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, and upi payment)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "upi",
+        "upi_id": "upi_id_123"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0023"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, and upi payment)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, and cod payment)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "cod",
+        "upi_id": "upi_id_123"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0024"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, and cod payment)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, and cod payment)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "cod",
+        "upi_id": "upi_id_123"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0025"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, and cod payment)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, and card payment)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242",
+        "upi_id": "upi_id_123"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0026"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, and card payment)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, and card payment)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242",
+        "upi_id": "upi_id_123"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0027"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, and card payment)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, and netbanking payment)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0028"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, and netbanking payment)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, and netbanking payment)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0029"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, and netbanking payment)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, and currency conversion)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0030"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, and currency conversion)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, and currency conversion)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0031"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, and currency conversion)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, and tax calculation)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0032"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, and tax calculation)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, and tax calculation)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0033"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, and tax calculation)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, and discount)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0034"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, and discount)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, and discount)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0035"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, and discount)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, and gift wrapping)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0036"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, and gift wrapping)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, and gift wrapping)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0037"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, and gift wrapping)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, and insurance)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0038"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, and insurance)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, and insurance)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0039"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, and insurance)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, and loyalty points)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true,
+      "loyalty_points": 100
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0040"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, and loyalty points)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, and loyalty points)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "netbanking",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true,
+      "loyalty_points": 100
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0041"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, and loyalty points)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, and cash on delivery)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "cod",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true,
+      "loyalty_points": 100
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0042"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, and cash on delivery)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, and cash on delivery)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "cod",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242"
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true,
+      "loyalty_points": 100
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0043"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, and cash on delivery)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, and partial payment)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "cod",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242",
+        "partial_payment": true
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true,
+      "loyalty_points": 100
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0044"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, and partial payment)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, and partial payment)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "cod",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242",
+        "partial_payment": true
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true,
+      "loyalty_points": 100
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0045"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, and partial payment)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, and split payment)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "cod",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242",
+        "partial_payment": true,
+        "split_payment": true
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true,
+      "loyalty_points": 100
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0046"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, and split payment)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, and split payment)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "cod",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242",
+        "partial_payment": true,
+        "split_payment": true
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true,
+      "loyalty_points": 100
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0047"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, and split payment)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, and installment payment)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "cod",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242",
+        "partial_payment": true,
+        "split_payment": true,
+        "installment_payment": true
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true,
+      "loyalty_points": 100
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0048"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, and installment payment)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, and installment payment)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "cod",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242",
+        "partial_payment": true,
+        "split_payment": true,
+        "installment_payment": true
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true,
+      "loyalty_points": 100
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0049"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, and installment payment)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, installment payment, and free shipping)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "cod",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242",
+        "partial_payment": true,
+        "split_payment": true,
+        "installment_payment": true
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true,
+      "loyalty_points": 100,
+      "free_shipping": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0050"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, installment payment, and free shipping)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, installment payment, and free shipping)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "cod",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242",
+        "partial_payment": true,
+        "split_payment": true,
+        "installment_payment": true
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true,
+      "loyalty_points": 100,
+      "free_shipping": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0051"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, installment payment, and free shipping)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, installment payment, free shipping, and express shipping)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "cod",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242",
+        "partial_payment": true,
+        "split_payment": true,
+        "installment_payment": true
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true,
+      "loyalty_points": 100,
+      "free_shipping": true,
+      "express_shipping": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0052"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, installment payment, free shipping, and express shipping)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, installment payment, free shipping, and express shipping)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "cod",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242",
+        "partial_payment": true,
+        "split_payment": true,
+        "installment_payment": true
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true,
+      "loyalty_points": 100,
+      "free_shipping": true,
+      "express_shipping": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0053"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, installment payment, free shipping, and express shipping)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, installment payment, free shipping, express shipping, and same day delivery)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "cod",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242",
+        "partial_payment": true,
+        "split_payment": true,
+        "installment_payment": true
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true,
+      "loyalty_points": 100,
+      "free_shipping": true,
+      "express_shipping": true,
+      "same_day_delivery": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0054"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, installment payment, free shipping, express shipping, and same day delivery)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, installment payment, free shipping, express shipping, and same day delivery)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "cod",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242",
+        "partial_payment": true,
+        "split_payment": true,
+        "installment_payment": true
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true,
+      "loyalty_points": 100,
+      "free_shipping": true,
+      "express_shipping": true,
+      "same_day_delivery": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0055"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, installment payment, free shipping, express shipping, and same day delivery)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, installment payment, free shipping, express shipping, same day delivery, and return policy)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "cod",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242",
+        "partial_payment": true,
+        "split_payment": true,
+        "installment_payment": true
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true,
+      "loyalty_points": 100,
+      "free_shipping": true,
+      "express_shipping": true,
+      "same_day_delivery": true,
+      "return_policy": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0056"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, installment payment, free shipping, express shipping, same day delivery, and return policy)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, installment payment, free shipping, express shipping, same day delivery, and return policy)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_ABC123",
+          "quantity": 2
+        },
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "cod",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242",
+        "partial_payment": true,
+        "split_payment": true,
+        "installment_payment": true
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true,
+      "loyalty_points": 100,
+      "free_shipping": true,
+      "express_shipping": true,
+      "same_day_delivery": true,
+      "return_policy": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0057"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (multiple items, different customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, installment payment, free shipping, express shipping, same day delivery, and return policy)"
+  },
+  {
+    "query": "Create new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, installment payment, free shipping, express shipping, same day delivery, return policy, and warranty)",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_456",
+      "items": [
+        {
+          "product_id": "prod_XYZ789",
+          "quantity": 1
+        }
+      ],
+      "payment": {
+        "method": "cod",
+        "netbanking_id": "netbanking_id_123",
+        "upi_id": "upi_id_123",
+        "card_token": "tok_test_4242",
+        "partial_payment": true,
+        "split_payment": true,
+        "installment_payment": true
+      },
+      "shipping_address": {
+        "line1": "45 MG Road",
+        "city": "Bengaluru",
+        "state": "KA",
+        "country": "IN",
+        "postal_code": "560001"
+      },
+      "currency": "USD",
+      "notes": "Test order",
+      "simulate": true,
+      "currency_conversion": true,
+      "tax_calculation": true,
+      "discount": 10,
+      "gift_wrapping": true,
+      "insurance": true,
+      "loyalty_points": 100,
+      "free_shipping": true,
+      "express_shipping": true,
+      "same_day_delivery": true,
+      "return_policy": true,
+      "warranty": true
+    },
+    "expected_response": {
+      "status": "simulated",
+      "message": "Order simulated.",
+      "order_id": "ord_20251129_0058"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating a new order with valid customer id, payment, and shipping address (different items, customer id, payment method, shipping address, currency, notes, simulate, upi payment, cod payment, card payment, netbanking payment, currency conversion, tax calculation, discount, gift wrapping, insurance, loyalty points, cash on delivery, partial payment, split payment, installment payment, free shipping, express shipping, same day delivery, return policy, and warranty)"
+  }
+]

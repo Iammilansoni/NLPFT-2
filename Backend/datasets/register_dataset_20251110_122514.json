@@ -1,0 +1,82 @@
+[
+  {
+    "query": "Register new account with {username} and {email}",
+    "intent": "register",
+    "slots": {},
+    "api_name": "register",
+    "endpoint": "<base_url>/api/register",
+    "method": "POST"
+  },
+  {
+    "query": "Create account for {username}",
+    "intent": "register",
+    "slots": {},
+    "api_name": "register",
+    "endpoint": "<base_url>/api/register",
+    "method": "POST"
+  },
+  {
+    "query": "Sign up with email {email} and username {username}",
+    "intent": "register",
+    "slots": {},
+    "api_name": "register",
+    "endpoint": "<base_url>/api/register",
+    "method": "POST"
+  },
+  {
+    "query": "Register new account with {username} and {email}",
+    "intent": "register",
+    "slots": {},
+    "api_name": "register",
+    "endpoint": "<base_url>/api/register",
+    "method": "POST"
+  },
+  {
+    "query": "Create account for {username}",
+    "intent": "register",
+    "slots": {},
+    "api_name": "register",
+    "endpoint": "<base_url>/api/register",
+    "method": "POST"
+  },
+  {
+    "query": "Sign up with email {email} and username {username}",
+    "intent": "register",
+    "slots": {},
+    "api_name": "register",
+    "endpoint": "<base_url>/api/register",
+    "method": "POST"
+  },
+  {
+    "query": "Register new account with {username} and {email}",
+    "intent": "register",
+    "slots": {},
+    "api_name": "register",
+    "endpoint": "<base_url>/api/register",
+    "method": "POST"
+  },
+  {
+    "query": "Create account for {username}",
+    "intent": "register",
+    "slots": {},
+    "api_name": "register",
+    "endpoint": "<base_url>/api/register",
+    "method": "POST"
+  },
+  {
+    "query": "Sign up with email {email} and username {username}",
+    "intent": "register",
+    "slots": {},
+    "api_name": "register",
+    "endpoint": "<base_url>/api/register",
+    "method": "POST"
+  },
+  {
+    "query": "Register new account with {username} and {email}",
+    "intent": "register",
+    "slots": {},
+    "api_name": "register",
+    "endpoint": "<base_url>/api/register",
+    "method": "POST"
+  }
+]

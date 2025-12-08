@@ -1,0 +1,82 @@
+[
+  {
+    "query": "Update profile for user {user_id}",
+    "intent": "update_profile",
+    "slots": {},
+    "api_name": "update_profile",
+    "endpoint": "<base_url>/api/update_profile",
+    "method": "POST"
+  },
+  {
+    "query": "Change name to {name} for user {user_id}",
+    "intent": "update_profile",
+    "slots": {},
+    "api_name": "update_profile",
+    "endpoint": "<base_url>/api/update_profile",
+    "method": "POST"
+  },
+  {
+    "query": "Modify phone number to {phone}",
+    "intent": "update_profile",
+    "slots": {},
+    "api_name": "update_profile",
+    "endpoint": "<base_url>/api/update_profile",
+    "method": "POST"
+  },
+  {
+    "query": "Update profile for user {user_id}",
+    "intent": "update_profile",
+    "slots": {},
+    "api_name": "update_profile",
+    "endpoint": "<base_url>/api/update_profile",
+    "method": "POST"
+  },
+  {
+    "query": "Change name to {name} for user {user_id}",
+    "intent": "update_profile",
+    "slots": {},
+    "api_name": "update_profile",
+    "endpoint": "<base_url>/api/update_profile",
+    "method": "POST"
+  },
+  {
+    "query": "Modify phone number to {phone}",
+    "intent": "update_profile",
+    "slots": {},
+    "api_name": "update_profile",
+    "endpoint": "<base_url>/api/update_profile",
+    "method": "POST"
+  },
+  {
+    "query": "Update profile for user {user_id}",
+    "intent": "update_profile",
+    "slots": {},
+    "api_name": "update_profile",
+    "endpoint": "<base_url>/api/update_profile",
+    "method": "POST"
+  },
+  {
+    "query": "Change name to {name} for user {user_id}",
+    "intent": "update_profile",
+    "slots": {},
+    "api_name": "update_profile",
+    "endpoint": "<base_url>/api/update_profile",
+    "method": "POST"
+  },
+  {
+    "query": "Modify phone number to {phone}",
+    "intent": "update_profile",
+    "slots": {},
+    "api_name": "update_profile",
+    "endpoint": "<base_url>/api/update_profile",
+    "method": "POST"
+  },
+  {
+    "query": "Update profile for user {user_id}",
+    "intent": "update_profile",
+    "slots": {},
+    "api_name": "update_profile",
+    "endpoint": "<base_url>/api/update_profile",
+    "method": "POST"
+  }
+]

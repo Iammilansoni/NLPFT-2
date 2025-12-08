@@ -34,30 +34,30 @@ async def rank_documents(
     request: RankingRequest = Body(..., description="Ranking request with query and options")
 ):
     """
-    Two-Stage AI Ranking Engine
+    🎯 Two-Stage AI Ranking Engine
     
     Performs a two-stage retrieval pipeline:
     
-    *Stage 1 - Vector Retrieval (Top-K):*
+    **Stage 1 - Vector Retrieval (Top-K):**
     - Uses embeddings stored in Redis Vector DB
     - Performs top-K nearest-neighbor vector search
     - Retrieves top-K most semantically relevant documents
     - Returns results exactly as stored, preserving text integrity
     
-    *Stage 2 - FlashRank Reranking (ms-marco-MiniLM-L-12-v2):*
+    **Stage 2 - FlashRank Reranking (ms-marco-MiniLM-L-12-v2):**
     - Applies high-precision cross-encoder reranking
     - Pairs each candidate with the user query
     - Computes accurate relevance scores
     - Reorders candidates strictly by reranker score (highest → lowest)
     
-    *Important Rules:*
-    - No hallucination: cannot create text that wasn't retrieved
-    - No altering dataset text except minor whitespace trimming
-    - Always trust cross-encoder scores over vector similarity
-    - Maintain deterministic, stable ranking behavior
+    **Important Rules:**
+    - ✅ No hallucination: cannot create text that wasn't retrieved
+    - ✅ No altering dataset text except minor whitespace trimming
+    - ✅ Always trust cross-encoder scores over vector similarity
+    - ✅ Maintain deterministic, stable ranking behavior
     
-    *Response Format:*
-    json
+    **Response Format:**
+    ```json
     {
       "query": "<USER_QUERY>",
       "ranked_results": [
@@ -65,7 +65,7 @@ async def rank_documents(
         ...
       ]
     }
-    
+    ```
     """
     try:
         logger.info(f"[Ranking API] Request: query='{request.query}', top_k={request.top_k}")
@@ -96,7 +96,7 @@ async def rank_documents_detailed(
     """
     🔍 Detailed Two-Stage AI Ranking Engine
     
-    Same as /rank but returns complete details including:
+    Same as `/rank` but returns complete details including:
     - Stage 1 vector retrieval results with similarity scores
     - Stage 2 reranked results with full metadata
     - API names, endpoints, request/response payloads
@@ -131,7 +131,7 @@ async def rank_documents_get(
     top_k: Optional[int] = Query(5, ge=1, le=50, description="Number of candidates to retrieve (default: 5)")
 ):
     """
-    Two-Stage AI Ranking Engine (GET)
+    🎯 Two-Stage AI Ranking Engine (GET)
     
     GET version of the ranking endpoint for simple queries.
     
@@ -164,7 +164,7 @@ async def rank_documents_get(
 @router.get("/rank/info", response_model=RerankerInfoResponse)
 async def get_ranking_info():
     """
-    ℹ Get Reranker Model Information
+    ℹ️ Get Reranker Model Information
     
     Returns information about the cross-encoder model used for reranking:
     - Model name: ms-marco-MiniLM-L-12-v2
@@ -228,8 +228,8 @@ async def rank_stage2_only(
     
     Useful for custom pipelines or when candidates come from a different source.
     
-    *Request Body:*
-    json
+    **Request Body:**
+    ```json
     {
       "query": "your search query",
       "candidates": [
@@ -237,7 +237,7 @@ async def rank_stage2_only(
         {"text": "candidate 2 text", ...}
       ]
     }
-    
+    ```
     """
     try:
         logger.info(f"[Stage 2 Only] Request: query='{query}', {len(candidates)} candidates")

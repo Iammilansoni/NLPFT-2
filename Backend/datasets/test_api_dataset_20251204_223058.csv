@@ -1,0 +1,6 @@
+"query","api","endpoint","method","request","expected_response","scenario_type","test_category","notes"
+"Test the API with a normal id","Test API","/test","POST","{""id"": ""12345""}","{""status"": ""success"", ""data"": {}}","valid","valid_flow","Test with a standard id"
+"Test the API with a slightly longer id parameterr","Test API","/test","POST","{""id"": ""1234567890""}","{""status"": ""success"", ""data"": {}}","valid","valid_flow","Test with a longer id"
+"Test the API with a very short id","Test API","/test","POST","{""id"": ""1""}","{""status"": ""success"", ""data"": {}}","valid","valid_flow","Test with a minimal id"
+"Test the API with an id containing speciel charactrs","Test API","/test","POST","{""id"": ""123!@#""}","{""status"": ""error"", ""data"": {}}","edge","boundary","Test with an id containing special characters"
+"Test the API with a completly empty id field","Test API","/test","POST","{""id"": """"}","{""status"": ""error"", ""data"": {}}","extreme","error_case","Test with an empty id"

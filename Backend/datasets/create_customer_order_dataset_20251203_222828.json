@@ -1,0 +1,3857 @@
+[
+  {
+    "query": "Create a standard customer order with two items using a credit card for payment. The shipping address includes all necessary details.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_1A2B3C4D",
+        "items": [
+          {
+            "product_id": "prod_ELEC456",
+            "quantity": 1
+          },
+          {
+            "product_id": "prod_BOOK789",
+            "quantity": 2
+          }
+        ],
+        "shipping_address": {
+          "line1": "123 Cyber Street",
+          "line2": "Tech Park",
+          "city": "Bengaluru",
+          "state": "KA",
+          "postal_code": "560100",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_visa_1a2b3c"
+        },
+        "notes": "Please gift wrap the books."
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251201_0003"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Standard valid case with multiple items and card payment."
+  },
+  {
+    "query": "Process a new ordr for a single item paid via UPI. The customer has no special instructions.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_5E6F7G8H",
+        "items": [
+          {
+            "product_id": "prod_HOME101",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "456 Main Road",
+          "city": "Mumbai",
+          "state": "MH",
+          "postal_code": "400001",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "upi",
+          "upi_id": "exampleuser@okbank"
+        },
+        "notes": null
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "order_id": "ord_20251201_0004"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Valid case for UPI payment with a null 'notes' field and a typo in the query."
+  },
+  {
+    "query": "Submit a cash on delivery (COD) order for three different products. Shipping address does not have a second line.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_9I0J1K2L",
+        "items": [
+          {
+            "product_id": "prod_FASH303",
+            "quantity": 1
+          },
+          {
+            "product_id": "prod_FASH304",
+            "quantity": 1
+          },
+          {
+            "product_id": "prod_ACC111",
+            "quantity": 3
+          }
+        ],
+        "shipping_address": {
+          "line1": "789 Ganges Street",
+          "city": "Varanasi",
+          "state": "UP",
+          "postal_code": "221001",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully for Cash on Delivery.",
+      "order_id": "ord_20251201_0005"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid COD order with multiple items and no optional fields."
+  },
+  {
+    "query": "Create an order using netbanking. Override the default currency to USD for an international customer.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_3M4N5O6P",
+        "items": [
+          {
+            "product_id": "prod_GADGET222",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "101 Silicon Alley",
+          "city": "Hyderabad",
+          "state": "TS",
+          "postal_code": "500081",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_icici_user123"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {
+        "currency": "USD"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully.",
+      "currency": "USD",
+      "order_id": "ord_20251201_0006"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid netbanking case demonstrating the use of the optional 'currency' query parameter."
+  },
+  {
+    "query": "Place a bulk order for a single product using a credit card. The customer ID contains hyphens.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust-corporate-7Q8R9S",
+        "items": [
+          {
+            "product_id": "prod_OFFICE555",
+            "quantity": 50
+          }
+        ],
+        "shipping_address": {
+          "line1": "Corporate Towers",
+          "line2": "Floor 15",
+          "city": "Gurugram",
+          "state": "HR",
+          "postal_code": "122002",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_amex_corp_4e5f6"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251201_0007"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid bulk order with a customer ID format variation."
+  },
+  {
+    "query": "Generate a new customer ordar with a UPI payment, and include a request ID for idempotency.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_T1U2V3W4",
+        "items": [
+          {
+            "product_id": "prod_SPORT999",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "99 Stadium Road",
+          "city": "Chennai",
+          "state": "TN",
+          "postal_code": "600001",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "upi",
+          "upi_id": "athlete99@ybl"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid",
+        "X-Request-ID": "uuid-abc-123-xyz-789"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "order_id": "ord_20251201_0008"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Valid UPI order using an idempotency key and a typo in the query."
+  },
+  {
+    "query": "A customer places an order with a very long note for special delivery instructions. Payment method is COD.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_X5Y6Z7A8",
+        "items": [
+          {
+            "product_id": "prod_FRAGILE123",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Delicate Lane",
+          "city": "Kochi",
+          "state": "KL",
+          "postal_code": "682001",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        },
+        "notes": "This is a very fragile item. Please handle with extreme care. Do not stack any other packages on top of this one. Deliver only between 10 AM and 2 PM and call the number on the package 15 minutes before arrival. Thank you for your careful attention to these instructions."
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully for Cash on Delivery.",
+      "order_id": "ord_20251201_0009"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid COD order with a long string in the 'notes' field."
+  },
+  {
+    "query": "Create an order where the product ID has mixed case and numbers. Payment is by card.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_B9C8D7E6",
+        "items": [
+          {
+            "product_id": "Prod-Gadget-V2-Alpha",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "22 Innovation Drive",
+          "city": "Pune",
+          "state": "MH",
+          "postal_code": "411057",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_mastercard_7d8e9f"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251201_0010"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid order with a complex product ID string."
+  },
+  {
+    "query": "A simple one-item order using netbanking, with a shipping address that contains a long second line.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_F5G6H7I8",
+        "items": [
+          {
+            "product_id": "prod_KITCHEN404",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "Sunstone Apartments",
+          "line2": "Building C, Flat 1204, Near the Grand Lake",
+          "city": "Noida",
+          "state": "UP",
+          "postal_code": "201301",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_sbi_user456"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully.",
+      "order_id": "ord_20251201_0011"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid case testing a long string in 'shipping_address.line2'."
+  },
+  {
+    "query": "Place an order with a non-Indian but valid country code and postal code format. Payment is by card.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_INTL_J9K8L7",
+        "items": [
+          {
+            "product_id": "prod_TRAVEL101",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "10 Downing Street",
+          "city": "London",
+          "state": "London",
+          "postal_code": "SW1A 2AA",
+          "country": "GB"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_intl_card_123"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251201_0012"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid order with a non-Indian address format to test flexibility."
+  },
+  {
+    "query": "Create an order with the minimum allowed quantity of 1 for an item.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_MIN_QUANTITY",
+        "items": [
+          {
+            "product_id": "prod_SINGLE_ITEM",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Minimalist Way",
+          "city": "Jaipur",
+          "state": "RJ",
+          "postal_code": "302001",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully for Cash on Delivery.",
+      "order_id": "ord_20251202_0001"
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Edge case testing the minimum required quantity (1)."
+  },
+  {
+    "query": "Attempt to create an order with an empty string for the optional 'notes' field.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_EMPTY_NOTE",
+        "items": [
+          {
+            "product_id": "prod_NO_NOTES",
+            "quantity": 2
+          }
+        ],
+        "shipping_address": {
+          "line1": "42 Blank Street",
+          "city": "Kolkata",
+          "state": "WB",
+          "postal_code": "700001",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "upi",
+          "upi_id": "nonotes@mybank"
+        },
+        "notes": ""
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "order_id": "ord_20251202_0002"
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Edge case testing an empty string for the 'notes' field, which should be valid."
+  },
+  {
+    "query": "Create an order with an empty string for the optional 'line2' of the shipping address.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_EMPTY_LINE2",
+        "items": [
+          {
+            "product_id": "prod_ADDR_TEST",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Main Street",
+          "line2": "",
+          "city": "Delhi",
+          "state": "DL",
+          "postal_code": "110001",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_card_empty"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251202_0003"
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Edge case testing an empty string for the 'shipping_address.line2' field."
+  },
+  {
+    "query": "Try to create an order where the items array contains exactly one item.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_ONE_ITEM_ARRAY",
+        "items": [
+          {
+            "product_id": "prod_ONLY_ONE",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "Solo Building",
+          "city": "Ahmedabad",
+          "state": "GJ",
+          "postal_code": "380001",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully for Cash on Delivery.",
+      "order_id": "ord_20251202_0004"
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Edge case testing the minimum number of items in the 'items' array (minItems: 1)."
+  },
+  {
+    "query": "Simulate an order creation to check for stock availability without actually placing the order.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_SIMULATE_VALID",
+        "items": [
+          {
+            "product_id": "prod_IN_STOCK",
+            "quantity": 5
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Test Lane",
+          "city": "Testville",
+          "state": "TS",
+          "postal_code": "999999",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_sim_card_123"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {
+        "simulate": "true"
+      }
+    },
+    "expected_response": {
+      "valid": true,
+      "simulation": true,
+      "message": "Order is valid and can be created."
+    },
+    "scenario_type": "edge",
+    "test_category": "valid_flow",
+    "notes": "Edge case demonstrating a successful simulation run."
+  },
+  {
+    "query": "Simulate an order where the requested quantity exceeds available stock.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_SIMULATE_ERROR",
+        "items": [
+          {
+            "product_id": "prod_LOW_STOCK",
+            "quantity": 999
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Test Lane",
+          "city": "Testville",
+          "state": "TS",
+          "postal_code": "999999",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_sim_card_456"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {
+        "simulate": "true"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Insufficient stock for product prod_LOW_STOCK. Available: 10, requested: 999"
+      ],
+      "simulation": true
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Edge case for a simulation run that fails due to insufficient stock."
+  },
+  {
+    "query": "Create an ordor with a customer ID containing special characters like underscores and dots.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_user.name_123",
+        "items": [
+          {
+            "product_id": "prod_SPEC_CHAR",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Special Road",
+          "city": "Character City",
+          "state": "SC",
+          "postal_code": "123456",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully for Cash on Delivery.",
+      "order_id": "ord_20251202_0007"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Edge case testing special characters in 'customer_id' and a typo in the query."
+  },
+  {
+    "query": "Attempt to create an order with a card payment but provide a null value for card_token.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_NULL_TOKEN",
+        "items": [
+          {
+            "product_id": "prod_ANY_ITEM",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "123 Invalid Street",
+          "city": "Errorville",
+          "state": "ER",
+          "postal_code": "000000",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": null
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_invalid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "error": "Validation Error",
+      "details": [
+        "payment.card_token must be a string"
+      ]
+    },
+    "scenario_type": "extreme",
+    "test_category": "error_case",
+    "notes": "Extreme case: 'card_token' is required for card payments and cannot be null, violating schema."
+  },
+  {
+    "query": "Submit an order creation request with an empty items array.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_EMPTY_ITEMS",
+        "items": [],
+        "shipping_address": {
+          "line1": "123 Nowhere Lane",
+          "city": "Null City",
+          "state": "NC",
+          "postal_code": "12345",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_invalid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "error": "Validation Error",
+      "details": [
+        "items must contain at least 1 item"
+      ]
+    },
+    "scenario_type": "extreme",
+    "test_category": "error_case",
+    "notes": "Extreme case: Violates the 'minItems: 1' constraint for the 'items' array."
+  },
+  {
+    "query": "Create an order where the quantity for an item is zero.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_ZERO_QUANTITY",
+        "items": [
+          {
+            "product_id": "prod_ZERO_ITEM",
+            "quantity": 0
+          }
+        ],
+        "shipping_address": {
+          "line1": "0 Zero Avenue",
+          "city": "Naughtsville",
+          "state": "NA",
+          "postal_code": "00000",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_invalid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "error": "Validation Error",
+      "details": [
+        "items[0].quantity must be >= 1"
+      ]
+    },
+    "scenario_type": "extreme",
+    "test_category": "error_case",
+    "notes": "Extreme case: Violates the 'minimum: 1' constraint for item quantity."
+  },
+  {
+    "query": "Attempt to create an order without the required 'payment' object.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_NO_PAYMENT",
+        "items": [
+          {
+            "product_id": "prod_FREEBIE",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Paymentless Plaza",
+          "city": "Free Town",
+          "state": "FT",
+          "postal_code": "54321",
+          "country": "IN"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_invalid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "error": "Validation Error",
+      "details": [
+        "payment is a required property"
+      ]
+    },
+    "scenario_type": "extreme",
+    "test_category": "error_case",
+    "notes": "Extreme case: Missing the mandatory 'payment' object in the request body."
+  },
+  {
+    "query": "Send a request with a UPI payment method but without the required 'upi_id'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_MISSING_UPI_ID",
+        "items": [
+          {
+            "product_id": "prod_UPI_FAIL",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "123 UPI Street",
+          "city": "PayFail",
+          "state": "PF",
+          "postal_code": "11223",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "upi"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_invalid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "error": "Validation Error",
+      "details": [
+        "upi_id is required when payment method is upi"
+      ]
+    },
+    "scenario_type": "extreme",
+    "test_category": "error_case",
+    "notes": "Extreme case: Violates the conditional requirement for 'upi_id' when method is 'upi'."
+  },
+  {
+    "query": "Submit a request where a required field in the shipping address, 'city', is missing.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_BAD_ADDRESS",
+        "items": [
+          {
+            "product_id": "prod_ADDR_FAIL",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Missing City St",
+          "state": "MC",
+          "postal_code": "55555",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_invalid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "error": "Validation Error",
+      "details": [
+        "shipping_address.city is a required property"
+      ]
+    },
+    "scenario_type": "extreme",
+    "test_category": "error_case",
+    "notes": "Extreme case: Missing a required sub-field 'city' within the 'shipping_address' object."
+  },
+  {
+    "query": "Attempt to create an order with an invalid payment method enum.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_BAD_PAY_METHOD",
+        "items": [
+          {
+            "product_id": "prod_CRYPTO",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Blockchain Blvd",
+          "city": "Crypto City",
+          "state": "CC",
+          "postal_code": "21212",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "crypto"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_invalid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "error": "Validation Error",
+      "details": [
+        "payment.method must be one of the following values: card, netbanking, upi, cod"
+      ]
+    },
+    "scenario_type": "extreme",
+    "test_category": "error_case",
+    "notes": "Extreme case: Providing a value for 'payment.method' that is not in the allowed enum list."
+  },
+  {
+    "query": "Create an order with an empty string for the required 'customer_id' field.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "",
+        "items": [
+          {
+            "product_id": "prod_ANON",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Anonymous Ave",
+          "city": "Ghost Town",
+          "state": "GT",
+          "postal_code": "40404",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_invalid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "error": "Validation Error",
+      "details": [
+        "customer_id does not meet minimum length of 1"
+      ]
+    },
+    "scenario_type": "extreme",
+    "test_category": "error_case",
+    "notes": "Extreme case: Violates the 'minLength: 1' constraint for 'customer_id'."
+  },
+  {
+    "query": "Submit an order where the 'product_id' is an empty string.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_VALID_CUST",
+        "items": [
+          {
+            "product_id": "",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "123 Valid Street",
+          "city": "Valid City",
+          "state": "VC",
+          "postal_code": "12345",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_invalid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "error": "Validation Error",
+      "details": [
+        "items[0].product_id does not meet minimum length of 1"
+      ]
+    },
+    "scenario_type": "extreme",
+    "test_category": "error_case",
+    "notes": "Extreme case: Violates the 'minLength: 1' constraint for 'product_id'."
+  },
+  {
+    "query": "Send a request that is missing the entire 'shipping_address' object.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_NO_ADDRESS",
+        "items": [
+          {
+            "product_id": "prod_NO_SHIP",
+            "quantity": 1
+          }
+        ],
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_invalid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "error": "Validation Error",
+      "details": [
+        "shipping_address is a required property"
+      ]
+    },
+    "scenario_type": "extreme",
+    "test_category": "error_case",
+    "notes": "Extreme case: Missing the mandatory 'shipping_address' object."
+  },
+  {
+    "query": "Create a valid order with a Japanese Yen currency override.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_JPY_BUYER",
+        "items": [
+          {
+            "product_id": "prod_JP_EDITION",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1-1-2 Otemachi",
+          "city": "Chiyoda-ku",
+          "state": "Tokyo",
+          "postal_code": "100-8111",
+          "country": "JP"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_jcb_card_123"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {
+        "currency": "JPY"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "JPY",
+      "order_id": "ord_20251202_0008"
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Edge case testing a valid but less common currency override."
+  },
+  {
+    "query": "Place an order with a postal code that includes a hyphen.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_US_BUYER",
+        "items": [
+          {
+            "product_id": "prod_US_IMPORT",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1600 Pennsylvania Avenue NW",
+          "city": "Washington",
+          "state": "DC",
+          "postal_code": "20500-0003",
+          "country": "US"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_us_card_456"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251202_0009"
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Edge case testing a postal code format with special characters."
+  },
+  {
+    "query": "Create an order where the customer ID is a very long string.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_this_is_an_exceptionally_long_customer_identifier_for_testing_boundary_conditions_1234567890",
+        "items": [
+          {
+            "product_id": "prod_LONG_ID_TEST",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Long ID Lane",
+          "city": "Stringsville",
+          "state": "ST",
+          "postal_code": "98765",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully for Cash on Delivery.",
+      "order_id": "ord_20251202_0010"
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Edge case testing a very long string for 'customer_id'."
+  },
+  {
+    "query": "Submit an order where the product ID is a very long string.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_NORMAL_ID",
+        "items": [
+          {
+            "product_id": "prod_this_is_an_extremely_long_and_descriptive_product_identifier_used_for_stress_testing_the_api_schema_v2.1.3-beta",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "123 Normal Street",
+          "city": "Regular Town",
+          "state": "RT",
+          "postal_code": "12345",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully for Cash on Delivery.",
+      "order_id": "ord_20251202_0011"
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Edge case testing a very long string for 'product_id'."
+  },
+  {
+    "query": "Create an order with payment method in uppercase.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_UPPERCASE_PAY",
+        "items": [
+          {
+            "product_id": "prod_CASE_TEST",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Case Road",
+          "city": "Capital City",
+          "state": "CC",
+          "postal_code": "11111",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "CARD",
+          "card_token": "tok_case_test_123"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_invalid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "error": "Validation Error",
+      "details": [
+        "payment.method must be one of the following values: card, netbanking, upi, cod"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Edge case to check if the enum for payment method is case-sensitive. It should fail validation."
+  },
+  {
+    "query": "Submit an order with additional, undefined properties in the main object.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_EXTRA_PROP",
+        "items": [
+          {
+            "product_id": "prod_EXTRA",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Extra Lane",
+          "city": "Addon",
+          "state": "AD",
+          "postal_code": "22222",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        },
+        "extra_field": "some_value"
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_invalid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "error": "Validation Error",
+      "details": [
+        "Additional property extra_field is not allowed"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Edge case testing the 'additionalProperties: false' constraint on the main object."
+  },
+  {
+    "query": "Create order with an additional property inside the shipping address.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_EXTRA_ADDR",
+        "items": [
+          {
+            "product_id": "prod_EXTRA_ADDR",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Extra Address Lane",
+          "city": "Addon",
+          "state": "AD",
+          "postal_code": "33333",
+          "country": "IN",
+          "landmark": "Near old tower"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_invalid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "error": "Validation Error",
+      "details": [
+        "Additional property landmark is not allowed in shipping_address"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Edge case testing 'additionalProperties: false' on a nested object."
+  },
+  {
+    "query": "Process an order where the quantity is a very large number, to test system limits.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_LARGE_QTY",
+        "items": [
+          {
+            "product_id": "prod_BULK_ITEM",
+            "quantity": 999999999
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Warehouse Way",
+          "city": "Stockpile",
+          "state": "SP",
+          "postal_code": "44444",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_bulk_buy_123"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "error",
+      "message": "Order quantity exceeds maximum limit."
+    },
+    "scenario_type": "edge",
+    "test_category": "performance",
+    "notes": "Edge case testing a very large integer for quantity, which may pass schema but fail business logic."
+  },
+  {
+    "query": "Submit a valid order with a Euro currency override for a European customer.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_EUR_BUYER",
+        "items": [
+          {
+            "product_id": "prod_EU_PLUG",
+            "quantity": 2
+          }
+        ],
+        "shipping_address": {
+          "line1": "Kurfürstendamm 21",
+          "city": "Berlin",
+          "state": "Berlin",
+          "postal_code": "10719",
+          "country": "DE"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_eu_card_789"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {
+        "currency": "EUR"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "EUR",
+      "order_id": "ord_20251202_0012"
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Edge case with EUR currency override and a German address format."
+  },
+  {
+    "query": "Create an order with line2 as null in the shipping address.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_NULL_LINE2",
+        "items": [
+          {
+            "product_id": "prod_ADDR_TEST_2",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Main Street",
+          "line2": null,
+          "city": "Delhi",
+          "state": "DL",
+          "postal_code": "110001",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_test_card_null"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251202_0013"
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Edge case testing a null value for the optional 'shipping_address.line2' field."
+  },
+  {
+    "query": "Make a new purhcase for multiple items using a card.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_G1H2I3J4",
+        "items": [
+          {
+            "product_id": "prod_TOY_CAR_01",
+            "quantity": 3
+          },
+          {
+            "product_id": "prod_DOLL_02",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "10 Toy Lane",
+          "city": "Playville",
+          "state": "PV",
+          "postal_code": "123123",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_play_card"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251203_0001"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Valid case, rephrased query with a typo."
+  },
+  {
+    "query": "A user wants to buy a single book with UPI, shipping to Goa.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_K5L6M7N8",
+        "items": [
+          {
+            "product_id": "prod_BOOK_GOA",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "25 Beach Road",
+          "city": "Panaji",
+          "state": "GA",
+          "postal_code": "403001",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "upi",
+          "upi_id": "reader@goapay"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "order_id": "ord_20251203_0002"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Simple, natural language query for a valid UPI transaction."
+  },
+  {
+    "query": "Complete a checkout with Cash On Delivery for two electronic items.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_O9P0Q1R2",
+        "items": [
+          {
+            "product_id": "prod_HEADPHONES_X1",
+            "quantity": 1
+          },
+          {
+            "product_id": "prod_MOUSE_Y2",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "9 Tech Avenue",
+          "line2": "Apt 5B",
+          "city": "Gurugram",
+          "state": "HR",
+          "postal_code": "122008",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully for Cash on Delivery.",
+      "order_id": "ord_20251203_0003"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Standard COD order described from a checkout flow perspective."
+  },
+  {
+    "query": "Finalize a transaction using netbanking for a single, high-value item.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_S3T4U5V6",
+        "items": [
+          {
+            "product_id": "prod_JEWELRY_Z3",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "5 Diamond Street",
+          "city": "Surat",
+          "state": "GJ",
+          "postal_code": "395003",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_axis_secure1"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully.",
+      "order_id": "ord_20251203_0004"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid netbanking order with domain-specific phrasing."
+  },
+  {
+    "query": "A customer is buying several clothing items and paying with a saved card token.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_W7X8Y9Z0",
+        "items": [
+          {
+            "product_id": "prod_SHIRT_M_BLUE",
+            "quantity": 2
+          },
+          {
+            "product_id": "prod_JEANS_32_BLACK",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "100 Fashion Blvd",
+          "city": "Mumbai",
+          "state": "MH",
+          "postal_code": "400050",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_saved_card_xyz"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251203_0005"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Realistic e-commerce scenario for a fashion purchase."
+  },
+  {
+    "query": "Execute an order placement for a grocery list via UPI payment.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_A1B2C3D4",
+        "items": [
+          {
+            "product_id": "prod_MILK_1L",
+            "quantity": 4
+          },
+          {
+            "product_id": "prod_BREAD_WHEAT",
+            "quantity": 2
+          },
+          {
+            "product_id": "prod_EGGS_12",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "B-4, Green Valley Apts",
+          "city": "Pune",
+          "state": "MH",
+          "postal_code": "411045",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "upi",
+          "upi_id": "grocerybuyer@icici"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "order_id": "ord_20251203_0006"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Common use case for ordering multiple grocery items."
+  },
+  {
+    "query": "I need to order a gift and have it shipped to a different city. Paying COD.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_E5F6G7H8",
+        "items": [
+          {
+            "product_id": "prod_GIFTBOX_SPECIAL",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "7 Gift Lane",
+          "city": "Lucknow",
+          "state": "UP",
+          "postal_code": "226010",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        },
+        "notes": "This is a gift. Please do not include the invoice in the box."
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully for Cash on Delivery.",
+      "order_id": "ord_20251203_0007"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Natural language request for a gift order with special notes."
+  },
+  {
+    "query": "A customer is checking out with a single item using netbanking and wants delivery to a P.O. Box style address.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_I9J0K1L2",
+        "items": [
+          {
+            "product_id": "prod_BOOK_SCIFI",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "Post Box 1984",
+          "city": "Chandigarh",
+          "state": "CH",
+          "postal_code": "160017",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_hdfc_user789"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully.",
+      "order_id": "ord_20251203_0008"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid case with a non-standard address line format."
+  },
+  {
+    "query": "Can I place an ordar for two products and pay with my card? Shipping to Chennai.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_M3N4O5P6",
+        "items": [
+          {
+            "product_id": "prod_CAMERA_LENS",
+            "quantity": 1
+          },
+          {
+            "product_id": "prod_TRIPOD",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "42 Camera Close",
+          "city": "Chennai",
+          "state": "TN",
+          "postal_code": "600020",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_chennai_shopper"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251203_0009"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Conversational query with a typo for a standard card transaction."
+  },
+  {
+    "query": "A user from a tier-2 city places an order for home goods using UPI.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_Q7R8S9T0",
+        "items": [
+          {
+            "product_id": "prod_CUSHIONS_SET",
+            "quantity": 1
+          },
+          {
+            "product_id": "prod_LAMP_TABLE",
+            "quantity": 2
+          }
+        ],
+        "shipping_address": {
+          "line1": "15 Civil Lines",
+          "city": "Indore",
+          "state": "MP",
+          "postal_code": "452001",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "upi",
+          "upi_id": "user.indore@axl"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "order_id": "ord_20251203_0010"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid UPI order with a realistic user scenario."
+  },
+  {
+    "query": "A repeat customer is buying a single item with COD, no special notes or address line 2.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_U1V2W3X4",
+        "items": [
+          {
+            "product_id": "prod_REORDER_ITEM",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "33 Repeat Customer Road",
+          "city": "Nagpur",
+          "state": "MH",
+          "postal_code": "440010",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully for Cash on Delivery.",
+      "order_id": "ord_20251203_0011"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Minimalist valid COD order, representing a simple reorder flow."
+  },
+  {
+    "query": "Create an order with netbanking where the state name is spelled out.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_Y5Z0A1B2",
+        "items": [
+          {
+            "product_id": "prod_STATE_TEST",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "8 Full State Name Street",
+          "city": "Bhopal",
+          "state": "Madhya Pradesh",
+          "postal_code": "462001",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_bob_user123"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully.",
+      "order_id": "ord_20251203_0012"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid order testing if the 'state' field accepts full names instead of just codes."
+  },
+  {
+    "query": "Process a transaction with a card where the postal code has spaces.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_C3D4E5F6",
+        "items": [
+          {
+            "product_id": "prod_SPACE_POST",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Space Road",
+          "city": "London",
+          "state": "London",
+          "postal_code": "SW1A 2AA",
+          "country": "GB"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_space_postal"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251203_0013"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid case checking handling of spaces in postal codes."
+  },
+  {
+    "query": "A user is paying via UPI and their UPI ID is a phone number.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_G7H8I9J0",
+        "items": [
+          {
+            "product_id": "prod_PHONE_PAY",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "98 Mobile Manor",
+          "city": "Hyderabad",
+          "state": "TS",
+          "postal_code": "500032",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "upi",
+          "upi_id": "9876543210@paytm"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "order_id": "ord_20251203_0014"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid case with a common UPI ID format (phone number)."
+  },
+  {
+    "query": "Place a COD order for an item with a complex product ID containing dots and hyphens.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_K1L2M3N4",
+        "items": [
+          {
+            "product_id": "prod-v2.1-final.release",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "21 Version Control Vista",
+          "city": "Gitgrad",
+          "state": "GG",
+          "postal_code": "90210",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully for Cash on Delivery.",
+      "order_id": "ord_20251203_0015"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid case testing handling of special characters within a product ID."
+  },
+  {
+    "query": "A user makes a purchase using netbanking and provides a two-word city name.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_O5P6Q7R8",
+        "items": [
+          {
+            "product_id": "prod_NAVI_MUMBAI",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "55 Palm Beach Road",
+          "city": "Navi Mumbai",
+          "state": "MH",
+          "postal_code": "400703",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_kotak_user45"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully.",
+      "order_id": "ord_20251203_0016"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid case testing a multi-word city name."
+  },
+  {
+    "query": "Create an order using a card, but this time with the currency paramter set to GBP.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_S9T0U1V2",
+        "items": [
+          {
+            "product_id": "prod_UK_TEA",
+            "quantity": 5
+          }
+        ],
+        "shipping_address": {
+          "line1": "221B Baker Street",
+          "city": "London",
+          "state": "London",
+          "postal_code": "NW1 6XE",
+          "country": "GB"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_gbp_card_111"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {
+        "currency": "GBP"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "currency": "GBP",
+      "order_id": "ord_20251203_0017"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Valid use of the currency override parameter with a typo in the query."
+  },
+  {
+    "query": "A customer is buying a single item and paying with UPI. Address is in a remote area.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_W3X4Y5Z6",
+        "items": [
+          {
+            "product_id": "prod_REMOTE_ITEM",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "Himalayan Foothills",
+          "line2": "Near the old monastery",
+          "city": "Leh",
+          "state": "LA",
+          "postal_code": "194101",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "upi",
+          "upi_id": "himalayan.trekker@okhdfc"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "order_id": "ord_20251203_0018"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid UPI order with a descriptive, multi-line address."
+  },
+  {
+    "query": "Place a COD order with a very simple, one-word address line.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_A7B8C9D0",
+        "items": [
+          {
+            "product_id": "prod_SIMPLE",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "Mainstreet",
+          "city": "Anytown",
+          "state": "AS",
+          "postal_code": "12345",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully for Cash on Delivery.",
+      "order_id": "ord_20251203_0019"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid order testing minimal but valid address fields."
+  },
+  {
+    "query": "A user with a long name is placing an order via netbanking.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_KrishnamurthyVenkateshwaran",
+        "items": [
+          {
+            "product_id": "prod_LONG_NAME_ITEM",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Long Name Lane",
+          "city": "Coimbatore",
+          "state": "TN",
+          "postal_code": "641001",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_canara_user99"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully.",
+      "order_id": "ord_20251203_0020"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid order with a long, single-string customer ID."
+  },
+  {
+    "query": "Submit an order using a card and a numeric customer ID.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "1234567890",
+        "items": [
+          {
+            "product_id": "prod_NUMERIC_ID",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "123 Numeric Street",
+          "city": "Digitville",
+          "state": "DV",
+          "postal_code": "10101",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_numeric_cust"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251203_0021"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid order testing if a purely numeric string is accepted for customer_id."
+  },
+  {
+    "query": "Process a UPI payment for a customer in a Union Territory.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_PUDUCHERRY_USER",
+        "items": [
+          {
+            "product_id": "prod_UT_ITEM",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 White Town Road",
+          "city": "Puducherry",
+          "state": "PY",
+          "postal_code": "605001",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "upi",
+          "upi_id": "pondy.user@ybl"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "order_id": "ord_20251203_0022"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid UPI order for a less common geographical location (Union Territory)."
+  },
+  {
+    "query": "A customer is placing a COD order for a large quantity of a low-cost item.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_BULK_COD",
+        "items": [
+          {
+            "product_id": "prod_PENS_PACK",
+            "quantity": 200
+          }
+        ],
+        "shipping_address": {
+          "line1": "500 Bulk Order Lane",
+          "city": "Stationery City",
+          "state": "SC",
+          "postal_code": "800001",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully for Cash on Delivery.",
+      "order_id": "ord_20251203_0023"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid COD order with a high quantity number."
+  },
+  {
+    "query": "Create an order via netbanking for a customer in the North East.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_NE_USER",
+        "items": [
+          {
+            "product_id": "prod_TEA_ASSAM",
+            "quantity": 3
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Tea Garden Estate",
+          "city": "Guwahati",
+          "state": "AS",
+          "postal_code": "781001",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_sbi_ne_user"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully.",
+      "order_id": "ord_20251203_0024"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Standard valid netbanking order for a specific region."
+  },
+  {
+    "query": "A user is buying a phone and an accessory together, paying by card.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_PHONE_BUYER",
+        "items": [
+          {
+            "product_id": "prod_SMARTPHONE_X2",
+            "quantity": 1
+          },
+          {
+            "product_id": "prod_PHONE_CASE_X2",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "202 Gadget Galaxy",
+          "city": "Bengaluru",
+          "state": "KA",
+          "postal_code": "560095",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_phone_purchase"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251203_0025"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Common e-commerce scenario of buying a main product and an accessory."
+  },
+  {
+    "query": "Submit an order using a UPI ID with a dot in the username.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_UPI_DOT",
+        "items": [
+          {
+            "product_id": "prod_DOT_ITEM",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Dot Avenue",
+          "city": "Point Place",
+          "state": "PP",
+          "postal_code": "14141",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "upi",
+          "upi_id": "first.last@okaxis"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "order_id": "ord_20251203_0026"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid UPI order testing a common UPI ID format with a period."
+  },
+  {
+    "query": "A customer is opting for COD for a small, single item purchase.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_SMALL_COD",
+        "items": [
+          {
+            "product_id": "prod_KEYCHAIN",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "789 Simple Street",
+          "city": "Jaipur",
+          "state": "RJ",
+          "postal_code": "302017",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully for Cash on Delivery.",
+      "order_id": "ord_20251203_0027"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "A very standard, minimal COD order."
+  },
+  {
+    "query": "Process a netbanking transaction for an order containing items with numeric product IDs.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_NUMERIC_PROD",
+        "items": [
+          {
+            "product_id": "8675309",
+            "quantity": 1
+          },
+          {
+            "product_id": "1234567",
+            "quantity": 2
+          }
+        ],
+        "shipping_address": {
+          "line1": "456 Number Road",
+          "city": "Digitville",
+          "state": "DV",
+          "postal_code": "10102",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_pnb_user321"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully.",
+      "order_id": "ord_20251203_0028"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid order testing if purely numeric strings are accepted for product_id."
+  },
+  {
+    "query": "Create an order using a card and a UUID as the customer ID.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "f81d4fae-7dec-11d0-a765-00a0c91e6bf6",
+        "items": [
+          {
+            "product_id": "prod_UUID_TEST",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 UUID Lane",
+          "city": "Unique Town",
+          "state": "UT",
+          "postal_code": "31337",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_uuid_customer"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251203_0029"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid case using a common format for IDs (UUID)."
+  },
+  {
+    "query": "A user is buying a subscription-like item via UPI, to be delivered to an office address.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_SUB_USER",
+        "items": [
+          {
+            "product_id": "prod_MAGAZINE_SUB",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "WeWork, 15th Floor",
+          "line2": "Galaxy Tower",
+          "city": "Noida",
+          "state": "UP",
+          "postal_code": "201309",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "upi",
+          "upi_id": "corp.user@mypsp"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "order_id": "ord_20251203_0030"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid order representing a B2B or office delivery scenario."
+  },
+  {
+    "query": "Finalize a COD purchase for a customer in Kerala.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_KERALA_COD",
+        "items": [
+          {
+            "product_id": "prod_SPICES_BOX",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "3 Backwater View",
+          "city": "Alappuzha",
+          "state": "KL",
+          "postal_code": "688001",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully for Cash on Delivery.",
+      "order_id": "ord_20251203_0031"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Standard COD order for a specific Indian state."
+  },
+  {
+    "query": "Complete a purchase using netbanking with a simple address.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_SIMPLE_NB",
+        "items": [
+          {
+            "product_id": "prod_NB_ITEM",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "123 Main St",
+          "city": "Anytown",
+          "state": "AS",
+          "postal_code": "12345",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_simple_user"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully.",
+      "order_id": "ord_20251203_0032"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "A straightforward and minimal netbanking order."
+  },
+  {
+    "query": "A user is ordering multiple quantities of the same item using a credit card.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_MULTI_QUANTITY",
+        "items": [
+          {
+            "product_id": "prod_SOCKS_PACK",
+            "quantity": 5
+          }
+        ],
+        "shipping_address": {
+          "line1": "5 Pair Place",
+          "city": "Footville",
+          "state": "FV",
+          "postal_code": "50505",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_multi_quant"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251203_0033"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid order with a single item type but multiple quantities."
+  },
+  {
+    "query": "Create an order with UPI where the country code is in lowercase.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_LOWERCASE_COUNTRY",
+        "items": [
+          {
+            "product_id": "prod_LC_COUNTRY",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Lowercase Lane",
+          "city": "Smalltown",
+          "state": "ST",
+          "postal_code": "11221",
+          "country": "in"
+        },
+        "payment": {
+          "method": "upi",
+          "upi_id": "lowercase@upi"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "order_id": "ord_20251203_0034"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid order to check if the system handles lowercase country codes gracefully."
+  },
+  {
+    "query": "A customer makes a COD purchase for a list of items for a party.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_PARTY_PLANNER",
+        "items": [
+          {
+            "product_id": "prod_BALLOONS",
+            "quantity": 3
+          },
+          {
+            "product_id": "prod_PAPER_PLATES",
+            "quantity": 5
+          },
+          {
+            "product_id": "prod_STREAMERS",
+            "quantity": 2
+          }
+        ],
+        "shipping_address": {
+          "line1": "10 Party Avenue",
+          "city": "Celebration City",
+          "state": "CC",
+          "postal_code": "77777",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully for Cash on Delivery.",
+      "order_id": "ord_20251203_0035"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid COD order with multiple distinct items."
+  },
+  {
+    "query": "Submit an order with netbanking and an address containing apartment and block numbers.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_APT_BUYER",
+        "items": [
+          {
+            "product_id": "prod_APT_ITEM",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "Block C, Apt 1024, Prestige Towers",
+          "city": "Bengaluru",
+          "state": "KA",
+          "postal_code": "560037",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_apt_user"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully.",
+      "order_id": "ord_20251203_0036"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid order with a complex, realistic 'line1' address format."
+  },
+  {
+    "query": "Place an order with a card for a product to be shipped to a corporate office.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_CORP_BUYER",
+        "items": [
+          {
+            "product_id": "prod_OFFICE_SUPPLY",
+            "quantity": 10
+          }
+        ],
+        "shipping_address": {
+          "line1": "Amazon Development Centre",
+          "line2": "Bagmane World Technology Center",
+          "city": "Bengaluru",
+          "state": "KA",
+          "postal_code": "560048",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_corp_card_987"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251203_0037"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid order with a real-world corporate address."
+  },
+  {
+    "query": "A user is paying for their shopping cart with UPI. The cart has 3 items.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_CART_CHECKOUT",
+        "items": [
+          {
+            "product_id": "prod_ITEM_A",
+            "quantity": 1
+          },
+          {
+            "product_id": "prod_ITEM_B",
+            "quantity": 2
+          },
+          {
+            "product_id": "prod_ITEM_C",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Shopping Cart Lane",
+          "city": "Ecom City",
+          "state": "EC",
+          "postal_code": "15975",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "upi",
+          "upi_id": "cart.checkout@psp"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "order_id": "ord_20251203_0038"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid UPI order described using e-commerce terminology ('shopping cart')."
+  },
+  {
+    "query": "Create a COD order for a customer located in a rural area.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_RURAL_COD",
+        "items": [
+          {
+            "product_id": "prod_RURAL_ITEM",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "Village Name, Post Office Name",
+          "city": "Tehsil Name",
+          "state": "RJ",
+          "postal_code": "341519",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully for Cash on Delivery.",
+      "order_id": "ord_20251203_0039"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid COD order with a typical rural address format."
+  },
+  {
+    "query": "A customer is purchasing a book using netbanking.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_BOOKWORM_NB",
+        "items": [
+          {
+            "product_id": "prod_NOVEL_BESTSELLER",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Library Lane",
+          "city": "Kolkata",
+          "state": "WB",
+          "postal_code": "700071",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_bookworm_1"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully.",
+      "order_id": "ord_20251203_0040"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Standard, simple netbanking transaction for a single item."
+  },
+  {
+    "query": "Process payment for an order with a card and include a brief note.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_NOTE_TAKER",
+        "items": [
+          {
+            "product_id": "prod_NOTE_ITEM",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Note Street",
+          "city": "Messageville",
+          "state": "MS",
+          "postal_code": "60606",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_with_note"
+        },
+        "notes": "Leave at front door."
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251203_0041"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid card order that includes the optional 'notes' field."
+  },
+  {
+    "query": "A customer is buying two items via UPI, shipping to a business address.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_BUSINESS_UPI",
+        "items": [
+          {
+            "product_id": "prod_STAPLER",
+            "quantity": 1
+          },
+          {
+            "product_id": "prod_PENS_BOX",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "C-21, Sector 58",
+          "city": "Noida",
+          "state": "UP",
+          "postal_code": "201301",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "upi",
+          "upi_id": "business.purchase@upi"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "order_id": "ord_20251203_0042"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid UPI order for a common business address format."
+  },
+  {
+    "query": "Place a COD order for a single item for a customer in Ahmedabad.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_AHMD_COD",
+        "items": [
+          {
+            "product_id": "prod_GUJARAT_ITEM",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Gandhi Ashram Road",
+          "city": "Ahmedabad",
+          "state": "GJ",
+          "postal_code": "380027",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully for Cash on Delivery.",
+      "order_id": "ord_20251203_0043"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Standard COD order for a major city."
+  },
+  {
+    "query": "A user is paying with netbanking and their address has a 'line2'.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_NB_LINE2",
+        "items": [
+          {
+            "product_id": "prod_LINE2_ITEM",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "Sunrise Apartments",
+          "line2": "Flat 301, Wing B",
+          "city": "Thane",
+          "state": "MH",
+          "postal_code": "400601",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_user_with_line2"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully.",
+      "order_id": "ord_20251203_0044"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid netbanking order including the optional 'line2' address field."
+  },
+  {
+    "query": "Process a card payment for a customer ordering a single item.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_SINGLE_CARD",
+        "items": [
+          {
+            "product_id": "prod_SINGLE_ITEM_CARD",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Card Lane",
+          "city": "Payment City",
+          "state": "PC",
+          "postal_code": "40404",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_single_item"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251203_0045"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "A very basic but valid credit card transaction."
+  },
+  {
+    "query": "Create an order with UPI for a customer with a simple alphanumeric ID.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "user12345",
+        "items": [
+          {
+            "product_id": "prod_ALPHANUM",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "123 AlphaNumeric Drive",
+          "city": "Mixville",
+          "state": "MX",
+          "postal_code": "123AB",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "upi",
+          "upi_id": "user12345@upi"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "order_id": "ord_20251203_0046"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid order with a simple alphanumeric customer ID, not following the 'cust_' prefix."
+  },
+  {
+    "query": "A customer is buying a set of items and wants to pay on delivery.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_SET_BUYER",
+        "items": [
+          {
+            "product_id": "prod_DINNER_SET",
+            "quantity": 1
+          },
+          {
+            "product_id": "prod_CUTLERY_SET",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "4 Set Street",
+          "city": "Collection Town",
+          "state": "CT",
+          "postal_code": "45454",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully for Cash on Delivery.",
+      "order_id": "ord_20251203_0047"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid COD order for multiple related items."
+  },
+  {
+    "query": "Process a netbanking order for a customer in South India.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_SOUTH_NB",
+        "items": [
+          {
+            "product_id": "prod_COFFEE_FILTER",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "7 Filter Coffee Lane",
+          "city": "Chennai",
+          "state": "TN",
+          "postal_code": "600004",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_south_user"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully.",
+      "order_id": "ord_20251203_0048"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid netbanking order with a regional context."
+  },
+  {
+    "query": "Create an order with a card payment and a numeric postal code as a string.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_NUM_POSTAL",
+        "items": [
+          {
+            "product_id": "prod_POSTAL_TEST",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "123 Postal Road",
+          "city": "Pin City",
+          "state": "PC",
+          "postal_code": "110011",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_num_postal"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251203_0049"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Standard valid order confirming postal code is handled as a string."
+  },
+  {
+    "query": "A customer is buying a single item via UPI and shipping to a university campus.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_STUDENT_UPI",
+        "items": [
+          {
+            "product_id": "prod_TEXTBOOK_CS101",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "Hostel 5, Room 201",
+          "line2": "IIT Bombay",
+          "city": "Mumbai",
+          "state": "MH",
+          "postal_code": "400076",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "upi",
+          "upi_id": "student.iitb@upi"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "pending_payment",
+      "message": "Order created. Awaiting UPI payment confirmation.",
+      "order_id": "ord_20251203_0050"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid UPI order with a realistic student/campus address."
+  },
+  {
+    "query": "Submit a COD order with the minimum possible valid data: one item, no optional fields.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_MINIMALIST",
+        "items": [
+          {
+            "product_id": "prod_MINIMAL",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Min Road",
+          "city": "Minville",
+          "state": "MV",
+          "postal_code": "10001",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "cod"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully for Cash on Delivery.",
+      "order_id": "ord_20251203_0051"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "A barebones valid request to confirm baseline functionality."
+  },
+  {
+    "query": "Process a netbanking order for a customer with a single-letter state code.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_SINGLE_STATE",
+        "items": [
+          {
+            "product_id": "prod_SINGLE_S",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Short Road",
+          "city": "Town",
+          "state": "S",
+          "postal_code": "12121",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "netbanking",
+          "netbanking_id": "nb_single_s_user"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created successfully.",
+      "order_id": "ord_20251203_0052"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid order testing if a single character is acceptable for the 'state' field."
+  },
+  {
+    "query": "Create an order using a card and a very long city name.",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "url": "https://api.example-shop.com/v1/orders",
+      "body": {
+        "customer_id": "cust_LONG_CITY",
+        "items": [
+          {
+            "product_id": "prod_LONG_CITY_ITEM",
+            "quantity": 1
+          }
+        ],
+        "shipping_address": {
+          "line1": "1 Long City Road",
+          "city": "Venkatanarasimharajuvaripeta",
+          "state": "AP",
+          "postal_code": "517583",
+          "country": "IN"
+        },
+        "payment": {
+          "method": "card",
+          "card_token": "tok_long_city"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test_api_key_valid"
+      },
+      "query_parameters": {}
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized.",
+      "order_id": "ord_20251203_0053"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid order using one of the longest city names in India."
+  }
+]

@@ -1,0 +1,2521 @@
+[
+  {
+    "query": "Create order with valid customer and items",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "order_id": "ord_123"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating an order with valid customer and items"
+  },
+  {
+    "query": "Create order with invalid customer id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid_id",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid customer id"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with invalid customer id"
+  },
+  {
+    "query": "Create order with missing shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with missing shipping address"
+  },
+  {
+    "query": "Create order with valid customer and items, but with typo in query",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New Yorke",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "order_id": "ord_123"
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Test creating an order with valid customer and items, but with typo in query"
+  },
+  {
+    "query": "Create order with invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "invalid_method",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid payment method"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with invalid payment method"
+  },
+  {
+    "query": "Create order with missing payment information",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing payment information"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with missing payment information"
+  },
+  {
+    "query": "Create order with valid customer and items, but with typo in customer id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_1234",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid customer id"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating an order with valid customer and items, but with typo in customer id"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing item quantity",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456"
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing item quantity"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing item quantity"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid item quantity",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": -1
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid item quantity"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid item quantity"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing payment method"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing payment method"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "invalid_method",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid payment method"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid payment method"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing card token",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing card token"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing card token"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid card token",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "invalid_token"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid card token"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid card token"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing shipping address"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Invalid City",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid shipping address"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing city in shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing city in shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing city in shipping address"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid city in shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Invalid City",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid city in shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid city in shipping address"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing state in shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing state in shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing state in shipping address"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid state in shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "Invalid State",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid state in shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid state in shipping address"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing country in shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing country in shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing country in shipping address"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid country in shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "Invalid Country",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid country in shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid country in shipping address"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing postal code in shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing postal code in shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing postal code in shipping address"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid postal code in shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "Invalid Postal Code"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid postal code in shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid postal code in shipping address"
+  },
+  {
+    "query": "Create order with valid customer and items, but with typo in product id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_4567",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid product id"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating an order with valid customer and items, but with typo in product id"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid product id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "invalid_product_id",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid product id"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid product id"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing product id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing product id"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing product id"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid quantity",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": -1
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid quantity"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid quantity"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing quantity",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456"
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing quantity"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing quantity"
+  },
+  {
+    "query": "Create order with valid customer and items, but with typo in customer id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_1234",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid customer id"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating an order with valid customer and items, but with typo in customer id"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid customer id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid_customer_id",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid customer id"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid customer id"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing customer id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing customer id"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing customer id"
+  },
+  {
+    "query": "Create order with valid customer and items, but with typo in payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "cardd",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid payment method"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating an order with valid customer and items, but with typo in payment method"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "invalid_payment_method",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid payment method"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid payment method"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing payment method"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing payment method"
+  },
+  {
+    "query": "Create order with valid customer and items, but with typo in card token",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_1234"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid card token"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating an order with valid customer and items, but with typo in card token"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid card token",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "invalid_card_token"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid card token"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid card token"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing card token",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing card token"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing card token"
+  },
+  {
+    "query": "Create order with valid customer and items, but with typo in shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New Yorke",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating an order with valid customer and items, but with typo in shipping address"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Invalid City",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid shipping address"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing shipping address"
+  },
+  {
+    "query": "Create order with valid customer and items, but with typo in city",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New Yorke",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid city"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating an order with valid customer and items, but with typo in city"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid city",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Invalid City",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid city"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid city"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing city",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing city"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing city"
+  },
+  {
+    "query": "Create order with valid customer and items, but with typo in state",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "New Yorke",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid state"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating an order with valid customer and items, but with typo in state"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid state",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "Invalid State",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid state"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid state"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing state",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing state"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing state"
+  },
+  {
+    "query": "Create order with valid customer and items, but with typo in country",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "Unites States",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid country"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating an order with valid customer and items, but with typo in country"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid country",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "Invalid Country",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid country"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid country"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing country",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing country"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing country"
+  },
+  {
+    "query": "Create order with valid customer and items, but with typo in postal code",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "1000"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid postal code"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating an order with valid customer and items, but with typo in postal code"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid postal code",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "Invalid Postal Code"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid postal code"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid postal code"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing postal code",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing postal code"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing postal code"
+  },
+  {
+    "query": "Create order with valid customer and items",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "order_id": "ord_123"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating an order with valid customer and items"
+  },
+  {
+    "query": "Create order with valid customer and items, but with typo in customer id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_1234",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid customer id"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating an order with valid customer and items, but with typo in customer id"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid customer id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "invalid_customer_id",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid customer id"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid customer id"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing customer id",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing customer id"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing customer id"
+  },
+  {
+    "query": "Create order with valid customer and items, but with typo in payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "cardd",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid payment method"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating an order with valid customer and items, but with typo in payment method"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "invalid_payment_method",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid payment method"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid payment method"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing payment method",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing payment method"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing payment method"
+  },
+  {
+    "query": "Create order with valid customer and items, but with typo in card token",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_1234"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid card token"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating an order with valid customer and items, but with typo in card token"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid card token",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "invalid_card_token"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid card token"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid card token"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing card token",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing card token"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing card token"
+  },
+  {
+    "query": "Create order with valid customer and items, but with typo in shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New Yorke",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating an order with valid customer and items, but with typo in shipping address"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Invalid City",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid shipping address"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing shipping address",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing shipping address"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing shipping address"
+  },
+  {
+    "query": "Create order with valid customer and items, but with typo in city",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New Yorke",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid city"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating an order with valid customer and items, but with typo in city"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid city",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "Invalid City",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid city"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid city"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing city",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing city"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing city"
+  },
+  {
+    "query": "Create order with valid customer and items, but with typo in state",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "New Yorke",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid state"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating an order with valid customer and items, but with typo in state"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid state",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "Invalid State",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid state"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid state"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing state",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing state"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing state"
+  },
+  {
+    "query": "Create order with valid customer and items, but with typo in country",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "Unites States",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid country"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating an order with valid customer and items, but with typo in country"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid country",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "Invalid Country",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid country"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid country"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing country",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing country"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing country"
+  },
+  {
+    "query": "Create order with valid customer and items, but with typo in postal code",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "1000"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid postal code"
+    },
+    "scenario_type": "edge",
+    "test_category": "typo",
+    "notes": "Test creating an order with valid customer and items, but with typo in postal code"
+  },
+  {
+    "query": "Create order with valid customer and items, but with invalid postal code",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "Invalid Postal Code"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Invalid postal code"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with invalid postal code"
+  },
+  {
+    "query": "Create order with valid customer and items, but with missing postal code",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "error",
+      "error_message": "Missing postal code"
+    },
+    "scenario_type": "edge",
+    "test_category": "error_case",
+    "notes": "Test creating an order with valid customer and items, but with missing postal code"
+  },
+  {
+    "query": "Create order with valid customer and items",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "cust_123",
+      "items": [
+        {
+          "product_id": "prod_456",
+          "quantity": 2
+        }
+      ],
+      "shipping_address": {
+        "city": "New York",
+        "line1": "123 Main St",
+        "state": "NY",
+        "country": "US",
+        "postal_code": "10001"
+      },
+      "payment": {
+        "method": "card",
+        "card_token": "tok_123"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "order_id": "ord_123"
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Test creating an order with valid customer and items"
+  }
+]
