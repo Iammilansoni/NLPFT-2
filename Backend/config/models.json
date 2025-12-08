@@ -1,0 +1,99 @@
+{
+  "version": "1.0",
+  "last_updated": "2025-12-03",
+  "embedding_models": [
+    {
+      "model_id": "all-minilm",
+      "type": "embedding",
+      "name": "All-MiniLM",
+      "dimension": 384,
+      "context_tokens": 512,
+      "cpu_friendly": true,
+      "provider": "ollama",
+      "ollama_model": "all-minilm",
+      "notes": "Super-Fast Lightweight Embedding Model. Perfect for speed-focused scenarios.",
+      "status": "active",
+      "use_cases": ["development", "testing", "low-resource", "real-time"],
+      "performance": {
+        "speed": "fast",
+        "quality": "good",
+        "memory_mb": 90
+      }
+    },
+    {
+      "model_id": "nomic-embed-text",
+      "type": "embedding",
+      "name": "Nomic-Embed-Text",
+      "dimension": 768,
+      "context_tokens": 8192,
+      "cpu_friendly": true,
+      "provider": "ollama",
+      "ollama_model": "nomic-embed-text",
+      "notes": "High-Quality, Balanced Default Embedding Model. Best balance between speed, context, and accuracy.",
+      "status": "active",
+      "use_cases": ["production", "balanced", "rag", "semantic-search"],
+      "performance": {
+        "speed": "fast",
+        "quality": "excellent",
+        "memory_mb": 274
+      }
+    },
+    {
+      "model_id": "mxbai-embed-large",
+      "type": "embedding",
+      "name": "MXBai-Embed-Large",
+      "dimension": 1024,
+      "context_tokens": 512,
+      "cpu_friendly": false,
+      "provider": "ollama",
+      "ollama_model": "mxbai-embed-large",
+      "notes": "High-Precision, Heavy-Duty Embedding Model. Ideal for precision-critical search.",
+      "status": "active",
+      "use_cases": ["high-quality", "enterprise", "legal", "medical"],
+      "performance": {
+        "speed": "moderate",
+        "quality": "superior",
+        "memory_mb": 670
+      }
+    }
+  ],
+  "llm_models": [
+    {
+      "model_id": "gemini-2.5-pro",
+      "type": "llm",
+      "name": "Gemini 2.5 Pro",
+      "dimension": null,
+      "context_tokens": 1000000,
+      "cpu_friendly": false,
+      "provider": "google",
+      "api_required": true,
+      "notes": "Primary dataset generation model via Gemini API. High quality, large context. Requires API key.",
+      "status": "active",
+      "use_cases": ["dataset-generation", "api"],
+      "pricing": {
+        "model": "pay-per-use",
+        "cost_per_1k_tokens": 0.00125
+      }
+    }
+  ],
+  "default_models": {
+    "embedding": "nomic-embed-text",
+    "llm": "gemini-2.5-pro"
+  },
+  "compatibility_matrix": {
+    "embedding_models": {
+      "all-minilm": {
+        "compatible_with": ["all-minilm"],
+        "migration_path": ["nomic-embed-text"]
+      },
+      "nomic-embed-text": {
+        "compatible_with": ["nomic-embed-text"],
+        "migration_path": ["mxbai-embed-large"]
+      },
+      "mxbai-embed-large": {
+        "compatible_with": ["mxbai-embed-large"],
+        "migration_path": []
+      }
+    }
+  }
+}
