@@ -1,5 +1,5 @@
 {
-  "name": "nlpforge-frontend",
+  "name": "nlpforge-saas",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -9,9 +9,8 @@
     "lint": "next lint",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:e2e": "cypress open",
-    "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",
@@ -44,26 +43,33 @@
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "react-hook-form": "^7.51.0",
+    "react-use": "^17.5.0",
     "recharts": "^2.12.0",
     "tailwind-merge": "^2.2.1",
     "tailwindcss": "^3.4.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@storybook/nextjs": "^7.6.0",
-    "@storybook/react": "^7.6.0",
+    "@playwright/test": "^1.40.0",
     "@tanstack/react-query-devtools": "^5.28.0",
     "@testing-library/jest-dom": "^6.4.0",
     "@testing-library/react": "^14.2.0",
+    "@types/d3-array": "^3.0.0",
+    "@types/d3-color": "^3.1.0",
+    "@types/d3-ease": "^3.0.0",
+    "@types/d3-interpolate": "^3.0.0",
+    "@types/d3-path": "^3.0.0",
+    "@types/d3-scale": "^4.0.0",
+    "@types/d3-shape": "^3.1.0",
+    "@types/d3-time": "^3.0.0",
+    "@types/d3-timer": "^3.0.0",
     "@types/node": "^20.19.24",
     "@types/react": "^18.3.26",
     "@types/react-dom": "^18.3.7",
-    "cypress": "^13.6.0",
     "eslint": "^8",
     "eslint-config-next": "14.2.0",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
-    "storybook": "^7.6.0",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5"
   }
