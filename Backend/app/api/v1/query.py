@@ -3,40 +3,28 @@ Query API endpoint - Main entry point for natural language queries
 Handles the complete pipeline: parse -> generate dataset -> embed -> search
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from typing import Optional, Dict, List
+from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime
+import os
 from app.nlp.query_parser import parse_query
 from app.nlp.dataset_generator import get_dataset_generator
 from app.nlp.embedding_manager import get_embedding_manager
 from app.services.template_service import get_template_service
 from app.core.logger import logger
+from app.core.postgres import get_db
+from app.models.schemas import QueryRequest, QueryResponse
 
 router = APIRouter()
 
 
-class QueryRequest(BaseModel):
-    """Request model for query endpoint"""
-    query: str = Field(..., description="Natural language query", min_length=1)
-    generate_dataset: bool = Field(True, description="Whether to generate dataset if needed")
-    num_examples: int = Field(50, description="Number of examples to generate", ge=10, le=200)
-    top_k: int = Field(5, description="Number of similar results to return", ge=1, le=20)
-
-
-class QueryResponse(BaseModel):
-    """Response model for query endpoint"""
-    query: str
-    intent: str
-    slots: Dict
-    confidence: float
-    best_matches: List[Dict]
-    dataset_generated: bool
-    dataset_info: Optional[Dict] = None
-    search_results: List[Dict]
-
-
 @router.post("/query", response_model=QueryResponse)
-async def process_query(request: QueryRequest, background_tasks: BackgroundTasks):
+async def process_query(
+    request: QueryRequest, 
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db)
+):
     """
     Process natural language query through complete pipeline
     
@@ -125,34 +113,51 @@ async def process_query(request: QueryRequest, background_tasks: BackgroundTasks
                 csv_path = dataset_info["paths"]["csv"]
                 df = pd.read_csv(csv_path)
                 
-                # Prepare data for embedding
-                queries = df['query'].tolist()
-                intents = df['intent'].tolist()
+                # Validate required columns (unified format: query,api,endpoint,request,response)
+                if 'api' not in df.columns:
+                    raise ValueError(f"Generated CSV missing 'api' column. Expected format: query,api,endpoint,request,response")
                 
-                # Parse slots from JSON string
+                # Prepare data for embedding (using unified format: query,api,endpoint,request,response)
+                queries = df['query'].tolist()
+                intents = df['api'].tolist()  # 'api' column contains the intent
+                
+                # Parse slots from 'request' column
                 slots_list = []
+                responses = []
                 for idx, row in df.iterrows():
-                    if 'slots_json' in df.columns:
-                        slots_list.append(json.loads(row['slots_json']))
-                    elif 'slots' in df.columns:
-                        if isinstance(row['slots'], str):
-                            slots_list.append(json.loads(row['slots']))
-                        else:
-                            slots_list.append(row['slots'])
+                    # Parse request (slots) from JSON string
+                    slots = {}
+                    if 'request' in df.columns and pd.notna(row['request']):
+                        try:
+                            if isinstance(row['request'], str):
+                                request_data = json.loads(row['request'])
+                                if isinstance(request_data, dict):
+                                    slots = request_data
+                        except json.JSONDecodeError:
+                            logger.warning(f"Invalid JSON in request at row {idx}: {row['request']}")
+                            slots = {}
+                    slots_list.append(slots)
+                    
+                    # Get response field
+                    if 'response' in df.columns and pd.notna(row['response']):
+                        responses.append(row['response'])
                     else:
-                        slots_list.append({})
+                        responses.append(json.dumps({"definition": f"API endpoint for {intents[idx]}"}))
                 
                 # Batch upsert to Redis
-                redis_keys = embedder.upsert_batch(
+                upsert_result = embedder.upsert_batch(
                     queries=queries,
                     intents=intents,
                     slots_list=slots_list,
-                    api_names=df['api_name'].tolist() if 'api_name' in df.columns else None,
-                    endpoints=df['endpoint'].tolist() if 'endpoint' in df.columns else None
+                    api_names=intents,  # Use api column value
+                    endpoints=df['endpoint'].tolist() if 'endpoint' in df.columns else None,
+                    responses=responses
                 )
                 
-                dataset_info["redis_keys"] = len(redis_keys)
-                logger.info(f"Embedded {len(redis_keys)} entries to Redis")
+                dataset_info["redis_keys"] = upsert_result["total"]
+                dataset_info["new_embeddings"] = upsert_result["new_count"]
+                dataset_info["skipped_duplicates"] = upsert_result["skipped_count"]
+                logger.info(f"Embedded {upsert_result['total']} entries to Redis ({upsert_result['new_count']} new, {upsert_result['skipped_count']} skipped)")
             else:
                 logger.info(f"Sufficient embeddings exist for {intent}. Skipping generation.")
         
@@ -183,7 +188,13 @@ async def process_query(request: QueryRequest, background_tasks: BackgroundTasks
         
         logger.info(f"Found {len(unique_matches)} unique API matches")
         
-        # Step 7: Build response
+        # Step 7: Build response with download URL if dataset was generated
+        dataset_download_url = None
+        if dataset_generated and dataset_info:
+            # Create download URL for the generated CSV
+            csv_filename = os.path.basename(dataset_info["paths"]["csv"])
+            dataset_download_url = f"/api/v1/dataset/download-file/{csv_filename}"
+        
         response = QueryResponse(
             query=request.query,
             intent=intent,
@@ -192,7 +203,8 @@ async def process_query(request: QueryRequest, background_tasks: BackgroundTasks
             best_matches=unique_matches,
             dataset_generated=dataset_generated,
             dataset_info=dataset_info,
-            search_results=search_results[:request.top_k]
+            search_results=search_results[:request.top_k],
+            dataset_download_url=dataset_download_url
         )
         
         return response
@@ -250,38 +262,58 @@ async def reindex_intent(intent: str, background_tasks: BackgroundTasks):
             merge_existing=False
         )
         
-        # Re-embed
+        # Re-embed (using unified format: query,api,endpoint,request,response)
         import pandas as pd
         import json
         csv_path = dataset_info["paths"]["csv"]
         df = pd.read_csv(csv_path)
         
+        # Validate required columns
+        if 'api' not in df.columns:
+            raise ValueError(f"Generated CSV missing 'api' column. Expected format: query,api,endpoint,request,response")
+        
         queries = df['query'].tolist()
-        intents = df['intent'].tolist()
+        intents = df['api'].tolist()  # 'api' column contains the intent
+        
+        # Parse slots from 'request' column
         slots_list = []
-        
+        responses = []
         for idx, row in df.iterrows():
-            if 'slots_json' in df.columns:
-                slots_list.append(json.loads(row['slots_json']))
-            elif 'slots' in df.columns:
-                if isinstance(row['slots'], str):
-                    slots_list.append(json.loads(row['slots']))
-                else:
-                    slots_list.append(row['slots'])
+            # Parse request (slots) from JSON string
+            slots = {}
+            if 'request' in df.columns and pd.notna(row['request']):
+                try:
+                    if isinstance(row['request'], str):
+                        request_data = json.loads(row['request'])
+                        if isinstance(request_data, dict):
+                            slots = request_data
+                except json.JSONDecodeError:
+                    logger.warning(f"Invalid JSON in request at row {idx}: {row['request']}")
+                    slots = {}
+            slots_list.append(slots)
+            
+            # Get response field
+            if 'response' in df.columns and pd.notna(row['response']):
+                responses.append(row['response'])
             else:
-                slots_list.append({})
+                responses.append(json.dumps({"definition": f"API endpoint for {intents[idx]}"}))
         
-        redis_keys = embedder.upsert_batch(
+        upsert_result = embedder.upsert_batch(
             queries=queries,
             intents=intents,
-            slots_list=slots_list
+            slots_list=slots_list,
+            api_names=intents,  # Use api column value
+            endpoints=df['endpoint'].tolist() if 'endpoint' in df.columns else None,
+            responses=responses
         )
         
         return {
             "message": f"Reindexed {intent}",
             "deleted": deleted,
             "generated": len(df),
-            "embedded": len(redis_keys)
+            "embedded": upsert_result["total"],
+            "new_embeddings": upsert_result["new_count"],
+            "skipped_duplicates": upsert_result["skipped_count"]
         }
         
     except Exception as e:

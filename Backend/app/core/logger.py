@@ -66,7 +66,7 @@ def log_error(error: Exception, context: str = "") -> None:
 
 def log_startup(component: str) -> None:
     """Log component startup."""
-    logger.info(f"🚀 Starting {component}...")
+    logger.info(f"Starting {component}...")
 
 
 def log_shutdown(component: str) -> None:

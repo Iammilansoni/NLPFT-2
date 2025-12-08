@@ -29,7 +29,13 @@ export function SearchInput({
 }: SearchInputProps) {
   const [localValue, setLocalValue] = React.useState(value)
   const [isFocused, setIsFocused] = React.useState(false)
+  const [isMounted, setIsMounted] = React.useState(false)
   const inputRef = React.useRef<HTMLInputElement>(null)
+
+  // Only enable client-side features after mount
+  React.useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   // Debounced onChange
   const debouncedOnChange = React.useMemo(
@@ -74,7 +80,7 @@ export function SearchInput({
           onFocus={() => setIsFocused(true)}
           onBlur={() => setTimeout(() => setIsFocused(false), 200)}
           placeholder={placeholder}
-          autoFocus={autoFocus}
+          autoFocus={isMounted && autoFocus}
           className={cn(
             "w-full h-11 pl-10 pr-10 rounded-lg border border-input bg-background",
             "text-sm placeholder:text-muted-foreground",

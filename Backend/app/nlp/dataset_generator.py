@@ -277,7 +277,7 @@ Return ONLY a JSON array of objects, no additional text.
     
     def save_dataset(self, examples: List[Dict], intent: str, format: str = "both") -> Dict[str, str]:
         """
-        Save dataset to CSV and JSON
+        Save dataset to CSV and JSON in old format (query,api,endpoint,request,response)
         
         Args:
             examples: List of examples
@@ -289,19 +289,25 @@ Return ONLY a JSON array of objects, no additional text.
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
-        # Create DataFrame
-        df = pd.DataFrame(examples)
-        
-        # Convert slots to JSON string for CSV
-        if 'slots' in df.columns:
-            df['slots_json'] = df['slots'].apply(json.dumps)
-        
         paths = {}
         
-        # Save CSV
+        # Save CSV in old format (query,api,endpoint,request,response)
         if format in ["csv", "both"]:
             csv_filename = f"{intent}_dataset.csv"
             csv_path = os.path.join(self.datasets_dir, csv_filename)
+            
+            # Convert examples to old format
+            csv_rows = []
+            for example in examples:
+                csv_rows.append({
+                    "query": example.get("query", ""),
+                    "api": example.get("intent", example.get("api_name", intent)),
+                    "endpoint": example.get("endpoint", f"<base_url>/api/{intent}"),
+                    "request": json.dumps(example.get("slots", {})),
+                    "response": json.dumps({"definition": f"API endpoint for {intent}"})
+                })
+            
+            df = pd.DataFrame(csv_rows)
             
             # If exists, merge with existing
             if os.path.exists(csv_path):
@@ -422,6 +428,154 @@ Return ONLY a JSON array of objects, no additional text.
         )
         
         return result
+    
+    def generate_from_plain_english(
+        self,
+        plain_english_query: str,
+        api_context: str = "",
+        num_apis: int = 10,
+        nl_variations_per_api: int = 20,
+        use_gemini: bool = True
+    ) -> Dict:
+        """
+        Generate dataset from plain English query using Gemini
+        
+        Args:
+            plain_english_query: Plain English description of what APIs to generate
+            api_context: Context for domain-specific APIs
+            num_apis: Number of APIs to generate
+            nl_variations_per_api: Number of natural language variations per API
+            use_gemini: Whether to use Gemini for generation
+            
+        Returns:
+            Dictionary with generation results
+        """
+        logger.info(f"Generating dataset from plain English query: {plain_english_query}")
+        
+        if not self.model:
+            raise ValueError("Gemini API not configured. Cannot generate from plain English query.")
+        
+        # Create prompt for Gemini to generate API dataset
+        context_text = f"\nContext: {api_context}" if api_context else ""
+        
+        prompt = f"""
+You are an expert at generating API test datasets from natural language descriptions.
+
+User Request: {plain_english_query}{context_text}
+
+Generate a comprehensive dataset with:
+- {num_apis} different APIs
+- {nl_variations_per_api} natural language variations for each API
+- Realistic user queries with different phrasings, tones, and edge cases
+
+For each API, provide:
+1. API name (intent) - a short identifier like "login", "register", "update_profile"
+2. API endpoint - like "/api/login"
+3. Natural language variations - different ways users might express the same intent
+4. Extracted slots/parameters - key-value pairs from the query
+
+Return the data in this EXACT JSON format (matching csv_dataset.csv structure):
+{{
+  "apis": [
+    {{
+      "api": "api_name",
+      "endpoint": "/api/api_name",
+      "description": "Brief description of what this API does",
+      "variations": [
+        {{
+          "query": "natural language query",
+          "request": {{"param1": "value1", "param2": "value2"}},
+          "response": {{"definition": "Brief description of API response"}}
+        }}
+      ]
+    }}
+  ]
+}}
+
+Return ONLY a valid JSON object, no additional text or markdown.
+"""
+        
+        try:
+            logger.info("Generating dataset with Gemini...")
+            response = self.model.generate_content(prompt)
+            
+            # Parse response
+            response_text = response.text.strip()
+            
+            # Extract JSON
+            if response_text.startswith("```"):
+                response_text = response_text.split("```")[1]
+                if response_text.startswith("json"):
+                    response_text = response_text[4:]
+            
+            response_text = response_text.strip()
+            
+            # Parse JSON
+            generated_data = json.loads(response_text)
+            
+            # Convert to our format (matching csv_dataset.csv structure)
+            all_examples = []
+            for api_data in generated_data.get("apis", []):
+                api_name = api_data.get("api", api_data.get("intent", "unknown"))
+                endpoint = api_data.get("endpoint", f"<base_url>/api/{api_name}")
+                
+                for variation in api_data.get("variations", []):
+                    # Extract request (slots) and response
+                    request_data = variation.get("request", variation.get("slots", {}))
+                    response_data = variation.get("response", {"definition": f"API endpoint for {api_name}"})
+                    
+                    all_examples.append({
+                        "query": variation.get("query", ""),
+                        "api": api_name,
+                        "endpoint": endpoint,
+                        "request": request_data,
+                        "response": response_data
+                    })
+            
+            logger.info(f"Generated {len(all_examples)} examples from {len(generated_data.get('apis', []))} APIs")
+            
+            # Save dataset
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            dataset_id = f"generated_{timestamp}"
+            
+            # Save CSV in old format (query,api,endpoint,request,response)
+            csv_filename = f"{dataset_id}.csv"
+            csv_path = os.path.join(self.datasets_dir, csv_filename)
+            
+            # Convert to old format matching csv_dataset.csv
+            csv_rows = []
+            for example in all_examples:
+                csv_rows.append({
+                    "query": example.get("query", ""),
+                    "api": example.get("intent", example.get("api_name", "unknown")),
+                    "endpoint": example.get("endpoint", f"<base_url>/api/{example.get('intent', 'unknown')}"),
+                    "request": json.dumps(example.get("slots", {})),
+                    "response": json.dumps({"definition": f"API endpoint for {example.get('intent', 'unknown')}"})
+                })
+            
+            df = pd.DataFrame(csv_rows)
+            df.to_csv(csv_path, index=False)
+            
+            # Save JSON
+            json_filename = f"{dataset_id}.json"
+            json_path = os.path.join(self.datasets_dir, json_filename)
+            with open(json_path, 'w') as f:
+                json.dump(all_examples, f, indent=2)
+            
+            return {
+                "dataset_id": dataset_id,
+                "total_examples": len(all_examples),
+                "total_apis": len(generated_data.get("apis", [])),
+                "paths": {
+                    "csv": csv_path,
+                    "json": json_path
+                },
+                "examples": all_examples
+            }
+            
+        except Exception as e:
+            logger.error(f"Error generating from plain English: {e}", exc_info=True)
+            raise
 
 
 # Global instance

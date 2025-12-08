@@ -37,6 +37,14 @@ export const API_ENDPOINTS = {
     ingest: `${API_BASE_URL}/api/v1/dataset/ingest`,
     generate: `${API_BASE_URL}/api/v1/dataset/generate`,
   },
+  
+  // Test Runs
+  runs: {
+    list: `${API_BASE_URL}/api/v1/runs`,
+    get: (id: number) => `${API_BASE_URL}/api/v1/runs/${id}`,
+    create: `${API_BASE_URL}/api/v1/runs`,
+    update: (id: number) => `${API_BASE_URL}/api/v1/runs/${id}`,
+  },
 } as const
 
 /**
@@ -140,4 +148,14 @@ export async function apiPut<T>(url: string, data?: any): Promise<T> {
  */
 export async function apiDelete<T>(url: string): Promise<T> {
   return apiFetch<T>(url, { method: 'DELETE' })
+}
+
+/**
+ * PATCH request
+ */
+export async function apiPatch<T>(url: string, data?: any): Promise<T> {
+  return apiFetch<T>(url, {
+    method: 'PATCH',
+    body: data ? JSON.stringify(data) : undefined,
+  })
 }

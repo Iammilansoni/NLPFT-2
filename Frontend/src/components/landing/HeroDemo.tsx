@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Loader2,
   FileCheck,
+  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -29,6 +30,14 @@ const STEPS: Step[] = [
   { id: 3, title: 'Generating test cases', icon: Database },
   { id: 4, title: 'Creating embeddings', icon: Code2 },
   { id: 5, title: 'Running tests', icon: Play },
+]
+
+const STEP_COLORS = [
+  { gradient: 'from-blue-500 to-cyan-500', bg: 'bg-blue-500/20', border: 'border-blue-500/40', text: 'text-blue-400', glow: 'shadow-blue-500/20' },
+  { gradient: 'from-purple-500 to-pink-500', bg: 'bg-purple-500/20', border: 'border-purple-500/40', text: 'text-purple-400', glow: 'shadow-purple-500/20' },
+  { gradient: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-500/20', border: 'border-emerald-500/40', text: 'text-emerald-400', glow: 'shadow-emerald-500/20' },
+  { gradient: 'from-orange-500 to-amber-500', bg: 'bg-orange-500/20', border: 'border-orange-500/40', text: 'text-orange-400', glow: 'shadow-orange-500/20' },
+  { gradient: 'from-violet-500 to-indigo-500', bg: 'bg-violet-500/20', border: 'border-violet-500/40', text: 'text-violet-400', glow: 'shadow-violet-500/20' },
 ]
 
 const TEST_RESULTS = [
@@ -56,51 +65,41 @@ export function HeroDemo() {
 
   const fullText = 'Test login with email: user@example.com and password: P@ssw0rd'
 
-  // ❗ Stable interval timer for stepper
-  const stepTimerRef = useRef<number | null>(null)
-  const STEP_DELAY = 800 // Complete in ~1 second per step
+  const STEP_DELAY = 1800 // Timing for each step
 
-  // Typewriter
+  // Typewriter effect
   useEffect(() => {
     if (typed.length < fullText.length) {
       const tId = window.setTimeout(
         () => setTyped(fullText.slice(0, typed.length + 1)),
-        20 // Faster typing speed
+        30
       )
       return () => clearTimeout(tId)
     } else if (typing) {
       setTyping(false)
-      const tId = window.setTimeout(() => setStepIndex(1), 300) // Faster transition to steps
+      // Start first step after typing completes
+      const tId = window.setTimeout(() => {
+        setStepIndex(1)
+      }, 600)
       return () => clearTimeout(tId)
     }
-  }, [typed, typing])
+  }, [typed, typing, fullText])
 
-  // Interval-driven step progression (prevents stuck state)
+  // Progress through steps automatically
   useEffect(() => {
-    // Start when pipeline begins and interval not already running
-    if (stepIndex < 1 || stepTimerRef.current) return
+    if (stepIndex === 0 || stepIndex > STEPS.length) return
 
-    stepTimerRef.current = window.setInterval(() => {
-      setStepIndex((s) => {
-        if (s < STEPS.length) return s + 1
-
-        // Reached last step → stop and show results once
-        if (stepTimerRef.current) {
-          clearInterval(stepTimerRef.current)
-          stepTimerRef.current = null
-        }
-        window.setTimeout(() => setShowResults(true), 300) // Faster results display
-        return s
-      })
+    const timer = window.setTimeout(() => {
+      if (stepIndex < STEPS.length) {
+        setStepIndex(stepIndex + 1)
+      } else if (stepIndex === STEPS.length) {
+        // All steps complete, show results
+        window.setTimeout(() => setShowResults(true), 400)
+      }
     }, STEP_DELAY)
 
-    return () => {
-      if (stepTimerRef.current) {
-        clearInterval(stepTimerRef.current)
-        stepTimerRef.current = null
-      }
-    }
-  }, [stepIndex, STEP_DELAY])
+    return () => clearTimeout(timer)
+  }, [stepIndex])
 
   // Confidence animation after results visible
   useEffect(() => {
@@ -130,34 +129,80 @@ export function HeroDemo() {
 
   return (
     <div className="relative w-full">
-      {/* soft outer glow */}
+      {/* Enhanced outer glow */}
       <div
-        className="absolute -inset-6 rounded-2xl blur-3xl opacity-60"
+        className="absolute -inset-8 rounded-3xl blur-3xl opacity-40"
         style={{
           background:
-            'linear-gradient(90deg, rgba(6,182,212,0.08), rgba(124,58,237,0.06))',
+            'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(168,85,247,0.12), rgba(16,185,129,0.1))',
         }}
       />
 
-      <GlassCard className="relative overflow-hidden p-0">
-        <div className="rounded-2xl overflow-hidden border border-border/40">
+      <GlassCard className="relative overflow-hidden p-0 shadow-2xl">
+        <div className="rounded-2xl overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-background via-background/95 to-background/90">
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-3 bg-card/80 border-b border-border/50">
+          <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-primary/5 via-purple-500/5 to-primary/5 border-b-2 border-primary/20 backdrop-blur-xl">
             <div className="flex items-center gap-3">
-              <div className="flex gap-1">
-                <span className="w-3 h-3 rounded-full bg-red-500/80" />
-                <span className="w-3 h-3 rounded-full bg-yellow-500/80" />
-                <span className="w-3 h-3 rounded-full bg-green-500/80" />
+              <div className="flex gap-1.5">
+                <motion.span 
+                  className="w-3 h-3 rounded-full bg-red-500/90 shadow-sm"
+                  animate={{ opacity: [1, 0.7, 1] }}
+                  transition={{ duration: 2, repeat: Infinity, delay: 0 }}
+                />
+                <motion.span 
+                  className="w-3 h-3 rounded-full bg-yellow-500/90 shadow-sm"
+                  animate={{ opacity: [1, 0.7, 1] }}
+                  transition={{ duration: 2, repeat: Infinity, delay: 0.3 }}
+                />
+                <motion.span 
+                  className="w-3 h-3 rounded-full bg-green-500/90 shadow-sm"
+                  animate={{ opacity: [1, 0.7, 1] }}
+                  transition={{ duration: 2, repeat: Infinity, delay: 0.6 }}
+                />
               </div>
-              <span className="text-sm font-semibold text-foreground">Live Demo</span>
+              <motion.span 
+                className="text-sm font-bold text-foreground tracking-wide"
+                animate={{ opacity: [1, 0.9, 1] }}
+                transition={{ duration: 3, repeat: Infinity }}
+              >
+                Live Demo
+              </motion.span>
             </div>
-            <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 px-3 py-1">
-              AI Active
-            </Badge>
+            <motion.div
+              animate={{
+                scale: [1, 1.05, 1],
+                boxShadow: [
+                  '0 0 0px rgba(16, 185, 129, 0)',
+                  '0 0 10px rgba(16, 185, 129, 0.3)',
+                  '0 0 0px rgba(16, 185, 129, 0)'
+                ]
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                ease: 'easeInOut'
+              }}
+            >
+              <Badge className="bg-gradient-to-r from-emerald-500/15 to-emerald-400/10 text-emerald-400 border-2 border-emerald-500/30 px-4 py-1.5 font-semibold shadow-lg">
+                <motion.span
+                  className="inline-block w-2 h-2 rounded-full bg-emerald-400 mr-2"
+                  animate={{
+                    scale: [1, 1.3, 1],
+                    opacity: [1, 0.7, 1]
+                  }}
+                  transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                    ease: 'easeInOut'
+                  }}
+                />
+                AI Active
+              </Badge>
+            </motion.div>
           </div>
 
           {/* Content */}
-          <div className="p-6 md:p-8 bg-gradient-to-br from-card/95 to-card/85 min-h-[460px]">
+          <div className="p-6 md:p-8 bg-gradient-to-br from-background/50 via-primary/5 to-purple-500/5 min-h-[460px] backdrop-blur-sm">
             {/* Terminal / input */}
             <div className="mb-6">
               <div className="flex items-center gap-3 mb-2">
@@ -167,17 +212,44 @@ export function HeroDemo() {
                 </span>
               </div>
 
-              <div className="rounded-lg border border-border/40 bg-muted/50 p-4 font-mono text-sm">
-                <span className="text-primary font-medium">$</span>
-                <span className="ml-3 text-foreground">{typed}</span>
-                {typing && (
-                  <motion.span
-                    aria-hidden
-                    animate={{ opacity: [1, 0.2, 1] }}
-                    transition={{ duration: 0.8, repeat: Infinity }}
-                    className="inline-block w-2 h-5 bg-primary ml-2 rounded-sm align-middle"
-                  />
-                )}
+              <div className="relative rounded-xl border-2 border-primary/30 bg-gradient-to-br from-card/90 via-primary/5 to-purple-500/5 p-5 font-mono text-sm shadow-2xl overflow-hidden backdrop-blur-sm">
+                {/* Animated background gradient */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-primary/10 via-purple-500/10 to-primary/10"
+                  animate={{
+                    x: ['-100%', '100%']
+                  }}
+                  transition={{
+                    duration: 3,
+                    repeat: Infinity,
+                    ease: 'linear'
+                  }}
+                />
+                <div className="relative flex items-center gap-3">
+                  <motion.span 
+                    className="text-primary font-bold text-lg"
+                    animate={{ opacity: [1, 0.7, 1] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                  >
+                    $
+                  </motion.span>
+                  <span className="text-foreground font-semibold">{typed}</span>
+                  {typing && (
+                    <motion.span
+                      aria-hidden
+                      animate={{ 
+                        opacity: [1, 0.3, 1],
+                        scale: [1, 1.1, 1]
+                      }}
+                      transition={{ 
+                        duration: 0.8, 
+                        repeat: Infinity,
+                        ease: 'easeInOut'
+                      }}
+                      className="inline-block w-2.5 h-5 bg-gradient-to-b from-primary via-purple-500 to-primary/60 ml-1 rounded-sm align-middle shadow-lg"
+                    />
+                  )}
+                </div>
               </div>
             </div>
 
@@ -192,52 +264,66 @@ export function HeroDemo() {
               {STEPS.map((s, i) => {
                 const done = i < Math.max(0, stepIndex - 1)
                 const running = i === Math.max(0, stepIndex - 1)
+                const pending = i > Math.max(0, stepIndex - 1)
                 const Icon = s.icon
+                const colors = STEP_COLORS[i] || STEP_COLORS[0]
+                
                 return (
                   <motion.div
                     key={s.id}
                     variants={itemVariant}
                     className={cn(
-                      'flex items-center gap-4 p-3 rounded-lg border transition-all duration-500 relative overflow-hidden',
+                      'flex items-center gap-4 p-5 rounded-xl border-2 transition-all duration-500 relative overflow-hidden group',
                       done
-                        ? 'bg-emerald-50/50 border-emerald-200/60 shadow-lg'
+                        ? `bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 ${colors.border} shadow-xl ${colors.glow}`
                         : running
-                        ? 'bg-primary/8 border-primary/40 shadow-xl'
-                        : 'bg-card/50 border-border/40'
+                        ? `bg-gradient-to-br ${colors.bg} ${colors.border} shadow-2xl ${colors.glow}`
+                        : 'bg-card/30 border-border/20 opacity-50'
                     )}
                     animate={{
-                      scale: running ? 1.02 : done ? 1.01 : 0.98,
-                      y: done ? -3 : running ? -1 : 0,
-                      backgroundColor: done 
-                        ? 'rgba(16, 185, 129, 0.1)' 
-                        : running 
-                        ? 'rgba(59, 130, 246, 0.08)' 
-                        : undefined
+                      scale: running ? 1.02 : done ? 1 : pending ? 0.98 : 1,
+                      y: done ? -1 : running ? 0 : 0,
+                      opacity: pending ? 0.5 : 1,
                     }}
                     transition={{
-                      duration: 0.5,
+                      duration: 0.4,
                       ease: 'easeOut'
                     }}
+                    whileHover={!running && !done ? { scale: 0.99, opacity: 0.7 } : {}}
                   >
                     {/* Animated background gradient for running state */}
                     {running && (
-                      <motion.div
-                        className="absolute inset-0 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5"
-                        animate={{
-                          x: ['-100%', '100%']
-                        }}
-                        transition={{
-                          duration: 2,
-                          repeat: Infinity,
-                          ease: 'linear'
-                        }}
-                      />
+                      <>
+                        <motion.div
+                          className={cn("absolute inset-0 bg-gradient-to-r from-transparent via-primary/15 to-transparent")}
+                          animate={{
+                            x: ['-100%', '200%']
+                          }}
+                          transition={{
+                            duration: 2.5,
+                            repeat: Infinity,
+                            ease: 'linear'
+                          }}
+                        />
+                        {/* Pulsing glow effect */}
+                        <motion.div
+                          className={cn("absolute inset-0 rounded-xl", `bg-gradient-to-r ${colors.gradient}`)}
+                          animate={{
+                            opacity: [0.1, 0.2, 0.1]
+                          }}
+                          transition={{
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: 'easeInOut'
+                          }}
+                        />
+                      </>
                     )}
                     
                     {/* Success overlay animation */}
                     {done && (
                       <motion.div
-                        className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-emerald-400/5"
+                        className="absolute inset-0 bg-gradient-to-r from-emerald-500/15 via-emerald-400/10 to-emerald-500/15"
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ 
@@ -247,31 +333,49 @@ export function HeroDemo() {
                         }}
                       />
                     )}
+                    
+                    {/* Progress bar for running state */}
+                    {running && (
+                      <motion.div
+                        className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent"
+                        initial={{ width: '0%' }}
+                        animate={{ width: '100%' }}
+                        transition={{
+                          duration: STEP_DELAY / 1000,
+                          ease: 'linear'
+                        }}
+                      />
+                    )}
                     <motion.div
                       className={cn(
-                        'flex-shrink-0 w-11 h-11 rounded-lg flex items-center justify-center overflow-hidden relative',
+                        'flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden relative',
                         done
-                          ? 'bg-emerald-600/20 text-emerald-500 border border-emerald-500/30'
+                          ? `bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 ${colors.border} border-2`
                           : running
-                          ? 'bg-primary/15 text-primary border border-primary/30'
-                          : 'bg-muted/10 text-muted-foreground border border-border/30'
+                          ? `bg-gradient-to-br ${colors.bg} ${colors.border} border-2`
+                          : 'bg-muted/20 text-muted-foreground border-2 border-border/40'
                       )}
                       animate={{
                         boxShadow: done 
-                          ? '0 0 20px rgba(16, 185, 129, 0.3)' 
+                          ? '0 0 25px rgba(16, 185, 129, 0.4), 0 0 50px rgba(16, 185, 129, 0.1)' 
                           : running 
-                          ? '0 0 15px rgba(59, 130, 246, 0.25)' 
-                          : '0 0 0px rgba(0, 0, 0, 0)'
+                          ? `0 0 20px rgba(59, 130, 246, 0.3), 0 0 40px rgba(59, 130, 246, 0.1)`
+                          : '0 0 0px rgba(0, 0, 0, 0)',
+                        scale: running ? [1, 1.05, 1] : done ? 1 : 1,
                       }}
-                      transition={{ duration: 0.5 }}
+                      transition={{ 
+                        duration: running ? 1.5 : 0.5,
+                        repeat: running ? Infinity : 0,
+                        ease: 'easeInOut'
+                      }}
                     >
                       <motion.div
                         animate={{
-                          scale: done ? [1, 1.3, 1.1] : running ? [1, 1.05, 1] : 1,
-                          rotate: done ? [0, 180, 360] : 0
+                          scale: done ? [1, 1.2, 1] : running ? [1, 1.1, 1] : 1,
+                          rotate: done ? [0, 10, -10, 0] : running ? [0, 360] : 0
                         }}
                         transition={{
-                          duration: done ? 0.8 : running ? 2 : 0,
+                          duration: done ? 0.6 : running ? 2 : 0,
                           ease: done ? 'easeOut' : 'easeInOut',
                           delay: done ? 0.1 : 0,
                           repeat: running ? Infinity : 0
@@ -279,120 +383,253 @@ export function HeroDemo() {
                       >
                         {done ? (
                           <motion.div
-                            initial={{ scale: 0, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
+                            initial={{ scale: 0, opacity: 0, rotate: -180 }}
+                            animate={{ scale: 1, opacity: 1, rotate: 0 }}
                             transition={{ 
-                              duration: 0.4, 
+                              duration: 0.5, 
                               ease: 'backOut',
                               delay: 0.2 
                             }}
+                            className="relative"
                           >
-                            <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+                            <CheckCircle2 className={cn("w-6 h-6", colors.text)} />
+                            {/* Checkmark glow */}
+                            <motion.div
+                              className={cn("absolute inset-0 rounded-full", `bg-gradient-to-r ${colors.gradient}`)}
+                              initial={{ scale: 0, opacity: 0.8 }}
+                              animate={{ scale: 2, opacity: 0 }}
+                              transition={{ 
+                                duration: 0.8,
+                                ease: 'easeOut',
+                                delay: 0.3
+                              }}
+                            />
                           </motion.div>
                         ) : running ? (
                           <motion.div
                             animate={{ rotate: 360 }}
                             transition={{ 
-                              duration: 1.5, 
+                              duration: 1.2, 
                               repeat: Infinity, 
                               ease: 'linear' 
                             }}
+                            className="relative"
                           >
-                            <Loader2 className="w-5 h-5 text-primary" />
+                            <Loader2 className={cn("w-6 h-6", colors.text)} />
+                            {/* Spinning glow trail */}
+                            <motion.div
+                              className={cn("absolute inset-0 rounded-full border-2", colors.border)}
+                              animate={{ 
+                                rotate: 360,
+                                scale: [1, 1.2, 1]
+                              }}
+                              transition={{ 
+                                duration: 1.5, 
+                                repeat: Infinity, 
+                                ease: 'linear' 
+                              }}
+                            />
                           </motion.div>
                         ) : (
-                          <Icon className="w-5 h-5" />
+                          <Icon className="w-5 h-5 opacity-50" />
                         )}
                       </motion.div>
                       
                       {/* Success pulse effect */}
                       {done && (
-                        <motion.div
-                          className="absolute inset-0 rounded-lg bg-emerald-500/20"
-                          initial={{ scale: 1, opacity: 0.8 }}
-                          animate={{ scale: 1.5, opacity: 0 }}
-                          transition={{ 
-                            duration: 0.6,
-                            ease: 'easeOut',
-                            delay: 0.1
-                          }}
-                        />
+                        <>
+                          <motion.div
+                            className={cn("absolute inset-0 rounded-xl", `bg-gradient-to-r ${colors.gradient}`)}
+                            initial={{ scale: 1, opacity: 0.3 }}
+                            animate={{ scale: 1.8, opacity: 0 }}
+                            transition={{ 
+                              duration: 0.8,
+                              ease: 'easeOut',
+                              delay: 0.2
+                            }}
+                          />
+                          <motion.div
+                            className={cn("absolute inset-0 rounded-xl", `bg-gradient-to-r ${colors.gradient}`)}
+                            initial={{ scale: 1, opacity: 0.2 }}
+                            animate={{ scale: 2.2, opacity: 0 }}
+                            transition={{ 
+                              duration: 1,
+                              ease: 'easeOut',
+                              delay: 0.4
+                            }}
+                          />
+                        </>
                       )}
                     </motion.div>
 
                     <div className="flex-1 min-w-0">
                       <motion.div
                         className={cn(
-                          'text-sm font-medium',
-                          done ? 'text-foreground' : running ? 'text-primary font-semibold' : 'text-foreground'
+                          'text-sm font-semibold',
+                          done ? 'text-emerald-700 dark:text-emerald-400' : running ? `${colors.text} font-bold` : 'text-foreground/70'
                         )}
                         animate={{
-                          opacity: running ? 1 : 0.9
+                          opacity: running ? 1 : done ? 1 : 0.7,
+                          scale: running ? [1, 1.02, 1] : 1
+                        }}
+                        transition={{
+                          duration: running ? 1.5 : 0.3,
+                          repeat: running ? Infinity : 0,
+                          ease: 'easeInOut'
                         }}
                       >
                         {s.title}
                       </motion.div>
                       <motion.div
-                        className="text-xs text-muted-foreground mt-1"
+                        className="text-xs mt-1.5 flex items-center gap-2"
                         animate={{
-                          opacity: running ? 1 : 0.7,
-                          color: done ? '#10b981' : running ? '#3b82f6' : undefined
+                          opacity: running ? 1 : done ? 0.9 : 0.6,
                         }}
                         transition={{ duration: 0.3 }}
                       >
                         <motion.span
+                          className={cn(
+                            "inline-flex items-center gap-1.5 font-medium",
+                            done ? 'text-emerald-600 dark:text-emerald-400' : running ? colors.text : 'text-muted-foreground'
+                          )}
                           animate={{
-                            scale: done ? [1, 1.2, 1] : 1
+                            scale: done ? [1, 1.15, 1] : running ? [1, 1.05, 1] : 1,
+                            x: running ? [0, 2, 0] : 0
                           }}
                           transition={{
-                            duration: 0.4,
+                            duration: done ? 0.5 : running ? 1.2 : 0,
                             ease: 'backOut',
-                            delay: done ? 0.2 : 0
+                            delay: done ? 0.2 : 0,
+                            repeat: running ? Infinity : 0
                           }}
                         >
-                          {done ? '✅ complete' : running ? '⚡ in progress' : '⏳ waiting'}
+                          {done ? (
+                            <>
+                              <motion.span
+                                initial={{ scale: 0, rotate: -180 }}
+                                animate={{ scale: 1, rotate: 0 }}
+                                transition={{ duration: 0.4, ease: 'backOut', delay: 0.3 }}
+                              >
+                                ✓
+                              </motion.span>
+                              <span>complete</span>
+                            </>
+                          ) : running ? (
+                            <>
+                              <motion.span
+                                animate={{ 
+                                  opacity: [0.5, 1, 0.5],
+                                  scale: [1, 1.2, 1]
+                                }}
+                                transition={{ 
+                                  duration: 1, 
+                                  repeat: Infinity,
+                                  ease: 'easeInOut'
+                                }}
+                              >
+                                ⚡
+                              </motion.span>
+                              <span>in progress</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>⏳</span>
+                              <span>waiting</span>
+                            </>
+                          )}
                         </motion.span>
                       </motion.div>
                     </div>
 
                     <motion.div
-                      className="flex items-center justify-center text-xs font-mono text-muted-foreground"
+                      className="flex items-center justify-center min-w-[40px]"
                       animate={{
                         opacity: running ? 1 : done ? 1 : 0,
-                        scale: running ? [1, 1.1, 1] : done ? [1, 1.2, 1] : 1
                       }}
                       transition={{
-                        duration: running ? 1.5 : 0.5,
-                        repeat: running ? Infinity : 0,
-                        ease: 'easeInOut'
+                        duration: 0.3
                       }}
                     >
                       {done ? (
-                        <motion.span
-                          initial={{ scale: 0, rotate: -180 }}
-                          animate={{ scale: 1, rotate: 0 }}
+                        <motion.div
+                          initial={{ scale: 0, rotate: -180, opacity: 0 }}
+                          animate={{ scale: 1, rotate: 0, opacity: 1 }}
                           transition={{ 
-                            duration: 0.5, 
+                            duration: 0.6, 
                             ease: 'backOut',
-                            delay: 0.1 
+                            delay: 0.2 
                           }}
-                          className="text-emerald-500 font-bold"
+                          className={cn("relative", colors.text)}
                         >
-                          ✓
-                        </motion.span>
+                          <motion.div
+                            className={cn("w-8 h-8 rounded-full flex items-center justify-center font-bold text-lg", `bg-gradient-to-br ${colors.gradient} text-white shadow-lg`)}
+                            animate={{
+                              scale: [1, 1.1, 1],
+                              boxShadow: [
+                                `0 0 0px ${colors.text}`,
+                                `0 0 15px ${colors.text}`,
+                                `0 0 0px ${colors.text}`
+                              ]
+                            }}
+                            transition={{
+                              duration: 2,
+                              repeat: Infinity,
+                              ease: 'easeInOut'
+                            }}
+                          >
+                            ✓
+                          </motion.div>
+                        </motion.div>
                       ) : running ? (
-                        <motion.span
-                          animate={{ opacity: [0.3, 1, 0.3] }}
+                        <motion.div
+                          className="flex items-center gap-1"
+                          animate={{ 
+                            opacity: [0.6, 1, 0.6],
+                          }}
                           transition={{ 
-                            duration: 1.2, 
+                            duration: 1.5, 
                             repeat: Infinity,
                             ease: 'easeInOut'
                           }}
-                          className="text-primary"
                         >
-                          ...
-                        </motion.span>
-                      ) : ''}
+                          <motion.span
+                            animate={{ opacity: [0.3, 1, 0.3] }}
+                            transition={{ 
+                              duration: 0.8, 
+                              repeat: Infinity,
+                              delay: 0,
+                              ease: 'easeInOut'
+                            }}
+                            className={cn("text-2xl", colors.text)}
+                          >
+                            •
+                          </motion.span>
+                          <motion.span
+                            animate={{ opacity: [0.3, 1, 0.3] }}
+                            transition={{ 
+                              duration: 0.8, 
+                              repeat: Infinity,
+                              delay: 0.2,
+                              ease: 'easeInOut'
+                            }}
+                            className={cn("text-2xl", colors.text)}
+                          >
+                            •
+                          </motion.span>
+                          <motion.span
+                            animate={{ opacity: [0.3, 1, 0.3] }}
+                            transition={{ 
+                              duration: 0.8, 
+                              repeat: Infinity,
+                              delay: 0.4,
+                              ease: 'easeInOut'
+                            }}
+                            className={cn("text-2xl", colors.text)}
+                          >
+                            •
+                          </motion.span>
+                        </motion.div>
+                      ) : null}
                     </motion.div>
                   </motion.div>
                 )
@@ -414,9 +651,20 @@ export function HeroDemo() {
                   <div className="rounded-lg border border-border/40 bg-gradient-to-br from-emerald-50/10 to-emerald-500/6 p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-3">
-                        <div className="h-12 w-12 rounded-lg bg-emerald-600/20 flex items-center justify-center border border-emerald-200/30 shadow-sm">
-                          <SparklePlaceholder />
-                        </div>
+                        <motion.div 
+                          className="h-12 w-12 rounded-lg bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 flex items-center justify-center border-2 border-emerald-500/30 shadow-lg"
+                          animate={{
+                            rotate: [0, 5, -5, 0],
+                            scale: [1, 1.05, 1]
+                          }}
+                          transition={{
+                            duration: 3,
+                            repeat: Infinity,
+                            ease: 'easeInOut'
+                          }}
+                        >
+                          <Sparkles className="w-6 h-6 text-emerald-500" />
+                        </motion.div>
                         <div>
                           <div className="text-sm font-semibold">Detected intent</div>
                           <div className="text-foreground font-bold">Login</div>
@@ -586,18 +834,5 @@ export function HeroDemo() {
         ))}
       </div>
     </div>
-  )
-}
-
-/* small placeholder icon element */
-function SparklePlaceholder() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M12 2l1.8 3.8L18 7l-3.2 1.2L12 12 10.8 8.2 7.6 7 10.8 5.8 12 2z"
-        fill="currentColor"
-        style={{ color: 'rgb(16 185 129)' }}
-      />
-    </svg>
   )
 }
