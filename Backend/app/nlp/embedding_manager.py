@@ -413,6 +413,24 @@ class EmbeddingManager:
         try:
             info = self.redis_client.ft(self.index_name).info()
             
+            # Handle both byte and string keys (decode_responses=False returns bytes)
+            def get_info_value(key: str, default=0):
+                """Get value from info dict, handling both byte and string keys"""
+                if key in info:
+                    return info[key]
+                byte_key = key.encode('utf-8') if isinstance(key, str) else key
+                if byte_key in info:
+                    val = info[byte_key]
+                    return val.decode('utf-8') if isinstance(val, bytes) else val
+                return default
+            
+            num_docs = get_info_value('num_docs', 0)
+            # Ensure num_docs is an integer
+            if isinstance(num_docs, str):
+                num_docs = int(num_docs)
+            elif isinstance(num_docs, bytes):
+                num_docs = int(num_docs.decode('utf-8'))
+            
             # Count documents by intent/api using aggregation (much faster)
             intents = {}
             cursor = 0
@@ -434,15 +452,17 @@ class EmbeddingManager:
                 if cursor == 0:
                     break
             
+            logger.info(f"Stats: index={self.index_name}, num_docs={num_docs}, intents={len(intents)}")
+            
             return {
                 "index_name": self.index_name,
-                "total_embeddings": info.get('num_docs', 0),  # Frontend expects this field name
-                "total_documents": info.get('num_docs', 0),  # Keep for backward compatibility
+                "total_embeddings": num_docs,  # Frontend expects this field name
+                "total_documents": num_docs,  # Keep for backward compatibility
                 "embedding_dimension": self.embedding_dim,
                 "model_name": self.model_name,
                 "model": self.model_name,  # Frontend expects this field name
                 "intents": intents,
-                "intents_sampled": count < info.get('num_docs', 0)  # Indicate if this is a sample
+                "intents_sampled": count < num_docs  # Indicate if this is a sample
             }
         except Exception as e:
             logger.error(f"Error getting stats: {e}")

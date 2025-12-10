@@ -1,10 +1,9 @@
-version: '3.8'
-
 # Development Setup: Infrastructure services only
 # Run frontend and backend locally for faster development
 # 
 # Usage:
-#   docker-compose -f docker-compose.dev.yml up -d
+#   Start:  docker-compose -f docker-compose.dev.yml up -d
+#   Stop:   docker-compose -f docker-compose.dev.yml down
 #
 # Then run locally:
 #   Backend:  cd Backend && uvicorn app.main:app --reload --port 8000
