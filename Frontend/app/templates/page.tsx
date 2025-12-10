@@ -374,7 +374,7 @@ export default function TemplatesPage() {
             description="Create your first API template to get started"
             action={{
               label: "Create Template",
-              onClick: () => {},
+              onClick: () => router.push("/templates/new"),
             }}
           />
         )}

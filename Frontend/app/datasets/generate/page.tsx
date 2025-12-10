@@ -57,7 +57,7 @@ export default function DatasetGenerationPage() {
   const [embeddingModel, setEmbeddingModel] = useState('sentence-transformers/all-MiniLM-L6-v2');
 
   // Generation state
-  const [currentDatasetId, setCurrentDatasetId] = useState<string | null>(null);
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -65,7 +65,7 @@ export default function DatasetGenerationPage() {
   const { data: templatesData } = useTemplatesList({ status: 'approved' });
   const generateMutation = useGenerateDataset();
   const { data: statusData, isLoading: isLoadingStatus } = useDatasetStatus(
-    currentDatasetId || '',
+    currentTaskId || '',
     isPolling
   );
   const embedMutation = useEmbedDataset();
@@ -101,7 +101,8 @@ export default function DatasetGenerationPage() {
         temperature,
       });
 
-      setCurrentDatasetId(response.dataset_id);
+      // Use task_id for status polling (fallback to dataset_id for backward compatibility)
+      setCurrentTaskId(response.task_id || response.dataset_id || '');
       setIsPolling(true);
     } catch (error: any) {
       alert(error.message || 'Failed to start generation');
@@ -109,19 +110,19 @@ export default function DatasetGenerationPage() {
   };
 
   const handleDownload = () => {
-    if (!currentDatasetId) return;
+    if (!currentTaskId) return;
     downloadMutation.mutate({
-      datasetId: currentDatasetId,
+      datasetId: currentTaskId,
       filename: `dataset_${selectedTemplate?.api_name || 'export'}.csv`,
     });
   };
 
   const handleEmbed = async () => {
-    if (!currentDatasetId) return;
+    if (!currentTaskId) return;
 
     try {
       await embedMutation.mutateAsync({
-        dataset_id: currentDatasetId,
+        dataset_id: currentTaskId,
         embedding_model: embeddingModel,
         vector_db_collection: 'api_templates',
       });
@@ -131,8 +132,8 @@ export default function DatasetGenerationPage() {
     }
   };
 
-  const isGenerating = generateMutation.isPending || (isPolling && statusData?.status === 'processing');
-  const canDownload = statusData?.status === 'completed' && statusData.download_url;
+  const isGenerating = generateMutation.isPending || (isPolling && (statusData?.status === 'processing' || statusData?.status === 'running'));
+  const canDownload = statusData?.status === 'completed' && (statusData.download_url || statusData.files?.csv);
   const canEmbed = statusData?.status === 'completed';
 
   return (
@@ -314,7 +315,7 @@ export default function DatasetGenerationPage() {
                     onChange={e => setCustomPrompt(e.target.value)}
                     disabled={isGenerating}
                     rows={3}
-                    placeholder="Add custom instructions for data generation..."
+                    placeholder="e.g., Focus on typos in queries, edge cases with special characters, or error scenarios with missing required fields"
                     className="w-full px-4 py-3 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary"
                   />
                 </div>
@@ -402,7 +403,7 @@ export default function DatasetGenerationPage() {
           <div className="lg:col-span-1">
             <div className="sticky top-4 space-y-4">
               {/* Generation Status */}
-              {currentDatasetId && (
+              {currentTaskId && (
                 <div className="bg-card border rounded-xl p-6">
                   <h3 className="font-semibold mb-4 flex items-center gap-2">
                     <Clock className="w-5 h-5" />
@@ -416,33 +417,82 @@ export default function DatasetGenerationPage() {
                         <span className={`px-2 py-1 text-xs rounded-full font-medium ${
                           statusData.status === 'completed' ? 'bg-success/10 text-success' :
                           statusData.status === 'failed' ? 'bg-destructive/10 text-destructive' :
-                          statusData.status === 'processing' ? 'bg-warning/10 text-warning' :
+                          (statusData.status === 'processing' || statusData.status === 'running') ? 'bg-warning/10 text-warning' :
                           'bg-muted text-muted-foreground'
                         }`}>
                           {statusData.status}
                         </span>
                       </div>
 
-                      {statusData.status === 'processing' && (
+                      {(statusData.status === 'processing' || statusData.status === 'running') && (
                         <>
                           <div>
                             <div className="flex justify-between text-sm mb-2">
                               <span>Progress</span>
-                              <span className="font-medium">{Math.round(statusData.progress * 100)}%</span>
+                              <span className="font-medium">
+                                {statusData.progress_percent ?? (statusData.progress > 1 ? statusData.progress : Math.round(statusData.progress * 100))}%
+                              </span>
                             </div>
                             <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                               <motion.div
                                 initial={{ width: 0 }}
-                                animate={{ width: `${statusData.progress * 100}%` }}
+                                animate={{ width: `${statusData.progress_percent ?? (statusData.progress > 1 ? statusData.progress : statusData.progress * 100)}%` }}
+                                transition={{ duration: 0.3, ease: "easeOut" }}
                                 className="h-full bg-primary"
                               />
                             </div>
                           </div>
 
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Rows Generated</span>
-                            <span className="font-medium">{statusData.rows_generated} / {statusData.total_rows}</span>
-                          </div>
+                          {/* Current Stage - show message or progress_stage */}
+                          {(statusData.progress_stage || statusData.message || statusData.current_step) && (
+                            <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                              <Loader2 className="w-4 h-4 animate-spin text-primary flex-shrink-0" />
+                              <span className="text-sm font-medium text-primary">
+                                {statusData.progress_stage || statusData.current_step || statusData.message}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Progress History - use steps if progress_history not available */}
+                          {(statusData.progress_history && statusData.progress_history.length > 0) ? (
+                            <div className="space-y-2 mt-2">
+                              <p className="text-xs text-muted-foreground font-medium">Progress Steps:</p>
+                              <div className="space-y-1 max-h-32 overflow-y-auto">
+                                {statusData.progress_history.map((item, index) => (
+                                  <div 
+                                    key={index} 
+                                    className="flex items-center gap-2 text-xs"
+                                  >
+                                    <CheckCircle2 className="w-3 h-3 text-success flex-shrink-0" />
+                                    <span className="text-muted-foreground truncate">{item.stage}</span>
+                                    <span className="text-muted-foreground ml-auto">{item.percent}%</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (statusData.steps && statusData.steps.length > 0) && (
+                            <div className="space-y-2 mt-2">
+                              <p className="text-xs text-muted-foreground font-medium">Completed Steps:</p>
+                              <div className="space-y-1 max-h-32 overflow-y-auto">
+                                {statusData.steps.map((step, index) => (
+                                  <div 
+                                    key={index} 
+                                    className="flex items-center gap-2 text-xs"
+                                  >
+                                    <CheckCircle2 className="w-3 h-3 text-success flex-shrink-0" />
+                                    <span className="text-muted-foreground truncate">{step}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {statusData.rows_generated !== undefined && statusData.total_rows !== undefined && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Rows Generated</span>
+                              <span className="font-medium">{statusData.rows_generated} / {statusData.total_rows}</span>
+                            </div>
+                          )}
                         </>
                       )}
 
@@ -453,15 +503,19 @@ export default function DatasetGenerationPage() {
                             <span className="font-medium">Generation Complete!</span>
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            Generated {statusData.rows_generated} rows
+                            {statusData.result?.total_generated 
+                              ? `Generated ${statusData.result.total_generated} rows`
+                              : statusData.rows_generated 
+                                ? `Generated ${statusData.rows_generated} rows`
+                                : statusData.message || 'Dataset ready'}
                           </div>
                         </div>
                       )}
 
                       {statusData.status === 'failed' && (
-                        <div className="flex items-center gap-2 text-destructive">
-                          <AlertCircle className="w-5 h-5" />
-                          <span className="text-sm">{statusData.error_message || 'Generation failed'}</span>
+                        <div className="flex items-start gap-2 text-destructive">
+                          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                          <span className="text-sm">{statusData.error_message || statusData.error || statusData.message || 'Generation failed'}</span>
                         </div>
                       )}
 

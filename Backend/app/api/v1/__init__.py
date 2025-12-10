@@ -25,8 +25,7 @@ from app.api.v1 import (
     user_data,
     user_settings,
     template_builder,
-    audit_logs,
-    runs
+    audit_logs
 )
 from app.core.postgres import get_db
 from app.api.v1.auth import get_current_user
@@ -68,10 +67,6 @@ router.include_router(user_settings.router, tags=["User Settings"])
 # === Audit Logs ===
 # audit_logs.py already has prefix="/audit"
 router.include_router(audit_logs.router, tags=["Audit Logs"])
-
-# === Test Runs ===
-# runs.py already has prefix="/runs"
-router.include_router(runs.router, tags=["Test Runs"])
 
 
 # === Root Level Stats Endpoint ===

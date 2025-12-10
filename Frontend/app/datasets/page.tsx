@@ -56,14 +56,22 @@ interface GenerationTask {
   dataset_id?: string
   status: string
   message: string
+  progress?: number
+  current_step?: string
+  steps?: Array<{ name: string; status: string; timestamp: string }>
+  error?: string
   created_at?: string
   completed_at?: string
   statistics?: DatasetStatistics
+  result?: {
+    total_generated?: number
+    csv_path?: string
+  }
   files?: {
-    json: string
-    jsonl: string
-    csv: string
-    summary: string
+    json?: string
+    jsonl?: string
+    csv?: string
+    summary?: string
   }
 }
 
@@ -101,6 +109,30 @@ export default function DatasetGeneratorPage() {
   const [isLoading, setIsLoading] = useState(true)
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+  // Format date in unambiguous format with local timezone: "Dec 10, 2025, 7:28 PM"
+  const formatDateTime = (dateString: string | undefined): string => {
+    if (!dateString) return 'N/A'
+    try {
+      // Parse ISO date string (handles both with and without Z suffix)
+      const date = new Date(dateString.endsWith('Z') ? dateString : dateString + 'Z')
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) return dateString
+      
+      return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZoneName: 'short'
+      })
+    } catch {
+      return dateString
+    }
+  }
 
   const formatError = (err: unknown): string => {
     if (typeof err === 'string') return err
@@ -596,7 +628,7 @@ export default function DatasetGeneratorPage() {
                   <div className="flex items-center gap-3">
                     {getStatusIcon(currentTask.status)}
                     <div>
-                      <CardTitle>Task Status</CardTitle>
+                      <CardTitle>Generation Progress</CardTitle>
                       <CardDescription>Task ID: {currentTask.task_id}</CardDescription>
                     </div>
                   </div>
@@ -615,7 +647,83 @@ export default function DatasetGeneratorPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">{currentTask.message}</p>
+                {/* Progress Bar */}
+                {(currentTask.status === 'running' || currentTask.status === 'pending') && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium">Progress</span>
+                      <span className="text-muted-foreground">{currentTask.progress || 0}%</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${currentTask.progress || 0}%` }}
+                        transition={{ duration: 0.3, ease: "easeOut" }}
+                        className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Current Step */}
+                {currentTask.current_step && (currentTask.status === 'running' || currentTask.status === 'pending') && (
+                  <div className="flex items-center gap-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                    <Loader2 className="w-5 h-5 animate-spin text-blue-500 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                        {currentTask.current_step}
+                      </p>
+                      {currentTask.message && currentTask.message !== currentTask.current_step && (
+                        <p className="text-xs text-muted-foreground mt-0.5">{currentTask.message}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Completed Steps History */}
+                {currentTask.steps && currentTask.steps.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-muted-foreground">Completed Steps:</p>
+                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                      {currentTask.steps.map((step, index) => (
+                        <div key={index} className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                          <span className="text-muted-foreground">{step.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Status Message for Completed/Failed */}
+                {(currentTask.status === 'completed' || currentTask.status === 'failed') && (
+                  <p className={cn(
+                    "text-sm p-3 rounded-lg",
+                    currentTask.status === 'completed' 
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" 
+                      : "bg-red-500/10 text-red-600 dark:text-red-400"
+                  )}>
+                    {currentTask.message || (currentTask.status === 'completed' ? 'Generation completed successfully!' : 'Generation failed')}
+                  </p>
+                )}
+
+                {/* Error Details */}
+                {currentTask.status === 'failed' && currentTask.error && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                    <p className="text-sm text-red-600 dark:text-red-400">
+                      <strong>Error:</strong> {currentTask.error}
+                    </p>
+                  </div>
+                )}
+
+                {/* Result Summary */}
+                {currentTask.status === 'completed' && currentTask.result?.total_generated && (
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                    <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                      ✅ Generated <strong>{currentTask.result.total_generated}</strong> test cases
+                    </p>
+                  </div>
+                )}
 
                 {currentTask.statistics && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -771,7 +879,7 @@ export default function DatasetGeneratorPage() {
                       <div>
                         <p className="font-medium">Dataset {task.dataset_id || task.task_id}</p>
                         <p className="text-sm text-muted-foreground">
-                          {task.created_at ? new Date(task.created_at).toLocaleString() : 'N/A'}
+                          {formatDateTime(task.created_at)}
                         </p>
                       </div>
                     </div>

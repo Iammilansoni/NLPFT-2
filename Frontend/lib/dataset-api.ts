@@ -19,26 +19,61 @@ export interface GenerateDatasetRequest {
 }
 
 export interface GenerateDatasetResponse {
-  dataset_id: string;
-  job_id: string;
-  status: string;
+  success: boolean;
+  task_id: string;
+  embedding_task_id?: string;
   message: string;
-  estimated_time_seconds: number;
+  template_name: string;
+  template_id: string;
+  total_generated: number;
+  requested: number;
+  csv_path: string;
+  json_path: string;
+  csv_preview?: string[][];
+  download_url?: string;
+  // Legacy fields for compatibility
+  dataset_id?: string;
+  job_id?: string;
+  status?: string;
+  estimated_time_seconds?: number;
 }
 
 export type DatasetStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
+export interface ProgressHistoryItem {
+  stage: string;
+  percent: number;
+  timestamp: string;
+}
+
 export interface DatasetStatusResponse {
-  dataset_id: string;
-  job_id: string;
-  status: DatasetStatus;
-  progress: number; // 0.0 to 1.0
-  rows_generated: number;
-  total_rows: number;
+  task_id?: string;
+  dataset_id?: string;
+  job_id?: string;
+  status: DatasetStatus | 'running' | 'pending';
+  progress: number; // 0.0 to 1.0 or 0 to 100
+  progress_percent?: number; // 0 to 100
+  progress_stage?: string; // Human-readable stage description
+  progress_history?: ProgressHistoryItem[]; // History of progress updates
+  message?: string;
+  current_step?: string;
+  steps?: string[];
+  rows_generated?: number;
+  total_rows?: number;
   error_message?: string;
+  error?: string;
   download_url?: string;
-  created_at: string;
+  created_at?: string;
   completed_at?: string;
+  result?: {
+    total_generated?: number;
+    csv_path?: string;
+  };
+  files?: {
+    csv?: string;
+    json?: string;
+  };
+  statistics?: Record<string, any>;
 }
 
 export interface EmbedDatasetRequest {
@@ -132,34 +167,50 @@ export class DatasetApiClient {
   /**
    * Get dataset generation status
    */
-  async getDatasetStatus(datasetId: string): Promise<DatasetStatusResponse> {
+  async getDatasetStatus(taskId: string): Promise<DatasetStatusResponse> {
     const response = await this.client.get<DatasetStatusResponse>(
-      `/api/v1/datasets/${datasetId}/status`
+      `/api/v1/datasets/status/${taskId}`
     );
     return response.data;
   }
 
   /**
-   * Download dataset CSV
+   * Download dataset CSV by task ID
    */
-  async downloadDataset(datasetId: string): Promise<Blob> {
-    const response = await this.client.get(`/api/v1/datasets/${datasetId}/download`, {
+  async downloadDataset(taskId: string, format: string = 'csv'): Promise<Blob> {
+    const response = await this.client.get(`/api/v1/datasets/download/${taskId}/${format}`, {
       responseType: 'blob',
     });
     return response.data;
   }
 
   /**
-   * Trigger download in browser
+   * Trigger download in browser by task ID
    */
-  triggerDownload(datasetId: string, filename?: string): void {
+  triggerDownload(taskId: string, filename?: string, format: string = 'csv'): void {
     const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : '';
-    const url = `${API_BASE_URL}/api/v1/datasets/${datasetId}/download`;
+    const url = `${API_BASE_URL}/api/v1/datasets/download/${taskId}/${format}`;
     
     // Create temporary link
     const link = document.createElement('a');
     link.href = token ? `${url}?token=${token}` : url;
-    link.download = filename || `dataset_${datasetId}.csv`;
+    link.download = filename || `dataset_${taskId}.${format}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  /**
+   * Download dataset by filename
+   */
+  triggerDownloadByFilename(filename: string): void {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : '';
+    const url = `${API_BASE_URL}/api/v1/datasets/download-file/${filename}`;
+    
+    // Create temporary link
+    const link = document.createElement('a');
+    link.href = token ? `${url}?token=${token}` : url;
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

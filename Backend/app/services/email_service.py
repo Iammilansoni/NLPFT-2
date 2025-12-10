@@ -247,6 +247,159 @@ class EmailService:
             logger.info(f"📧 [DEV MODE] Resend OTP for {to_email}: {otp}")
             return False
 
+    def send_password_reset_email(self, to_email: str, reset_token: str, reset_url: str, username: str = "User") -> bool:
+        """
+        Send password reset email with reset link
+        
+        Args:
+            to_email: Recipient email address
+            reset_token: Unique reset token
+            reset_url: Full URL for password reset page
+            username: User's name (for personalization)
+        
+        Returns:
+            bool: True if sent successfully, False otherwise
+        """
+        try:
+            if not self.smtp_user or not self.smtp_password:
+                logger.warning("⚠️ Email service not configured (SMTP_USER/SMTP_PASSWORD missing)")
+                logger.info(f"📧 [DEV MODE] Password reset link for {to_email}: {reset_url}")
+                logger.info(f"📧 [DEV MODE] Reset token: {reset_token}")
+                return True  # Return True in dev mode for testing
+            
+            # Create message
+            message = MIMEMultipart("alternative")
+            message["Subject"] = "Reset Your NLPForge Password"
+            message["From"] = f"{self.from_name} <{self.from_email}>"
+            message["To"] = to_email
+            
+            # Create HTML content
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
+                <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f4f4f5;">
+                    <tr>
+                        <td align="center" style="padding: 40px 20px;">
+                            <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                                <!-- Header -->
+                                <tr>
+                                    <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); border-radius: 12px 12px 0 0;">
+                                        <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">
+                                            🔐 NLPForge
+                                        </h1>
+                                        <p style="margin: 10px 0 0; color: #fecaca; font-size: 14px;">
+                                            Password Reset Request
+                                        </p>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Content -->
+                                <tr>
+                                    <td style="padding: 40px;">
+                                        <h2 style="margin: 0 0 20px; color: #18181b; font-size: 24px; font-weight: 600;">
+                                            Reset Your Password
+                                        </h2>
+                                        
+                                        <p style="margin: 0 0 20px; color: #3f3f46; font-size: 16px; line-height: 1.6;">
+                                            Hi <strong>{username}</strong>,
+                                        </p>
+                                        
+                                        <p style="margin: 0 0 30px; color: #3f3f46; font-size: 16px; line-height: 1.6;">
+                                            We received a request to reset your password for your NLPForge account. Click the button below to create a new password:
+                                        </p>
+                                        
+                                        <!-- Reset Button -->
+                                        <div style="text-align: center; margin: 30px 0;">
+                                            <a href="{reset_url}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 16px 48px; font-size: 18px; font-weight: 600; border-radius: 8px; box-shadow: 0 4px 6px rgba(102, 126, 234, 0.4);">
+                                                Reset Password
+                                            </a>
+                                        </div>
+                                        
+                                        <p style="margin: 20px 0; color: #71717a; font-size: 14px; text-align: center;">
+                                            Or copy and paste this link into your browser:
+                                        </p>
+                                        <p style="margin: 0 0 30px; color: #667eea; font-size: 14px; word-break: break-all; text-align: center;">
+                                            {reset_url}
+                                        </p>
+                                        
+                                        <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; border-radius: 8px; margin: 0 0 30px;">
+                                            <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">
+                                                ⚠️ <strong>Important:</strong> This link will expire in <strong>1 hour</strong>. If you didn't request a password reset, please ignore this email or contact support.
+                                            </p>
+                                        </div>
+                                        
+                                        <div style="border-top: 1px solid #e4e4e7; padding-top: 20px; margin-top: 30px;">
+                                            <p style="margin: 0 0 10px; color: #71717a; font-size: 14px;">
+                                                Best regards,<br>
+                                                <strong>The NLPForge Team</strong>
+                                            </p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Footer -->
+                                <tr>
+                                    <td style="padding: 30px 40px; background-color: #f9fafb; border-radius: 0 0 12px 12px; text-align: center;">
+                                        <p style="margin: 0 0 10px; color: #71717a; font-size: 12px;">
+                                            This is an automated message from NLPForge. Please do not reply to this email.
+                                        </p>
+                                        <p style="margin: 0; color: #a1a1aa; font-size: 12px;">
+                                            © 2025 NLPForge. All rights reserved.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </body>
+            </html>
+            """
+            
+            # Plain text fallback
+            text_content = f"""
+            NLPForge - Reset Your Password
+            
+            Hi {username},
+            
+            We received a request to reset your password. Click the link below to create a new password:
+            
+            {reset_url}
+            
+            This link will expire in 1 hour.
+            
+            If you didn't request a password reset, please ignore this email.
+            
+            Best regards,
+            The NLPForge Team
+            """
+            
+            # Attach both HTML and plain text versions
+            part1 = MIMEText(text_content, "plain")
+            part2 = MIMEText(html_content, "html")
+            message.attach(part1)
+            message.attach(part2)
+            
+            # Send email
+            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+                server.starttls()
+                server.login(self.smtp_user, self.smtp_password)
+                server.send_message(message)
+            
+            logger.info(f"✅ Password reset email sent to {to_email}")
+            return True
+        
+        except Exception as e:
+            logger.error(f"❌ Failed to send password reset email to {to_email}: {e}")
+            # In development, log reset link for testing
+            logger.info(f"📧 [DEV MODE] Password reset link for {to_email}: {reset_url}")
+            return False
+
 
 # Singleton instance
 _email_service = None

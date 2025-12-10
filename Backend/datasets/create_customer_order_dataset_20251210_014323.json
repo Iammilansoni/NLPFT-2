@@ -1,0 +1,243 @@
+[
+  {
+    "query": "Create booking for user 22",
+    "api": "Create_Customer_Order",
+    "endpoint": "/api",
+    "method": "POST",
+    "request": {
+      "items": [
+        {
+          "quantity": 1,
+          "product_id": "prod_ABC123"
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "customer_id": "cust_22",
+      "shipping_address": {
+        "city": "London",
+        "line1": "12 Park Lane",
+        "state": "UK",
+        "country": "GB",
+        "postal_code": "SW1A 0AA"
+      }
+    },
+    "expected_response": {
+      "items": [
+        {
+          "price": 999,
+          "quantity": 1,
+          "product_id": "prod_ABC123"
+        }
+      ],
+      "status": "created",
+      "message": "Order created.",
+      "currency": "GBP",
+      "order_id": "ord_20251129_0001",
+      "total_amount": 999
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid request for a single item order with realistic details."
+  },
+  {
+    "query": "How do I update my order status?",
+    "api": "Create_Customer_Order",
+    "endpoint": "/api",
+    "method": "POST",
+    "request": {
+      "items": [
+        {
+          "quantity": 1,
+          "product_id": "prod_ABC123"
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "customer_id": "cust_987654",
+      "shipping_address": {
+        "city": "London",
+        "line1": "12 Park Lane",
+        "state": "UK",
+        "country": "GB",
+        "postal_code": "SW1A 0AA"
+      }
+    },
+    "expected_response": {
+      "status": "order_updated",
+      "message": "Order status updated successfully."
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid request with a simple order status update."
+  },
+  {
+    "query": "Update user details for cust_987654",
+    "api": "Create_Customer_Order",
+    "endpoint": "/api",
+    "method": "POST",
+    "request": {
+      "items": [
+        {
+          "quantity": 1,
+          "product_id": "prod_ABC123"
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "customer_id": "cust_987654",
+      "shipping_address": {
+        "city": "London",
+        "line1": "12 Park Lane",
+        "state": "UK",
+        "country": "GB",
+        "postal_code": "SW1A 0AA"
+      }
+    },
+    "expected_response": {
+      "status": "ok",
+      "message": "User details updated successfully."
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid request for updating user information."
+  },
+  {
+    "query": "add order with 20 items from prod_XYZ789",
+    "api": "Create_Customer_Order",
+    "endpoint": "/api",
+    "method": "POST",
+    "request": {
+      "items": [
+        {
+          "quantity": 20,
+          "product_id": "prod_XYZ789"
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "customer_id": "cust_987654",
+      "shipping_address": {
+        "city": "London",
+        "line1": "12 Park Lane",
+        "state": "UK",
+        "country": "GB",
+        "postal_code": "SW1A 0AA"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created."
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid request for placing a large order with details."
+  },
+  {
+    "query": "How do I create an order?",
+    "api": "Create_Customer_Order",
+    "endpoint": "/api",
+    "method": "POST",
+    "request": {
+      "items": [
+        {
+          "quantity": 1,
+          "product_id": "prod_ABC123"
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "customer_id": "cust_987654",
+      "shipping_address": {
+        "city": "London",
+        "line1": "12 Park Lane",
+        "state": "UK",
+        "country": "GB",
+        "postal_code": "SW1A 0AA"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created."
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid request for ordering a product with no additional details. Expecting a helpful response."
+  },
+  {
+    "query": "Create my order with the code 123456",
+    "api": "Create_Customer_Order",
+    "endpoint": "/api",
+    "method": "POST",
+    "request": {
+      "items": [
+        {
+          "quantity": 1,
+          "product_id": "prod_ABC123"
+        }
+      ],
+      "payment": {
+        "method": "card",
+        "card_token": "tok_test_4242"
+      },
+      "customer_id": "cust_987654",
+      "shipping_address": {
+        "city": "London",
+        "line1": "12 Park Lane",
+        "state": "UK",
+        "country": "GB",
+        "postal_code": "SW1A 0AA"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created."
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid request with a code, expecting a confirmation."
+  },
+  {
+    "query": "add order with payment method as UPI",
+    "api": "Create_Customer_Order",
+    "endpoint": "/api",
+    "method": "POST",
+    "request": {
+      "items": [
+        {
+          "quantity": 1,
+          "product_id": "prod_ABC123"
+        }
+      ],
+      "payment": {
+        "method": "upi",
+        "upi_id": "milan@upi"
+      },
+      "customer_id": "cust_987654",
+      "shipping_address": {
+        "city": "London",
+        "line1": "12 Park Lane",
+        "state": "UK",
+        "country": "GB",
+        "postal_code": "SW1A 0AA"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created."
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Valid request with a specific payment method and ID"
+  }
+]

@@ -61,14 +61,17 @@ export function useGenerateDataset() {
       // Invalidate lists
       queryClient.invalidateQueries({ queryKey: datasetKeys.lists() });
       
-      // Set initial status in cache
-      queryClient.setQueryData(datasetKeys.status(response.dataset_id), {
+      // Set initial status in cache using task_id (fallback to dataset_id for backward compatibility)
+      const taskId = response.task_id || response.dataset_id || '';
+      queryClient.setQueryData(datasetKeys.status(taskId), {
+        task_id: response.task_id,
         dataset_id: response.dataset_id,
         job_id: response.job_id,
-        status: response.status,
+        status: 'running',
         progress: 0,
+        message: response.message || 'Starting generation...',
         rows_generated: 0,
-        total_rows: 0,
+        total_rows: response.requested || 0,
         created_at: new Date().toISOString(),
       });
     },

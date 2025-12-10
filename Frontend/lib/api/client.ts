@@ -37,14 +37,6 @@ export const API_ENDPOINTS = {
     ingest: `${API_BASE_URL}/api/v1/dataset/ingest`,
     generate: `${API_BASE_URL}/api/v1/dataset/generate`,
   },
-  
-  // Test Runs
-  runs: {
-    list: `${API_BASE_URL}/api/v1/runs`,
-    get: (id: number) => `${API_BASE_URL}/api/v1/runs/${id}`,
-    create: `${API_BASE_URL}/api/v1/runs`,
-    update: (id: number) => `${API_BASE_URL}/api/v1/runs/${id}`,
-  },
 } as const
 
 /**

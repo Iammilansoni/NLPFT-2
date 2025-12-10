@@ -5,9 +5,6 @@ export const API_VERSION = 'v1';
 export const ROUTES = {
   HOME: '/',
   DASHBOARD: '/dashboard',
-  NEW_RUN: '/run/new',
-  RUNS: '/runs',
-  RUN_DETAIL: (id: string) => `/runs/${id}`,
   SEARCH: '/search',
   TEMPLATES: '/templates',
   TEMPLATE_DETAIL: (intent: string) => `/templates/${intent}`,

@@ -55,14 +55,14 @@ class User(Base):
     """
     USERS table - Multi-tenant user authentication
     Core fields from diagram: PK=u_id, user_name, email, password, created_at
-    Enhanced fields: is_active, email_verified
+    Enhanced fields: is_active, email_verified, google_id for OAuth
     """
     __tablename__ = "users"
     
     u_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_name = Column(Text, nullable=True)
     email = Column(Text, unique=True, nullable=False, index=True)
-    password = Column(Text, nullable=False)  # Store hashed password (bcrypt)
+    password = Column(Text, nullable=False)
     is_active = Column(Integer, nullable=False, default=1)  # 0=disabled, 1=active
     is_expert = Column(Integer, nullable=False, default=0)  # 0=regular user, 1=expert (can approve templates)
     email_verified = Column(Integer, nullable=False, default=0)  # 0=no, 1=yes

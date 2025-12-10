@@ -98,8 +98,8 @@ BATCH_SIZE = int(os.getenv("BATCH_SIZE", "32"))
 
 # Ollama Configuration (LOCAL LLM for dataset generation)
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b-instruct-q4_K_M")  # Primary: Llama 3.2 Instruct (quantized)
-OLLAMA_FALLBACK_MODEL = os.getenv("OLLAMA_FALLBACK_MODEL", "gemma2:2b-instruct-q4_K_M")  # Fallback: Gemma 2B (faster, lighter)
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma2:2b-instruct-q4_K_M")  # Primary: Gemma 2B Instruct (faster, lighter)
+OLLAMA_FALLBACK_MODEL = os.getenv("OLLAMA_FALLBACK_MODEL", "llama3.2:3b-instruct-q4_K_M")  # Fallback: Llama 3.2 Instruct (quantized)
 
 # Intent detection method: "vector_search" or "pattern_matching"
 INTENT_DETECTION_METHOD = os.getenv("INTENT_DETECTION_METHOD", "vector_search")

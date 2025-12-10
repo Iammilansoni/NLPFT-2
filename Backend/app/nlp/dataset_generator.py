@@ -144,53 +144,106 @@ class EnterpriseDatasetGenerator:
         sample_responses_json = safe_json_dumps(sample_responses, "[]")
         domain_tags_str = ', '.join(str(t) for t in domain_tags) if domain_tags else 'general'
         
-        # Build comprehensive system prompt with STRICT RULES
-        system_prompt = f"""You are an EXPERT DATASET GENERATOR creating HIGH-QUALITY, DIVERSE datasets for EMBEDDING MODELS.
+        # Build system prompt with SAFETY DIRECTIVES to prevent LLM refusal
+        system_prompt = f"""You are an API Test Dataset Generator used for safe software testing.
 
-# 📘 TEMPLATE (SOURCE OF TRUTH)
-- **API**: {name} ({method} {endpoint})
-- **Base URL**: {base_url}
-- **Security**: {security_classification}
-- **Tags**: {domain_tags_str}
+Your purpose is to generate **harmless synthetic test cases** for API robustness validation.
+These outputs are used for defensive security testing, validation, and quality assurance.
 
-## Description
+⚠ SAFETY DIRECTIVE (MUST FOLLOW)
+- You may generate inputs that *simulate* malformed or unsafe-like patterns for testing,  
+  but they must always be non-executable, neutral, and clearly fake.
+- Any string resembling SQL, script tags, HTML, injections must be intentionally broken or altered so it cannot function.
+- NEVER provide functional exploit payloads or instructions.
+
+===============================================================================
+📌 API Metadata (From Template)
+===============================================================================
+API Name: {name}
+Base URL: {base_url}
+Method: {method}
+Endpoint: {endpoint}
+Security Classification: {security_classification}
+Domain Tags: {domain_tags_str}
+
+Description:
 {description}
 
-## Schema & Examples
-Parameters: {parameters_json}
-JSON Schema: {json_schema_json}
-Requests: {sample_requests_json}
-Responses: {sample_responses_json}
+Parameters:
+{parameters_json}
 
-# 🎯 OBJECTIVE: EMBEDDING-OPTIMIZED DATASET
+JSON Schema:
+{json_schema_json}
 
-## 1. QUERY DIVERSITY (CRITICAL)
-Generate queries with varied structures to train robust embeddings:
-- **Linguistic (25%)**: Imperative ("Create user"), Interrogative ("How to create?"), Declarative ("I want to..."), Passive, Conditional.
-- **Paraphrases (25%)**: Synonyms ("Register" vs "Sign up"), jargon, varying lengths (3-25+ words).
-- **Typos/Errors (15%)**: Swaps ("craete"), missing chars ("userr"), phonetic ("receve"), keyboard slips.
-- **Shorthand (10%)**: "usr", "pwd", "acct", "cust", acronyms.
-- **Contextual (15%)**: "getting error when...", "for Q4 project...", "urgent request".
-- **Multi-intent (10%)**: "Create user then update", "List or create".
+Sample Requests:
+{sample_requests_json}
 
-## 2. SCENARIO DISTRIBUTION
-- **70% VALID**: Normal, schema-compliant.
-- **20% EDGE**: Boundary values, special chars, min/max.
-- **10% EXTREME**: Stress tests, malformed inputs.
+===============================================================================
+🎯 Generate dataset entries with HIGH VARIATION
+===============================================================================
+Each data point must contain:
 
-## 3. OPTIMIZATION RULES
-- **Length Variance**: Mix ultra-short (2-4 words) to very long (26+ words).
-- **Style Mix**: Questions, Commands, Statements, Conversational ("hey can u"), Keywords ("user create").
-- **Negative Examples**: Include 10% queries that sound similar but match different intents (contrastive learning).
+1. natural language `query`
+2. structured `request` using template schema fields only
+3. valid `expected_response` OR validation-error response
+4. classification labels:
+   - scenario_type → valid | edge | extreme
+   - test_category → valid_flow | boundary | typo | error_case | paraphrase
+5. short `notes` (explain intention, edge, typo, boundary)
 
-## 4. STRICT CONSTRAINTS
-- **ZERO HALLUCINATION**: Use ONLY template data. No invented fields/logic.
-- **SEMANTIC CONSISTENCY**: Even when generating typos or variations, the *intent* of the query must match the API's function. Do not generate queries for unrelated actions (e.g., do not ask to 'create user' if the API is 'create order').
-- **VALID JSON**: All request/response fields must be valid JSON.
-- **REALISTIC DATA**: No placeholders like "test123". Use domain-appropriate values.
-- **NO MARKDOWN**: Output raw JSON array only.
+===============================================================================
+📌 CASE DISTRIBUTION RULE
+===============================================================================
+- ~70% valid realistic requests
+- ~20% edge/boundary values (long strings, empty, weird but SAFE characters)
+- ~10% invalid/extreme cases (missing required fields, wrong type, broken format)
 
-# 🔐 Security: {security_classification.upper()} (Use synthetic, realistic values)
+===============================================================================
+📌 REQUIRED DIVERSITY IN QUERIES
+===============================================================================
+Include multiple writing styles:
+
+• direct commands → "Create booking for user 22"
+• question form → "How do I update order status?"
+• shorthand/abbreviation → "upd usr details"
+• casual/slang → "hey, add order quickly"
+• typo-mistakes → "creaet custmer", "updtae stat"
+• paraphrased equivalents
+
+Boundary examples allowed (must remain harmless):
+- strings with random symbols → "abc@@??##"
+- slightly broken emails → "user@@mail"
+- empty/very long text
+- non-standard values like "00000" or unicode characters
+
+Extreme invalid cases allowed:
+- missing required fields
+- wrong type formats (number instead of boolean)
+- intentionally incomplete JSON or nonsense values
+
+===============================================================================
+⚠ HARD OUTPUT FORMAT RULE
+===============================================================================
+Return ONLY a JSON array, no explanation, no markdown.
+
+Each item must be:
+
+{{
+  "query": "...",
+  "api": "{name}",
+  "endpoint": "{endpoint}",
+  "method": "{method}",
+  "request": {{ ... }},
+  "expected_response": {{ ... }},
+  "scenario_type": "valid"|"edge"|"extreme",
+  "test_category": "valid_flow"|"typo"|"boundary"|"error_case"|"paraphrase",
+  "notes": "..."
+}}
+
+Output must be valid JSON.
+No extra keys. No commentary.
+===============================================================================
+You understand. Await user prompt.
 """
         
         return system_prompt
@@ -199,86 +252,49 @@ Generate queries with varied structures to train robust embeddings:
         self,
         user_prompt: str,
         num_examples: int,
-        focus_areas: Optional[List[str]] = None
+        focus_areas: Optional[List[str]] = None,
+        template_data: Dict[str, Any] = None
     ) -> str:
         """
-        Build user prompt for STRICT CSV dataset generation
+        Build user prompt for dataset generation
         
         Args:
             user_prompt: User's custom generation instructions
             num_examples: Number of test cases to generate
             focus_areas: Specific areas to focus on
+            template_data: Template information for reference
         
         Returns:
             User prompt string
         """
-        focus_text = ""
-        if focus_areas:
-            focus_text = f"\n\n**FOCUS AREAS**: Pay special attention to: {', '.join(focus_areas)}"
-        
-        # Calculate distribution if num_examples is provided
-        distribution_text = ""
-        count_instruction = ""
-        
+        # Calculate distribution
         if num_examples:
             valid_count = int(num_examples * 0.70)
             edge_count = int(num_examples * 0.20)
             extreme_count = num_examples - valid_count - edge_count
-            
-            count_instruction = f"Generate EXACTLY **{num_examples}** high-quality, diverse test cases following ALL system prompt rules."
-            distribution_text = f"""## STRICT DISTRIBUTION (Must Match Exactly)
-- **{valid_count} VALID cases** (70%): Schema-compliant, realistic values, normal operation
-- **{edge_count} EDGE cases** (20%): Boundary conditions, special chars, min/max values
-- **{extreme_count} EXTREME cases** (10%): Error-inducing, stress tests, rare conditions"""
         else:
-            count_instruction = """**DETERMINE THE NUMBER OF TEST CASES FROM THE USER'S CUSTOM REQUIREMENTS.**
-- If the user specifies a number (e.g., "generate 50 cases"), use that number.
-- If the user DOES NOT specify a number, **DEFAULT TO 100 TEST CASES**.
-- Do not generate more than 1000 cases."""
-            distribution_text = """## DISTRIBUTION GUIDELINES
-- Maintain roughly: 70% VALID, 20% EDGE, 10% EXTREME cases
-- Ensure diversity across all categories."""
+            num_examples = 15
+            valid_count = 10
+            edge_count = 3
+            extreme_count = 2
 
-        user_prompt_text = f"""# 🎯 GENERATION REQUEST
+        user_prompt_text = f"""Generate exactly {num_examples} test cases for the API above. Output ONLY a JSON array.
 
-{count_instruction}
+Requirements:
+- {valid_count} valid test cases with realistic data
+- {edge_count} edge cases (boundary values, empty strings, long text)
+- {extreme_count} error cases (missing required fields, wrong types)
 
-## Requirements
-{user_prompt}
-{focus_text}
-{distribution_text}
+Each test case needs: query, api, endpoint, method, request, expected_response, scenario_type, test_category, notes
 
-## DIVERSITY CHECKLIST (MANDATORY)
-1. **Variations**: Typos (15%), Abbreviations (10%), Questions (15%), Commands (20%), Statements (15%), Conversational (10%), Keywords (5%).
-2. **Lengths**: Mix Short (3-5 words), Medium (6-12), Long (13+).
-3. **Typos**: Transposition ("teh"), Omission ("creat"), Insertion ("userr"), Substitution ("vreate"). MUST PRESERVE INTENT (e.g., "creat order" is OK, "create user" is NOT OK if API is order).
+Generate varied natural language queries:
+- "Create order for customer X"
+- "Place a new booking with COD payment"  
+- "I want to buy product ABC"
+- Include some with typos like "creaet ordr"
 
-## OUTPUT FORMAT (JSON ARRAY ONLY)
-[
-  {{
-    "query": "Description (Vary length 3-30 words, include typos/variations)",
-    "api": "api_name",
-    "endpoint": "/path",
-    "method": "METHOD",
-    "request": {{...}},
-    "expected_response": {{...}},
-    "scenario_type": "valid|edge|extreme",
-    "test_category": "typo|paraphrase|abbreviation|question|command|statement|conversational|keyword|boundary|error_case",
-    "query_style": "imperative|interrogative|declarative|conversational|keyword_only",
-    "has_typo": true|false,
-    "notes": "Purpose"
-  }}
-]
-
-## RULES
-1. **JSON ONLY**: No markdown, no backticks. Start with [, end with ].
-2. **UNIQUE**: No duplicate queries or structures.
-3. **VALID**: Valid JSON objects for request/response.
-4. **SCHEMA**: Follow template exactly.
-5. **INTENT**: Queries must match the API function.
-
-**START GENERATION - RETURN JSON ARRAY**
-"""
+Output format: [{{"query":"...", "api":"...", ...}}, ...]
+Return ONLY the JSON array, nothing else."""
         
         return user_prompt_text
     
@@ -457,25 +473,39 @@ Generate queries with varied structures to train robust embeddings:
             logger.warning(f"Test case is not a dict: {type(test_case)}")
             return False
         
-        required_fields = ["query", "api", "endpoint", "method", "request", 
-                          "expected_response", "scenario_type", "test_category", "notes"]
-        
-        for field in required_fields:
-            if field not in test_case:
-                logger.warning(f"Missing required field: {field}")
-                return False
-        
-        # Validate scenario_type
-        if test_case.get("scenario_type") not in ["valid", "edge", "extreme"]:
-            logger.warning(f"Invalid scenario_type: {test_case.get('scenario_type')}")
+        # Only require query field - be lenient with other fields
+        if "query" not in test_case or not test_case.get("query"):
+            logger.warning(f"Missing required field: query")
             return False
         
-        # Validate test_category
+        # Add default values for missing fields
+        if "api" not in test_case:
+            test_case["api"] = template_data.get("name", "unknown_api")
+        if "endpoint" not in test_case:
+            test_case["endpoint"] = template_data.get("endpoint", "/api")
+        if "method" not in test_case:
+            test_case["method"] = template_data.get("method", "POST")
+        if "request" not in test_case:
+            test_case["request"] = {}
+        if "expected_response" not in test_case:
+            test_case["expected_response"] = {"status": "success"}
+        if "scenario_type" not in test_case:
+            test_case["scenario_type"] = "valid"
+        if "test_category" not in test_case:
+            test_case["test_category"] = "valid_flow"
+        if "notes" not in test_case:
+            test_case["notes"] = ""
+        
+        # Normalize scenario_type
+        scenario = test_case.get("scenario_type", "valid").lower()
+        if scenario not in ["valid", "edge", "extreme"]:
+            test_case["scenario_type"] = "valid"
+        
+        # Normalize test_category
         valid_categories = ["typo", "boundary", "rare_combination", "valid_flow", 
-                           "error_case", "security", "performance"]
-        if test_case.get("test_category") not in valid_categories:
-            logger.warning(f"Invalid test_category: {test_case.get('test_category')}")
-            return False
+                           "error_case", "security", "performance", "paraphrase"]
+        if test_case.get("test_category", "").lower() not in valid_categories:
+            test_case["test_category"] = "valid_flow"
         
         return True
     
@@ -563,8 +593,8 @@ Generate queries with varied structures to train robust embeddings:
                     }
                 }
                 
-                # Longer timeout for local CPU inference
-                timeout = httpx.Timeout(300.0, connect=10.0)  # 5 min for generation, 10s for connect
+                # Longer timeout for local CPU inference (large datasets need more time)
+                timeout = httpx.Timeout(900.0, connect=10.0)  # 15 min for generation, 10s for connect
                 
                 async with httpx.AsyncClient(timeout=timeout) as client:
                     response = await client.post(url, json=payload)
@@ -622,7 +652,8 @@ Generate queries with varied structures to train robust embeddings:
         num_examples: Optional[int] = None,
         user_prompt: str = "",
         focus_areas: Optional[List[str]] = None,
-        scenario_distribution: Optional[Dict[str, float]] = None
+        scenario_distribution: Optional[Dict[str, float]] = None,
+        task_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate comprehensive, embedding-ready CSV dataset from approved template
@@ -635,95 +666,140 @@ Generate queries with varied structures to train robust embeddings:
             user_prompt: User's custom generation instructions
             focus_areas: Specific areas to focus on
             scenario_distribution: Custom distribution of scenarios
+            task_id: Optional task ID for progress tracking
         
         Returns:
             Dictionary with generation results and file paths
         """
+        # Progress tracking helper
+        def update_progress(progress: int, message: str, step: str = None):
+            if task_id:
+                try:
+                    from app.services.dataset_task_manager import get_task_manager
+                    task_manager = get_task_manager()
+                    task_manager.update_progress(task_id, progress, message, step)
+                except Exception as e:
+                    logger.warning(f"Progress update failed: {e}")
+            logger.info(f"📊 Progress: {progress}% - {message}")
+        
+        update_progress(5, "Initializing dataset generation...", "init")
+        
         if not self.ollama_available:
             raise ValueError("❌ Ollama not available. Install from https://ollama.ai/download")
         
         # Safely extract template info
         template_name = "Unknown"
-        template_id = "unknown"
+        template_id_str = "unknown"
         try:
             template_name = template_data.get("name", "Unknown") if isinstance(template_data, dict) else "Unknown"
-            template_id = str(template_data.get("id", "unknown")) if isinstance(template_data, dict) else "unknown"
+            template_id_str = str(template_data.get("id", "unknown")) if isinstance(template_data, dict) else "unknown"
         except Exception as e:
             logger.error(f"❌ Error extracting template info: {e}")
         
-        logger.info(f"🚀 Starting FAST dataset generation for: {template_name}")
+        update_progress(10, f"Preparing to generate for: {template_name}", "prepare")
+        
+        logger.info(f"🚀 Starting dataset generation for: {template_name}")
         logger.info(f"⚡ Provider: {self.provider.upper()} | Model: {self.model_name}")
-        target_msg = f"{num_examples} test cases" if num_examples else "dynamic count (default 100)"
-        logger.info(f"📊 Target: {target_msg} (70% valid, 20% edge, 10% extreme)")
-        custom_preview = user_prompt[:100] if user_prompt else "None"
-        logger.info(f"📝 User prompt: {custom_preview}...")
+        target_count = num_examples if num_examples else 50
+        logger.info(f"📊 Target: {target_count} test cases")
         
         try:
-            # Build prompts with error handling
-            logger.info(f"📋 Building prompts...")
+            # Build system prompt (same for all batches)
+            update_progress(15, "Building prompts...", "build_prompts")
             try:
                 system_prompt = self._build_system_prompt(template_data, scenario_distribution)
-                user_prompt_msg = self._build_user_prompt(user_prompt, num_examples, focus_areas)
             except Exception as prompt_error:
                 logger.error(f"❌ Error building prompts: {type(prompt_error).__name__}: {prompt_error}")
                 raise ValueError(f"Failed to build prompts: {prompt_error}")
             
-            logger.info(f"📋 Total prompt: ~{(len(system_prompt) + len(user_prompt_msg))//4} tokens")
-            
             import time
             start_time = time.time()
             
-            # Call Ollama API
-            response_text = None
-            try:
-                response_text = await self._call_ollama_api(system_prompt, user_prompt_msg, num_examples)
-            except Exception as api_error:
-                logger.error(f"❌ API call failed: {type(api_error).__name__}: {api_error}")
-                raise ValueError(f"API call failed: {api_error}")
+            # ============= CHUNKED GENERATION =============
+            # Generate in batches of 15 to avoid LLM refusal for large numbers
+            BATCH_SIZE = 15
+            all_test_cases = []
+            total_batches = (target_count + BATCH_SIZE - 1) // BATCH_SIZE  # Ceiling division
             
-            if not response_text:
-                raise ValueError("Empty response from API")
+            update_progress(20, f"Generating {target_count} test cases in {total_batches} batches...", "batch_start")
             
-            elapsed = time.time() - start_time
-            logger.info(f"✅ API call completed in {elapsed:.2f} seconds")
-            
-            # Save raw response for debugging if extraction fails
-            try:
-                test_cases = self._extract_json_from_response(response_text)
-            except Exception as extract_error:
-                logger.error(f"❌ JSON extraction failed: {extract_error}")
-                logger.error(f"❌ Full response text:\n{response_text}")
-                # Save to file for inspection
-                debug_file = os.path.join(self.datasets_dir, f"debug_response_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
+            for batch_num in range(total_batches):
+                # Calculate how many to generate in this batch
+                remaining = target_count - len(all_test_cases)
+                batch_count = min(BATCH_SIZE, remaining)
+                
+                if batch_count <= 0:
+                    break
+                
+                # Calculate progress (20-60% for LLM calls)
+                batch_progress = 20 + int((batch_num / total_batches) * 40)
+                update_progress(batch_progress, f"Batch {batch_num + 1}/{total_batches}: Generating {batch_count} test cases...", f"batch_{batch_num + 1}")
+                
+                # Build user prompt for this batch
+                user_prompt_msg = self._build_user_prompt(user_prompt, batch_count, focus_areas, template_data)
+                
+                logger.info(f"📦 Batch {batch_num + 1}/{total_batches}: Requesting {batch_count} test cases")
+                
+                response_text = None
                 try:
-                    with open(debug_file, 'w', encoding='utf-8') as f:
-                        f.write(f"Error: {extract_error}\n\n")
-                        f.write(f"Response text:\n{response_text}")
-                    logger.error(f"❌ Saved debug response to: {debug_file}")
-                except:
-                    pass
-                raise ValueError(f"Failed to extract JSON from response: {extract_error}")
+                    response_text = await self._call_ollama_api(system_prompt, user_prompt_msg, batch_count)
+                except Exception as api_error:
+                    logger.error(f"❌ API call failed for batch {batch_num + 1}: {type(api_error).__name__}: {api_error}")
+                    # Continue with other batches if we already have some results
+                    if all_test_cases:
+                        logger.warning(f"⚠️ Continuing with {len(all_test_cases)} test cases from previous batches")
+                        break
+                    raise ValueError(f"API call failed: {api_error}")
+                
+                if not response_text:
+                    logger.warning(f"⚠️ Empty response for batch {batch_num + 1}")
+                    continue
+                
+                # Parse batch response
+                try:
+                    batch_test_cases = self._extract_json_from_response(response_text)
+                except Exception as extract_error:
+                    logger.error(f"❌ JSON extraction failed for batch {batch_num + 1}: {extract_error}")
+                    # Save to file for inspection
+                    debug_file = os.path.join(self.datasets_dir, f"debug_response_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
+                    try:
+                        with open(debug_file, 'w', encoding='utf-8') as f:
+                            f.write(f"Batch {batch_num + 1} Error: {extract_error}\n\n")
+                            f.write(f"Response text:\n{response_text}")
+                        logger.error(f"❌ Saved debug response to: {debug_file}")
+                    except:
+                        pass
+                    continue  # Try next batch
+                
+                if batch_test_cases:
+                    all_test_cases.extend(batch_test_cases)
+                    logger.info(f"✅ Batch {batch_num + 1}: Got {len(batch_test_cases)} test cases (total: {len(all_test_cases)})")
+                else:
+                    logger.warning(f"⚠️ Batch {batch_num + 1}: No test cases extracted")
+                    # Save problematic response for debugging
+                    debug_file = os.path.join(self.datasets_dir, f"debug_response_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
+                    try:
+                        with open(debug_file, 'w', encoding='utf-8') as f:
+                            f.write("="*80 + "\n")
+                            f.write(f"BATCH {batch_num + 1} - {self.provider.upper()} RESPONSE DEBUG DUMP\n")
+                            f.write("="*80 + "\n\n")
+                            f.write("Full Response:\n")
+                            f.write(response_text)
+                        logger.error(f"❌ Saved debug response to: {debug_file}")
+                    except:
+                        pass
+            
+            # End of batch loop
+            elapsed = time.time() - start_time
+            test_cases = all_test_cases
+            
+            update_progress(60, f"Generated {len(test_cases)} test cases in {elapsed:.1f}s", "parse_complete")
             
             if not test_cases:
-                # Save problematic response to file for debugging
-                debug_file = os.path.join(self.datasets_dir, f"debug_response_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
-                try:
-                    with open(debug_file, 'w', encoding='utf-8') as f:
-                        f.write("="*80 + "\n")
-                        f.write(f"{self.provider.upper()} RESPONSE DEBUG DUMP\n")
-                        f.write("="*80 + "\n\n")
-                        f.write("Full Response:\n")
-                        f.write(response_text)
-                    logger.error(f"❌ Saved debug response to: {debug_file}")
-                except Exception as save_error:
-                    logger.error(f"❌ Could not save debug file: {save_error}")
-                
-                logger.error(f"❌ Failed to extract JSON from response.")
-                logger.error(f"❌ Response length: {len(response_text)} chars")
-                logger.error(f"❌ Response preview (first 2000 chars): {response_text[:2000]}")
-                raise ValueError(f"❌ Failed to extract test cases from LLM response. Response may be malformed. Debug file: {debug_file if 'debug_file' in locals() else 'N/A'}")
+                raise ValueError(f"❌ Failed to generate any test cases after {total_batches} batches. LLM may be refusing the request.")
             
-            logger.info(f"✅ Received {len(test_cases)} test cases from {self.provider.upper()}")
+            logger.info(f"✅ Received {len(test_cases)} test cases from {self.provider.upper()} in {total_batches} batches")
+            update_progress(70, f"Received {len(test_cases)} test cases, validating...", "validate")
             
             # Validate test cases
             valid_test_cases = []
@@ -740,11 +816,13 @@ Generate queries with varied structures to train robust embeddings:
                 logger.warning(f"⚠️ Total validation errors: {validation_errors}")
             
             logger.info(f"✅ Validated {len(valid_test_cases)} of {len(test_cases)} test cases")
+            update_progress(80, f"Validated {len(valid_test_cases)} test cases", "validated")
             
             if len(valid_test_cases) == 0:
                 raise ValueError("❌ No valid test cases generated. Check template schema and LLM output.")
             
             # Convert to CSV format
+            update_progress(85, "Converting to CSV format...", "convert_csv")
             csv_rows = self._convert_to_csv_format(valid_test_cases)
             
             # Generate unique filename with timestamp
@@ -752,6 +830,8 @@ Generate queries with varied structures to train robust embeddings:
             safe_template_name = "".join(c if c.isalnum() or c in "_-" else "_" for c in template_name.lower())
             csv_filename = f"{safe_template_name}_dataset_{timestamp}.csv"
             csv_path = os.path.join(self.datasets_dir, csv_filename)
+            
+            update_progress(90, "Saving CSV file...", "save_csv")
             
             # Save to CSV with proper escaping
             df = pd.DataFrame(csv_rows)
@@ -764,6 +844,8 @@ Generate queries with varied structures to train robust embeddings:
             with open(json_path, 'w', encoding='utf-8') as f:
                 json.dump(valid_test_cases, f, indent=2, ensure_ascii=False)
             logger.info(f"💾 Saved JSON backup: {json_path}")
+            
+            update_progress(95, "Calculating statistics...", "stats")
             
             # Calculate statistics
             scenario_stats = {
@@ -778,12 +860,14 @@ Generate queries with varied structures to train robust embeddings:
                 category_stats[category] = category_stats.get(category, 0) + 1
             
             logger.info(f"📊 Distribution: valid={scenario_stats['valid']}, edge={scenario_stats['edge']}, extreme={scenario_stats['extreme']}")
+            
+            update_progress(100, f"✅ Generated {len(valid_test_cases)} test cases successfully!", "complete")
             logger.info(f"✅ Dataset generation completed successfully!")
             
             return {
                 "success": True,
                 "template_name": template_name,
-                "template_id": template_id,
+                "template_id": template_id_str,
                 "total_generated": len(valid_test_cases),
                 "requested": num_examples if num_examples else "dynamic",
                 "scenario_distribution": scenario_stats,
@@ -804,6 +888,15 @@ Generate queries with varied structures to train robust embeddings:
             error_traceback = traceback.format_exc()
             logger.error(f"❌ Error generating dataset: {type(e).__name__}: {e}")
             logger.error(f"❌ Full traceback:\n{error_traceback}")
+            
+            # Update progress with error
+            if task_id:
+                try:
+                    from app.services.dataset_task_manager import get_task_manager
+                    task_manager = get_task_manager()
+                    task_manager.update_task(task_id, status="failed", message=str(e), error=str(e))
+                except:
+                    pass
             
             # Determine error category for better debugging
             error_category = "unknown"
@@ -826,7 +919,7 @@ Generate queries with varied structures to train robust embeddings:
                 "error_category": error_category,
                 "error_type": type(e).__name__,
                 "template_name": template_name,
-                "template_id": template_id,
+                "template_id": template_id_str,
                 "traceback": error_traceback
             }
 

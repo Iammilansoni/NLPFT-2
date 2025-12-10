@@ -290,10 +290,12 @@ async def generate_dataset(
             # Create task for tracking
             task_manager = get_task_manager()
             task_id = task_manager.create_task()
-            task_manager.update_task(task_id, status="running", message="Generating dataset with LLM...")
+            task_manager.update_task(task_id, status="running", message="Starting dataset generation...", progress=0)
             
             # ============== ENTERPRISE DATASET GENERATION ==============
             # Load full template data with all related information
+            task_manager.update_progress(task_id, 5, "Loading template data...", "load_template")
+            
             params_result = await db.execute(
                 select(Parameter).where(Parameter.t_id == dataset_request.template_id)
             )
@@ -336,17 +338,18 @@ async def generate_dataset(
             # Use enterprise generator
             enterprise_generator = get_enterprise_dataset_generator()
             
-            # Generate dataset with full template context
+            # Generate dataset with full template context (pass task_id for progress tracking)
             result = await enterprise_generator.generate_dataset_from_template(
                 template_data=template_data,
                 num_examples=dataset_request.num_examples,
                 user_prompt=dataset_request.user_prompt,
                 focus_areas=dataset_request.focus_areas,
-                scenario_distribution=dataset_request.scenario_distribution
+                scenario_distribution=dataset_request.scenario_distribution,
+                task_id=task_id
             )
             
             if not result.get("success"):
-                task_manager.update_task(task_id, status="failed", message=f"Dataset generation failed: {result.get('error')}")
+                task_manager.update_task(task_id, status="failed", message=f"Dataset generation failed: {result.get('error')}", progress=0)
                 raise HTTPException(
                     status_code=500,
                     detail=f"Dataset generation failed: {result.get('error')}"
@@ -472,14 +475,35 @@ def list_datasets():
 
 @router.get("/status/{task_id}")
 def get_task_status(task_id: str):
-    """Get status of a dataset generation/upload task"""
+    """
+    Get status of a dataset generation/upload task
+    
+    Returns progress information including:
+    - status: pending, running, completed, failed
+    - progress: 0-100 percentage
+    - message: current status message
+    - current_step: what's happening now
+    - steps: history of completed steps
+    """
     task_manager = get_task_manager()
     task = task_manager.get_task(task_id)
     
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     
-    return task
+    return {
+        "task_id": task.get("task_id"),
+        "status": task.get("status"),
+        "progress": task.get("progress", 0),
+        "message": task.get("message", ""),
+        "current_step": task.get("current_step", ""),
+        "steps": task.get("steps", []),
+        "created_at": task.get("created_at"),
+        "completed_at": task.get("completed_at"),
+        "statistics": task.get("statistics"),
+        "files": task.get("files"),
+        "error": task.get("error")
+    }
 
 
 # ============= DATASET EMBEDDING =============

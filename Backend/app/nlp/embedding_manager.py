@@ -3,6 +3,7 @@ Embedding Manager - Handle embeddings and Redis vector operations
 Uses Ollama for CPU-based embeddings (no HuggingFace dependency)
 """
 
+import os
 import hashlib
 import json
 from datetime import datetime
@@ -506,13 +507,27 @@ class EmbeddingManager:
         return deleted
 
 
-# Global instance
-_embedding_manager = None
+# Global instance cache (keyed by model name for dynamic model support)
+_embedding_managers: Dict[str, "EmbeddingManager"] = {}
 
 
-def get_embedding_manager() -> EmbeddingManager:
-    """Get or create global EmbeddingManager instance"""
-    global _embedding_manager
-    if _embedding_manager is None:
-        _embedding_manager = EmbeddingManager()
-    return _embedding_manager
+def get_embedding_manager(model_name: str = "nomic-embed-text") -> EmbeddingManager:
+    """
+    Get or create EmbeddingManager instance for a specific model.
+    
+    Supports dynamic model selection - different models have different dimensions
+    and require separate Redis indices.
+    
+    Args:
+        model_name: Ollama embedding model name (all-minilm, nomic-embed-text, mxbai-embed-large)
+    
+    Returns:
+        EmbeddingManager instance for the specified model
+    """
+    global _embedding_managers
+    
+    if model_name not in _embedding_managers:
+        logger.info(f"Creating EmbeddingManager for model: {model_name}")
+        _embedding_managers[model_name] = EmbeddingManager(model_name=model_name)
+    
+    return _embedding_managers[model_name]

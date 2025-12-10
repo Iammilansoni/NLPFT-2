@@ -1,0 +1,123 @@
+version: '3.8'
+
+# Development Setup: Infrastructure services only
+# Run frontend and backend locally for faster development
+# 
+# Usage:
+#   docker-compose -f docker-compose.dev.yml up -d
+#
+# Then run locally:
+#   Backend:  cd Backend && uvicorn app.main:app --reload --port 8000
+#   Frontend: cd Frontend && npm run dev
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: nlpforge-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=nlpforge
+      - POSTGRES_PASSWORD=nlpforge_secure_password
+      - POSTGRES_DB=nlpforge
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nlpforge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - nlpforge-network
+
+  # Redis with RedisInsight (includes RediSearch, RedisJSON, etc.)
+  redis:
+    image: redis/redis-stack:latest
+    container_name: nlpforge-redis
+    ports:
+      - "6379:6379"
+      - "8001:8001"  # RedisInsight UI
+    volumes:
+      - redis_data:/data
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024}
+      - REDIS_ARGS=--requirepass ${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024} --appendonly yes --appendfsync everysec
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - nlpforge-network
+
+  # Redis Commander - Web UI
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: nlpforge-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379:0:${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024}
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - nlpforge-network
+
+  # pgAdmin - PostgreSQL Web UI
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: nlpforge-pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@admin.com
+      - PGADMIN_DEFAULT_PASSWORD=admin123
+      - PGADMIN_CONFIG_SERVER_MODE=False
+      - PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED=False
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - nlpforge-network
+
+  # MinIO - S3-compatible object storage
+  minio:
+    image: minio/minio:latest
+    container_name: nlpforge-minio
+    ports:
+      - "9000:9000"  # API
+      - "9001:9001"  # Console
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - nlpforge-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  nlpforge-network:
+    driver: bridge

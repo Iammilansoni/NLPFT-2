@@ -90,7 +90,8 @@ def create_app() -> FastAPI:
     )
     
     # CORS configuration - MUST be added FIRST before other middleware
-    cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
+    # Include both localhost and 127.0.0.1 variants, plus IPv6 localhost
+    cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001,http://[::1]:3000").split(",")
     
     app.add_middleware(
         CORSMiddleware,

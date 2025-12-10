@@ -13,7 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.postgres import get_db
 from app.services.auth_service import get_auth_service, AuthService, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.models.schemas.auth_schemas import (
-    UserCreate, UserLogin, UserResponse, Token, ChangePasswordRequest
+    UserCreate, UserLogin, UserResponse, Token, ChangePasswordRequest,
+    ForgotPasswordRequest, ResetPasswordRequest
 )
 from app.models.schemas.common_schemas import MessageResponse
 from app.models.database_models import User
@@ -365,5 +366,230 @@ async def auth_health():
     return {
         "status": "healthy",
         "service": "authentication",
-        "features": ["registration", "login", "jwt_tokens", "user_profile"]
+        "features": ["registration", "login", "jwt_tokens", "user_profile", "password_reset"]
     }
+
+
+@router.post("/forgot-password", response_model=MessageResponse)
+async def forgot_password(
+    request: Request,
+    forgot_data: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """
+    Request a password reset link
+    
+    ⏱️ RATE LIMIT: 3 requests per hour per email
+    
+    - **email**: Email address of the account
+    
+    If the email exists, a password reset link will be sent.
+    For security, we always return success even if the email doesn't exist.
+    """
+    import secrets
+    from datetime import datetime, timedelta
+    from app.services.email_service import get_email_service
+    from app.models.password_reset_models import PasswordReset
+    from sqlalchemy import select, and_
+    
+    # Check if user exists (but don't reveal this to the client)
+    user = await auth_service.get_user_by_email(db, forgot_data.email)
+    
+    if user:
+        # Rate limiting: Check if user has requested too many resets in the past hour
+        one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+        result = await db.execute(
+            select(PasswordReset).where(
+                and_(
+                    PasswordReset.email == forgot_data.email,
+                    PasswordReset.created_at >= one_hour_ago
+                )
+            )
+        )
+        recent_requests = result.scalars().all()
+        
+        if len(recent_requests) >= 3:
+            logger.warning(f"⚠️ Too many password reset requests for {forgot_data.email}")
+            # Still return success to not reveal rate limiting
+            return MessageResponse(
+                message="If an account with that email exists, a password reset link has been sent."
+            )
+        
+        # Generate secure token
+        reset_token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(hours=1)
+        
+        # Get client IP
+        client_ip = request.client.host if request.client else None
+        
+        # Store reset token
+        password_reset = PasswordReset(
+            email=forgot_data.email,
+            token=reset_token,
+            expires_at=expires_at,
+            ip_address=client_ip
+        )
+        
+        try:
+            db.add(password_reset)
+            await db.commit()
+        except Exception as e:
+            logger.error(f"❌ Failed to store password reset token: {e}")
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to process password reset request"
+            )
+        
+        # Build reset URL (frontend URL)
+        frontend_url = request.headers.get("Origin", "http://localhost:3000")
+        reset_url = f"{frontend_url}/auth/reset-password?token={reset_token}"
+        
+        # Send email
+        email_service = get_email_service()
+        username = user.user_name or user.email.split('@')[0]
+        
+        try:
+            email_service.send_password_reset_email(
+                to_email=forgot_data.email,
+                reset_token=reset_token,
+                reset_url=reset_url,
+                username=username
+            )
+        except Exception as e:
+            logger.error(f"❌ Failed to send password reset email: {e}")
+            # Don't fail the request, user can try again
+        
+        logger.info(f"📧 Password reset requested for: {forgot_data.email}")
+    else:
+        # User doesn't exist, but don't reveal this
+        logger.info(f"📧 Password reset requested for non-existent email: {forgot_data.email}")
+    
+    # Always return the same message for security
+    return MessageResponse(
+        message="If an account with that email exists, a password reset link has been sent."
+    )
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+async def reset_password(
+    request: Request,
+    reset_data: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """
+    Reset password using token from email
+    
+    - **token**: Reset token from the email link
+    - **new_password**: New password (min 8 characters, must contain uppercase, lowercase, and digit)
+    - **confirm_password**: Must match new password
+    """
+    from datetime import datetime
+    from app.models.password_reset_models import PasswordReset
+    from sqlalchemy import select, update, and_
+    
+    # Find the reset token
+    result = await db.execute(
+        select(PasswordReset).where(
+            and_(
+                PasswordReset.token == reset_data.token,
+                PasswordReset.is_used == False
+            )
+        )
+    )
+    reset_record = result.scalar_one_or_none()
+    
+    if not reset_record:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+    
+    # Check if token is expired
+    if reset_record.expires_at < datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reset token has expired. Please request a new one."
+        )
+    
+    # Get the user
+    user = await auth_service.get_user_by_email(db, reset_record.email)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User not found"
+        )
+    
+    # Validate password strength
+    password = reset_data.new_password
+    if not any(c.isupper() for c in password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain at least one uppercase letter"
+        )
+    if not any(c.islower() for c in password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain at least one lowercase letter"
+        )
+    if not any(c.isdigit() for c in password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain at least one digit"
+        )
+    
+    # Hash new password and update user
+    new_password_hash = auth_service.hash_password(reset_data.new_password)
+    
+    await db.execute(
+        update(User).where(User.u_id == user.u_id).values(password=new_password_hash)
+    )
+    
+    # Mark token as used
+    await db.execute(
+        update(PasswordReset).where(PasswordReset.id == reset_record.id).values(is_used=True)
+    )
+    
+    await db.commit()
+    
+    logger.info(f"✅ Password reset successful for: {reset_record.email}")
+    
+    return MessageResponse(message="Password has been reset successfully. You can now log in with your new password.")
+
+
+@router.get("/verify-reset-token")
+async def verify_reset_token(
+    token: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Verify if a password reset token is valid
+    
+    - **token**: Reset token to verify
+    
+    Returns token validity status
+    """
+    from datetime import datetime
+    from app.models.password_reset_models import PasswordReset
+    from sqlalchemy import select, and_
+    
+    result = await db.execute(
+        select(PasswordReset).where(
+            and_(
+                PasswordReset.token == token,
+                PasswordReset.is_used == False
+            )
+        )
+    )
+    reset_record = result.scalar_one_or_none()
+    
+    if not reset_record:
+        return {"valid": False, "message": "Invalid reset token"}
+    
+    if reset_record.expires_at < datetime.utcnow():
+        return {"valid": False, "message": "Reset token has expired"}
+    
+    return {"valid": True, "email": reset_record.email}
+

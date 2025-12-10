@@ -27,7 +27,6 @@ import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { useQueryStats } from '@/hooks/useQuery'
 import { useTemplateStats } from '@/hooks/useTemplates'
-import { useRecentRuns } from '@/hooks/useRuns'
 import { apiClient } from '@/lib/api'
 import { EMBEDDING_MODELS, DEFAULT_EMBEDDING_MODEL, getEmbeddingModelInfo } from '@/lib/constants/embedding-models'
 import { GlassCard } from '@/components/ui/GlassCard'
@@ -90,7 +89,6 @@ export default function DashboardPage() {
   // Use our custom hooks for backend data
   const { data: stats, isLoading, error } = useQueryStats()
   const { data: templateStats, isLoading: templatesLoading, error: templatesError } = useTemplateStats()
-  const { data: recentRunsData, isLoading: runsLoading, error: runsError } = useRecentRuns(10)
 
   // Calculate detailed health status with safe defaults
   const backendHealthy = !error && !!stats
@@ -98,7 +96,7 @@ export default function DashboardPage() {
   const templatesHealthy = !templatesError && !!templateStats
 
   const allHealthy = backendHealthy && databaseHealthy && templatesHealthy
-  const isLoading_ = isLoading || templatesLoading || runsLoading
+  const isLoading_ = isLoading || templatesLoading
 
   const quickActions = [
     { label: 'Test Login', icon: <Terminal className="w-4 h-4" />, query: 'Test login with credentials' },
