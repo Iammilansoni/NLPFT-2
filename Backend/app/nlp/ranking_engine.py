@@ -121,8 +121,8 @@ def stage1_vector_retrieval(user_query: str, top_k: int = DEFAULT_TOP_K) -> List
     candidates = []
     for rank, doc in enumerate(results.docs, start=1):
         try:
-            vector_distance = float(doc.vector_score)
-            vector_similarity = 1.0 - vector_distance  # Convert distance to similarity
+            vector_distance = _safe_float(doc.vector_score, 1.0)
+            vector_similarity = _safe_float(1.0 - vector_distance, 0.0)  # Convert distance to similarity
             
             # Extract the text content for reranking (using query field as the primary text)
             text_content = getattr(doc, "query", "")
@@ -232,14 +232,14 @@ def stage2_flashrank_rerank(
             
             final_result = {
                 "rank": new_rank,
-                "score": float(result.get("score", 0.0)),  # FlashRank score
+                "score": _safe_float(result.get("score", 0.0)),  # FlashRank score (sanitized)
                 "text": result.get("text", "").strip(),
                 "query": original_candidate.get("query", ""),
                 "api": original_candidate.get("api", ""),
                 "endpoint": original_candidate.get("endpoint", ""),
                 "request": original_candidate.get("request", {}),
                 "response": original_candidate.get("response", {}),
-                "vector_score": original_candidate.get("vector_score", 0.0),
+                "vector_score": _safe_float(original_candidate.get("vector_score", 0.0)),
             }
             final_results.append(final_result)
         
@@ -352,7 +352,7 @@ def rank_query_detailed(
         "stage1_results": [
             {
                 "rank": c["rank"],
-                "vector_score": c["vector_score"],
+                "vector_score": _safe_float(c["vector_score"]),
                 "text": c["text"],
                 "api": c["api"],
                 "endpoint": c["endpoint"]
@@ -368,6 +368,24 @@ def rank_query_detailed(
 # ===============================================================
 # UTILITY FUNCTIONS
 # ===============================================================
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    """
+    Safely convert a value to a JSON-compliant float.
+    
+    Handles NaN, Inf, -Inf, and invalid values by returning the default.
+    This prevents JSON serialization errors.
+    """
+    import math
+    try:
+        f = float(value)
+        # Check for NaN and Infinity which are not JSON compliant
+        if math.isnan(f) or math.isinf(f):
+            return default
+        return f
+    except (TypeError, ValueError):
+        return default
+
+
 def _safe_json_parse(value: str) -> Dict[str, Any]:
     """Safely parse JSON string, returning empty dict on failure"""
     if not value:
