@@ -734,12 +734,12 @@ export default function DatasetGeneratorPage() {
                     />
                     <StatCard
                       label="NL Variations"
-                      value={currentTask.statistics.total_nl_variations}
+                      value={currentTask.statistics.total_nl_variations ?? 0}
                       gradient="from-purple-500 to-pink-500"
                     />
                     <StatCard
                       label="Avg per API"
-                      value={currentTask.statistics.avg_variations_per_api.toFixed(1)}
+                      value={currentTask.statistics.avg_variations_per_api?.toFixed(1) ?? '0'}
                       gradient="from-emerald-500 to-green-500"
                     />
                   </div>

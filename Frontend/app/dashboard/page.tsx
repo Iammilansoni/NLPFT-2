@@ -71,10 +71,15 @@ const itemVariants = {
 export default function DashboardPage() {
   const router = useRouter()
   const [query, setQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<any[] | null>(null)
+  const [searchResults, setSearchResults] = useState<{
+    query: string;
+    ranked_results: Array<{ rank: number; score: number; text: string }>;
+    stage1_results?: any[];
+  } | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [embeddingModel, setEmbeddingModel] = useState(DEFAULT_EMBEDDING_MODEL)
+  const [showStage1, setShowStage1] = useState(false)
   
   // Model mismatch dialog state
   const [showMismatchDialog, setShowMismatchDialog] = useState(false)
@@ -156,11 +161,10 @@ export default function DashboardPage() {
     setSearchResults(null)
     
     try {
-      const results = await apiClient.searchSimilarTestCases(
+      // Use 2-stage ranking API: Stage 1 (KNN Vector Search) + Stage 2 (FlashRank Reranking)
+      const results = await apiClient.rankQueryDetailed(
         query.trim(),
-        5, // top_k
-        embeddingModel, // embedding model
-        0.7 // min_similarity threshold
+        10 // top_k for Stage 1 retrieval
       )
       
       // Check for MODEL_MISMATCH error in response
@@ -172,11 +176,16 @@ export default function DashboardPage() {
           datasetName: results.dataset_name,
         })
         setShowMismatchDialog(true)
-        setSearchError('Model mismatch detected')
+        setSearchError('Embedding model mismatch detected')
         return
       }
       
       setSearchResults(results)
+      
+      toast({
+        title: "Search Complete",
+        description: `Found ${results.ranked_results?.length || 0} results using 2-stage ranking`,
+      })
     } catch (err: any) {
       console.error('Search failed:', err)
       
@@ -184,17 +193,34 @@ export default function DashboardPage() {
       if (err?.error === 'MODEL_MISMATCH' || err?.detail?.error === 'MODEL_MISMATCH') {
         const errorData = err.detail || err
         setMismatchInfo({
-          datasetModel: errorData.embedded_with_model,
-          settingsModel: errorData.current_model,
+          datasetModel: errorData.embedded_with_model || errorData.dataset_model,
+          settingsModel: errorData.current_model || errorData.search_model,
           datasetId: errorData.dataset_id,
           datasetName: errorData.dataset_name,
         })
         setShowMismatchDialog(true)
-        setSearchError('Model mismatch detected')
+        setSearchError('Embedding model mismatch detected')
         return
       }
       
-      setSearchError(err.detail?.message || err.message || 'Failed to perform search')
+      // Check for dimension mismatch errors
+      if (err?.message?.includes('dimension') || err?.detail?.includes('dimension')) {
+        setSearchError('Vector dimension mismatch. The embedding model may have changed. Please re-embed your dataset.')
+        toast({
+          title: "Dimension Mismatch",
+          description: "The search failed due to vector dimension mismatch. Re-embedding may be required.",
+          variant: "destructive",
+        })
+        return
+      }
+      
+      setSearchError(err.detail?.message || err.detail || err.message || 'Failed to perform search')
+      
+      toast({
+        title: "Search Failed",
+        description: err.detail?.message || err.detail || err.message || 'Failed to perform search',
+        variant: "destructive",
+      })
     } finally {
       setIsSearching(false)
     }
@@ -370,6 +396,142 @@ export default function DashboardPage() {
               ))}
             </motion.div>
           </motion.div>
+
+          {/* Search Results Section */}
+          {searchResults && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-4"
+            >
+              <GlassCard className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <Search className="w-5 h-5 text-primary" />
+                      Search Results
+                      <span className="text-sm font-normal text-muted-foreground ml-2">
+                        (2-Stage: KNN + FlashRank Reranking)
+                      </span>
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Query: "{searchResults.query}"
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowStage1(!showStage1)}
+                      className="text-xs"
+                    >
+                      {showStage1 ? 'Hide Stage 1' : 'Show Stage 1'}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSearchResults(null)}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Stage 1 Results (KNN Vector Search) */}
+                {showStage1 && searchResults.stage1_results && (
+                  <div className="mb-6 p-4 bg-muted/30 rounded-lg border border-dashed">
+                    <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                      <Brain className="w-4 h-4" />
+                      Stage 1: KNN Vector Search (Cosine Similarity)
+                    </h4>
+                    <div className="space-y-2">
+                      {searchResults.stage1_results.slice(0, 5).map((result: any, idx: number) => (
+                        <div key={idx} className="flex items-center justify-between text-sm p-2 bg-background/50 rounded">
+                          <span className="truncate max-w-[60%]">{result.query || result.text}</span>
+                          <span className="text-xs font-mono bg-blue-500/10 text-blue-600 px-2 py-0.5 rounded">
+                            {((result.vector_score ?? result.cosine_similarity ?? 0) * 100).toFixed(1)}% similarity
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Stage 2 Results (FlashRank Reranked) */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
+                    <Zap className="w-4 h-4" />
+                    Stage 2: FlashRank Reranked Results
+                  </h4>
+                  {searchResults.ranked_results?.length > 0 ? (
+                    searchResults.ranked_results.map((result, idx) => (
+                      <motion.div
+                        key={idx}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className="p-4 bg-muted/20 hover:bg-muted/40 rounded-xl border border-transparent hover:border-primary/20 transition-all group"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">
+                                {result.rank}
+                              </span>
+                              {result.api && (
+                                <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 text-xs font-medium rounded">
+                                  {result.api}
+                                </span>
+                              )}
+                              {result.endpoint && (
+                                <span className="text-xs text-muted-foreground font-mono truncate max-w-[200px]">
+                                  {result.endpoint}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm font-medium mb-1 line-clamp-2">
+                              {result.text}
+                            </p>
+                            {result.original_similarity !== undefined && (
+                              <p className="text-xs text-muted-foreground">
+                                Original similarity: {(result.original_similarity * 100).toFixed(1)}%
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="text-lg font-bold text-primary">
+                              {(result.score * 100).toFixed(1)}%
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              FlashRank Score
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No results found for your query
+                    </div>
+                  )}
+                </div>
+              </GlassCard>
+            </motion.div>
+          )}
+
+          {/* Search Error */}
+          {searchError && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg"
+            >
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="w-4 h-4" />
+                <span className="text-sm font-medium">{searchError}</span>
+              </div>
+            </motion.div>
+          )}
 
           {/* Metrics Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

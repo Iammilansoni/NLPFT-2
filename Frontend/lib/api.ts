@@ -148,6 +148,80 @@ class ApiClient {
   }
 
   // ============================================================================
+  // Two-Stage Ranking API (KNN Search + FlashRank Reranking)
+  // ============================================================================
+
+  /**
+   * Two-Stage AI Ranking Engine
+   * 
+   * Stage 1: Vector Retrieval (Top-K) from Redis Vector DB using KNN search
+   * Stage 2: FlashRank Reranking with ms-marco-MiniLM-L-12-v2 cross-encoder
+   * 
+   * @param query - Search query text
+   * @param topK - Number of candidates to retrieve (default: 5)
+   * @returns Ranked results with FlashRank scores
+   */
+  async rankQuery(query: string, topK: number = 5): Promise<{
+    query: string;
+    ranked_results: Array<{
+      rank: number;
+      score: number;
+      text: string;
+    }>;
+  }> {
+    return this.request(`/api/v1/ranking/rank?query=${encodeURIComponent(query)}&top_k=${topK}`);
+  }
+
+  /**
+   * Detailed Two-Stage AI Ranking with full metadata
+   * 
+   * Returns both Stage 1 and Stage 2 results with complete information including:
+   * - Stage 1 vector retrieval results with similarity scores
+   * - Stage 2 reranked results with full metadata (API, endpoint, request/response)
+   * 
+   * @param query - Search query text
+   * @param topK - Number of candidates to retrieve (default: 5)
+   */
+  async rankQueryDetailed(query: string, topK: number = 5): Promise<{
+    query: string;
+    stage1_results: Array<{
+      api: string;
+      query: string;
+      endpoint: string;
+      request: any;
+      response: any;
+      cosine_similarity: number;
+    }>;
+    ranked_results: Array<{
+      rank: number;
+      score: number;
+      text: string;
+      api: string;
+      endpoint: string;
+      request: any;
+      response: any;
+      original_similarity: number;
+    }>;
+  }> {
+    return this.request('/api/v1/ranking/rank/detailed', {
+      method: 'POST',
+      body: JSON.stringify({ query, top_k: topK }),
+    });
+  }
+
+  /**
+   * Get reranker model information
+   */
+  async getRerankerInfo(): Promise<{
+    model_name: string;
+    model_type: string;
+    framework: string;
+    loaded: boolean;
+  }> {
+    return this.request('/api/v1/ranking/rank/info');
+  }
+
+  // ============================================================================
   // Template API
   // ============================================================================
 
