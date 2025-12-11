@@ -185,10 +185,14 @@ def process_upload_task(task_id: str, file_path: str, clear_existing: bool = Fal
 @router.post("/upload")
 async def upload_dataset(
     file: UploadFile = File(...),
-    background_tasks: BackgroundTasks = BackgroundTasks()
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Upload CSV dataset and start background ingestion to Redis
+    
+    🔒 User Isolation: Task is associated with the authenticated user.
+    
     Returns task_id for tracking progress
     """
     if not file.filename.lower().endswith(".csv"):
@@ -200,7 +204,8 @@ async def upload_dataset(
         raise HTTPException(status_code=400, detail="File too large (max 50MB)")
     
     task_manager = get_task_manager()
-    task_id = task_manager.create_task()
+    # 🔒 Associate task with current user
+    task_id = task_manager.create_task(user_id=current_user.u_id)
     
     save_path = os.path.join(DATASETS_DIR, file.filename)
     with open(save_path, "wb") as f:
@@ -289,7 +294,8 @@ async def generate_dataset(
             
             # Create task for tracking
             task_manager = get_task_manager()
-            task_id = task_manager.create_task()
+            # 🔒 Associate task with current user
+            task_id = task_manager.create_task(user_id=current_user.u_id)
             task_manager.update_task(task_id, status="running", message="Starting dataset generation...", progress=0)
             
             # ============== ENTERPRISE DATASET GENERATION ==============
@@ -457,8 +463,12 @@ async def generate_dataset(
 
 @router.get("/")
 @router.get("/list")
-def list_datasets():
-    """List all dataset generation tasks
+async def list_datasets(
+    current_user: User = Depends(get_current_user)
+):
+    """List dataset generation tasks for the current user
+    
+    🔒 User Isolation: Only returns tasks belonging to the authenticated user.
     
     Available at both:
     - GET /api/v1/datasets/
@@ -466,7 +476,8 @@ def list_datasets():
     """
     try:
         task_manager = get_task_manager()
-        tasks = task_manager.list_tasks()
+        # 🔒 Filter tasks by current user's ID
+        tasks = task_manager.list_tasks(user_id=current_user.u_id)
         return {"datasets": tasks}
     except Exception as e:
         logger.error(f"Error listing datasets: {e}", exc_info=True)
@@ -474,9 +485,14 @@ def list_datasets():
 
 
 @router.get("/status/{task_id}")
-def get_task_status(task_id: str):
+async def get_task_status(
+    task_id: str,
+    current_user: User = Depends(get_current_user)
+):
     """
     Get status of a dataset generation/upload task
+    
+    🔒 User Isolation: Only returns task if it belongs to the authenticated user.
     
     Returns progress information including:
     - status: pending, running, completed, failed
@@ -486,7 +502,8 @@ def get_task_status(task_id: str):
     - steps: history of completed steps
     """
     task_manager = get_task_manager()
-    task = task_manager.get_task(task_id)
+    # 🔒 Pass user_id for access control
+    task = task_manager.get_task(task_id, user_id=current_user.u_id)
     
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
