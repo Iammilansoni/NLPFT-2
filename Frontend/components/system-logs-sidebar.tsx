@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Play, Pause, Trash2, Activity, Terminal } from 'lucide-react'
+import { X, Play, Pause, Trash2, Activity, Terminal, Server } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -15,12 +15,12 @@ export function SystemLogsSidebar() {
   const { logs, isConnected, isPaused, clearLogs, togglePause } = useSystemLogs()
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom (since newest are at top, we scroll to top)
   useEffect(() => {
     if (scrollRef.current && !isPaused) {
       const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
       if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        scrollContainer.scrollTop = 0; // Scroll to top since newest logs are first
       }
     }
   }, [logs, isPaused])
@@ -39,6 +39,9 @@ export function SystemLogsSidebar() {
           >
             <Terminal className="h-5 w-5 text-muted-foreground" />
             <span className="text-xs font-medium vertical-rl writing-mode-vertical">Logs</span>
+            {isConnected && (
+              <span className="absolute -top-1 -left-1 h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+            )}
           </motion.button>
         )}
       </AnimatePresence>
@@ -47,7 +50,7 @@ export function SystemLogsSidebar() {
       <motion.div
         initial={false}
         animate={{
-          width: isSystemLogsOpen ? 400 : 0,
+          width: isSystemLogsOpen ? 420 : 0,
           opacity: isSystemLogsOpen ? 1 : 0,
         }}
         transition={{ duration: 0.3, ease: 'easeInOut' }}
@@ -64,6 +67,7 @@ export function SystemLogsSidebar() {
             <Badge variant={isConnected ? "default" : "destructive"} className="h-5 text-[10px] px-1.5">
               {isConnected ? 'LIVE' : 'OFFLINE'}
             </Badge>
+            <span className="text-xs text-muted-foreground">({logs.length})</span>
           </div>
           <div className="flex items-center gap-1">
             <Button
@@ -100,17 +104,32 @@ export function SystemLogsSidebar() {
           <div className="space-y-2 font-mono text-xs">
             {logs.length === 0 && (
               <div className="text-center text-muted-foreground py-10">
-                No logs to display...
+                <Terminal className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>No logs to display...</p>
+                <p className="text-[10px] mt-1">Logs will appear as you interact with the system</p>
               </div>
             )}
             {logs.map((log, i) => (
-              <div key={i} className="flex gap-2 items-start p-2 rounded hover:bg-muted/50 transition-colors group">
-                <span className="text-muted-foreground shrink-0 w-16 text-[10px]">
-                  {new Date(log.timestamp).toLocaleTimeString()}
-                </span>
+              <div 
+                key={`${log.timestamp}-${i}`} 
+                className={cn(
+                  "flex gap-2 items-start p-2 rounded transition-colors group",
+                  log.is_system 
+                    ? "bg-muted/30 hover:bg-muted/50 border-l-2 border-primary/30" 
+                    : "hover:bg-muted/50"
+                )}
+              >
+                <div className="flex flex-col items-center gap-1 shrink-0">
+                  <span className="text-muted-foreground w-14 text-[10px]">
+                    {new Date(log.timestamp).toLocaleTimeString()}
+                  </span>
+                  {log.is_system && (
+                    <Server className="h-3 w-3 text-primary/60" title="System log" />
+                  )}
+                </div>
                 <div className="flex-1 break-all">
                   <span className={cn(
-                    "font-bold mr-2",
+                    "font-bold mr-2 text-[10px]",
                     log.level === 'INFO' && "text-blue-500",
                     log.level === 'WARNING' && "text-yellow-500",
                     log.level === 'ERROR' && "text-red-500",
@@ -122,7 +141,7 @@ export function SystemLogsSidebar() {
                   <span className="text-foreground/90">{log.message}</span>
                   {log.logger && (
                     <span className="ml-2 text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                      {log.logger}
+                      {log.logger}:{log.line}
                     </span>
                   )}
                 </div>
@@ -130,6 +149,16 @@ export function SystemLogsSidebar() {
             ))}
           </div>
         </ScrollArea>
+        
+        {/* Footer with connection info */}
+        <div className="border-t border-border/50 p-2 text-[10px] text-muted-foreground flex items-center justify-between">
+          <span>
+            {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
+          </span>
+          <span>
+            {isPaused ? '⏸️ Paused' : '▶️ Live'}
+          </span>
+        </div>
       </motion.div>
     </>
   )
