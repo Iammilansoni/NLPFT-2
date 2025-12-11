@@ -27,31 +27,24 @@ def ingest_csv_to_redis(csv_path: str, clear_existing: bool = False) -> Dict:
     try:
         logger.info(f"Starting ingestion from {csv_path}")
         
-        # Clear existing embeddings if requested
         if clear_existing:
             logger.warning("Clearing all existing embeddings as requested")
             embedder = get_embedding_manager()
             embedder.clear_all_embeddings()
-        
-        # Read CSV
         df = pd.read_csv(csv_path)
-        df = df.dropna(subset=['query'])  # Remove rows with missing queries
+        df = df.dropna(subset=['query'])  
         
-        # Validate required columns (old format: query,api,endpoint,request,response)
         required_cols = ['query', 'api']
         missing_cols = [col for col in required_cols if col not in df.columns]
         if missing_cols:
             raise ValueError(f"Missing required columns: {missing_cols}. Expected format: query,api,endpoint,request,response")
         
-        # Get embedding manager
         embedder = get_embedding_manager()
         
-        # Prepare data (using old format: query,api,endpoint,request,response)
         queries = df['query'].astype(str).tolist()
-        intents = df['api'].astype(str).tolist()  # 'api' column contains the intent
-        api_names = intents  # Use api column value
-        
-        # Parse slots from 'request' column
+        intents = df['api'].astype(str).tolist()  
+        api_names = intents 
+       
         slots_list = []
         for idx, row in df.iterrows():
             slots = {}
@@ -71,15 +64,12 @@ def ingest_csv_to_redis(csv_path: str, clear_existing: bool = False) -> Dict:
         else:
             endpoints = [f"<base_url>/api/{intent}" for intent in intents]
         
-        # Get response field if available (for old format compatibility)
         responses = []
         if 'response' in df.columns:
             responses = df['response'].tolist()
         else:
-            # Generate default response if not present
             responses = [json.dumps({"definition": f"API endpoint for {intent}"}) for intent in intents]
         
-        # Batch upsert to Redis (deduplication happens automatically via hash)
         logger.info(f"Upserting {len(queries)} entries to Redis (existing embeddings will be preserved)...")
         upsert_result = embedder.upsert_batch(
             queries=queries,
