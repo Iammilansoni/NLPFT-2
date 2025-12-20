@@ -19,13 +19,12 @@
 #   - RedisInsight:   http://localhost:8001
 #   - Redis Commander: http://localhost:8081
 #   - pgAdmin:        http://localhost:5050
-#   - MinIO Console:  http://localhost:9001
 #
 # =============================================================================
 
 services:
   # ---------------------------------------------------------------------------
-  # PostgreSQL Database - Primary data storage for users, templates, etc.
+  # PostgreSQL Database - Primary data storage
   # ---------------------------------------------------------------------------
   postgres:
     image: postgres:15-alpine
@@ -56,7 +55,7 @@ services:
         max-file: "3"
 
   # ---------------------------------------------------------------------------
-  # Redis Stack - Vector database with RediSearch for semantic search
+  # Redis Stack - Vector database with RediSearch
   # ---------------------------------------------------------------------------
   redis:
     image: redis/redis-stack:latest
@@ -70,7 +69,7 @@ services:
         --requirepass ${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024}
         --appendonly yes
         --appendfsync everysec
-        --maxmemory 512mb
+        --maxmemory 1gb
         --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
@@ -143,38 +142,12 @@ services:
         max-file: "2"
 
   # ---------------------------------------------------------------------------
-  # MinIO - S3-compatible Object Storage for datasets and files
-  # ---------------------------------------------------------------------------
-  minio:
-    image: minio/minio:latest
-    container_name: nlpforge-minio
-    hostname: minio
-    ports:
-      - "9000:9000"     # S3 API
-      - "9001:9001"     # Web Console
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
-    command: server /data --console-address ":9001"
-    volumes:
-      - minio_data:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-      start_period: 30s
-    restart: unless-stopped
-    networks:
-      - nlpforge-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ---------------------------------------------------------------------------
   # Ollama - Local LLM and Embedding Model Server
+  # ---------------------------------------------------------------------------
+  # Supported Embedding Models (3 models):
+  # - nomic-embed-text (768D) - Default, balanced
+  # - all-minilm (384D) - Fast, lightweight
+  # - mxbai-embed-large (1024D) - High accuracy
   # ---------------------------------------------------------------------------
   ollama:
     image: ollama/ollama:latest
@@ -211,6 +184,34 @@ services:
         max-file: "3"
 
   # ---------------------------------------------------------------------------
+  # Ollama Init - Automatically pull required models on startup
+  # ---------------------------------------------------------------------------
+  ollama-init:
+    image: curlimages/curl:latest
+    container_name: nlpforge-ollama-init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "🚀 Pulling required Ollama models..."
+        echo "📦 [1/4] Pulling nomic-embed-text (768D embedding - default)..."
+        curl -X POST http://ollama:11434/api/pull -d '{"name": "nomic-embed-text", "stream": false}' -H 'Content-Type: application/json' --max-time 600 || echo "⚠️ nomic-embed-text pull failed"
+        echo "📦 [2/4] Pulling all-minilm (384D embedding - fast)..."
+        curl -X POST http://ollama:11434/api/pull -d '{"name": "all-minilm", "stream": false}' -H 'Content-Type: application/json' --max-time 600 || echo "⚠️ all-minilm pull failed"
+        echo "📦 [3/4] Pulling mxbai-embed-large (1024D embedding - high accuracy)..."
+        curl -X POST http://ollama:11434/api/pull -d '{"name": "mxbai-embed-large", "stream": false}' -H 'Content-Type: application/json' --max-time 600 || echo "⚠️ mxbai-embed-large pull failed"
+        echo "📦 [4/4] Pulling llama3.1:8b-instruct-q4_K_M (dataset generation LLM)..."
+        curl -X POST http://ollama:11434/api/pull -d '{"name": "llama3.1:8b-instruct-q4_K_M", "stream": false}' -H 'Content-Type: application/json' --max-time 900 || echo "⚠️ llama3.1 pull failed"
+        echo "✅ Model initialization complete!"
+        echo "📋 Available models:"
+        curl -s http://ollama:11434/api/tags | grep -o '"name":"[^"]*"' || echo "Could not list models"
+    networks:
+      - nlpforge-network
+    restart: "no"
+
+  # ---------------------------------------------------------------------------
   # Backend - FastAPI Application Server
   # ---------------------------------------------------------------------------
   backend:
@@ -237,16 +238,9 @@ services:
       REDIS_PORT: "6379"
       REDIS_PASSWORD: ${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024}
 
-      # Ollama Configuration (for embeddings)
+      # Ollama Configuration
       OLLAMA_HOST: http://ollama:11434
       OLLAMA_BASE_URL: http://ollama:11434
-
-      # MinIO Configuration
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
-      MINIO_BUCKET: ${MINIO_BUCKET:-nlpforge}
-      MINIO_SECURE: "false"
 
       # Application Configuration
       ENVIRONMENT: ${ENVIRONMENT:-production}
@@ -338,9 +332,6 @@ volumes:
   pgadmin_data:
     driver: local
     name: nlpforge-pgadmin-data
-  minio_data:
-    driver: local
-    name: nlpforge-minio-data
   ollama_data:
     driver: local
     name: nlpforge-ollama-data
