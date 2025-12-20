@@ -4,13 +4,13 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { GlowButton } from '@/components/ui/glow-button'
-import { 
-  Terminal, 
-  Sparkles, 
-  Zap, 
-  CheckCircle2, 
-  Code2, 
+import { Button } from '@/components/ui/button'
+import {
+  MessageSquareText,
+  Target,
+  Zap,
+  CheckCircle2,
+  Code2,
   Database,
   ArrowRight,
   Play,
@@ -23,7 +23,7 @@ const demoSteps = [
   {
     id: 'input',
     title: 'Natural Language Input',
-    icon: Terminal,
+    icon: MessageSquareText,
     color: 'from-blue-500 to-cyan-500',
     content: {
       type: 'terminal',
@@ -33,8 +33,8 @@ const demoSteps = [
   {
     id: 'analysis',
     title: 'AI Analysis',
-    icon: Sparkles,
-    color: 'from-purple-500 to-pink-500',
+    icon: Target,
+    color: 'from-blue-500 to-sky-500',
     content: {
       type: 'analysis',
       items: [
@@ -143,28 +143,26 @@ export function InteractiveShowcase() {
                 const StepIcon = step.icon
                 const isActive = activeStep === index
                 const isCompleted = activeStep > index
-                
+
                 return (
                   <motion.button
                     key={step.id}
                     onClick={() => setActiveStep(index)}
-                    className={`flex items-center gap-3 px-4 md:px-6 py-3 rounded-xl border-2 transition-all ${
-                      isActive 
-                        ? 'border-primary bg-primary/10 shadow-glow' 
-                        : isCompleted
+                    className={`flex items-center gap-3 px-4 md:px-6 py-3 rounded-xl border-2 transition-all ${isActive
+                      ? 'border-primary bg-primary/10 shadow-glow'
+                      : isCompleted
                         ? 'border-success/50 bg-success/5'
                         : 'border-border hover:border-primary/50'
-                    }`}
+                      }`}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
-                      isActive 
-                        ? `bg-gradient-to-br ${step.color} text-white shadow-lg` 
-                        : isCompleted
+                    <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${isActive
+                      ? `bg-gradient-to-br ${step.color} text-white shadow-lg`
+                      : isCompleted
                         ? 'bg-success/20 text-success'
                         : 'bg-muted text-muted-foreground'
-                    }`}>
+                      }`}>
                       {isCompleted ? (
                         <CheckCircle2 className="h-5 w-5" />
                       ) : (
@@ -196,7 +194,7 @@ export function InteractiveShowcase() {
                     <div className="space-y-4">
                       <div className="flex items-center gap-3 mb-6">
                         <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white shadow-lg">
-                          <Terminal className="h-6 w-6" />
+                          <MessageSquareText className="h-6 w-6" />
                         </div>
                         <div>
                           <h3 className="text-xl font-bold">Natural Language Input</h3>
@@ -240,8 +238,8 @@ export function InteractiveShowcase() {
                   {demoSteps[activeStep].content.type === 'analysis' && (
                     <div className="space-y-6">
                       <div className="flex items-center gap-3 mb-6">
-                        <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white shadow-lg">
-                          <Sparkles className="h-6 w-6" />
+                        <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-sky-500 flex items-center justify-center text-white shadow-lg">
+                          <Target className="h-6 w-6" />
                         </div>
                         <div>
                           <h3 className="text-xl font-bold">AI Analysis</h3>
@@ -339,28 +337,27 @@ export function InteractiveShowcase() {
             </motion.div>
           </AnimatePresence>
 
-          {/* Navigation Buttons */}
           <div className="flex justify-center gap-4 mt-8">
-            <GlowButton
+            <Button
               variant="outline"
               onClick={() => setActiveStep(Math.max(0, activeStep - 1))}
               disabled={activeStep === 0}
               className="disabled:opacity-50"
             >
               Previous
-            </GlowButton>
+            </Button>
             {activeStep < demoSteps.length - 1 ? (
-              <GlowButton
+              <Button
                 onClick={() => setActiveStep(Math.min(demoSteps.length - 1, activeStep + 1))}
               >
                 Next Step
                 <ArrowRight className="ml-2 h-4 w-4" />
-              </GlowButton>
+              </Button>
             ) : (
-              <GlowButton>
+              <Button>
                 <Play className="mr-2 h-4 w-4" />
                 Try It Now
-              </GlowButton>
+              </Button>
             )}
           </div>
         </div>

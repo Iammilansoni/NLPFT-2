@@ -5,6 +5,12 @@ import re
 from datetime import datetime
 from app.core.context_vars import user_id_ctx
 
+# Import activity log service for user-friendly log transformation
+try:
+    from app.services.activity_log_service import activity_log_service
+except ImportError:
+    activity_log_service = None
+
 class LogManager:
     def __init__(self):
         # Map user_id -> List[WebSocket]
@@ -103,7 +109,11 @@ class LogManager:
             "is_system": is_system_log
         }
         
-        # 4. Broadcast
+        # 4. Enhance with user-friendly message using ActivityLogService
+        if activity_log_service:
+            log_entry = activity_log_service.enhance_log_entry(log_entry)
+        
+        # 5. Broadcast
         try:
             loop = asyncio.get_running_loop()
             if loop.is_running():

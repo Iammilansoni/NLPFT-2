@@ -11,18 +11,18 @@ import {
 } from './dropdown-menu'
 
 const accents = [
-  { name: 'Violet', value: 'violet', color: 'rgb(124 58 237)' },
+  { name: 'Blue', value: 'blue', color: 'rgb(59 130 246)' },
   { name: 'Teal', value: 'teal', color: 'rgb(6 182 212)' },
   { name: 'Emerald', value: 'emerald', color: 'rgb(16 185 129)' },
 ]
 
 export function ThemeAccentToggle() {
-  const [currentAccent, setCurrentAccent] = useState('violet')
+  const [currentAccent, setCurrentAccent] = useState('blue')
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
-    const accent = document.documentElement.getAttribute('data-accent') || 'violet'
+    const accent = document.documentElement.getAttribute('data-accent') || 'blue'
     setCurrentAccent(accent)
   }, [])
 

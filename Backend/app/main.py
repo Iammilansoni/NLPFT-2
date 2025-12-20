@@ -28,11 +28,11 @@ async def lifespan(app: FastAPI):
     postgres_error = None
     try:
         await db_manager.connect()
-        logger.info("✅ PostgreSQL: Connected successfully")
+        logger.info("PostgreSQL connected successfully")
         postgres_connected = True
     except Exception as e:
         postgres_error = str(e)
-        logger.warning(f"⚠️ PostgreSQL not available: {e}")
+        logger.warning(f"PostgreSQL not available: {e}")
         logger.warning("Running without PostgreSQL - Limited functionality available")
 
     # Check Redis connection - Optional
@@ -51,10 +51,10 @@ async def lifespan(app: FastAPI):
         )
         redis_client.ping()
         redis_connected = True
-        logger.info("✅ Redis: Connected successfully")
+        logger.info("Redis connected successfully")
     except Exception as e:
         redis_error = str(e)
-        logger.warning(f"⚠️ Redis not available: {e}")
+        logger.warning(f"Redis not available: {e}")
         logger.warning("Running without Redis - Vector search features disabled")
 
     app.state.startup_time = datetime.now(timezone.utc)
@@ -64,7 +64,7 @@ async def lifespan(app: FastAPI):
     app.state.redis_connected = redis_connected
     app.state.redis_error = redis_error
 
-    logger.info("✅ Application startup completed")
+    logger.info("Application startup completed")
 
     yield
 
@@ -121,9 +121,9 @@ def create_app() -> FastAPI:
             default_limits=["1000/hour"],  # Default limit for all endpoints
             headers_enabled=True
         )
-        logger.info("✅ Rate limiter: Using Redis storage")
+        logger.info("Rate limiter: Using Redis storage")
     except Exception as e:
-        logger.warning(f"⚠️ Rate limiter: Redis unavailable ({e}), using memory storage")
+        logger.warning(f"Rate limiter: Redis unavailable ({e}), using memory storage")
         limiter = Limiter(
             key_func=get_remote_address,
             default_limits=["1000/hour"],
@@ -315,14 +315,14 @@ def create_app() -> FastAPI:
         from app.core.security import verify_token
         from fastapi import Query
         
-        logger.info(f"🔌 WebSocket connection attempt with token: {'present' if token else 'missing'}")
+        logger.info(f"WebSocket connection attempt with token: {'present' if token else 'missing'}")
         
         # Accept connection first
         try:
             await websocket.accept()
-            logger.info("✅ WebSocket connection accepted")
+            logger.info("WebSocket connection accepted")
         except Exception as e:
-            logger.error(f"❌ Failed to accept WebSocket connection: {e}")
+            logger.error(f"Failed to accept WebSocket connection: {e}")
             return
         
         # Authenticate
@@ -331,9 +331,9 @@ def create_app() -> FastAPI:
             try:
                 payload = verify_token(token)
                 user_id = payload.get("sub")
-                logger.info(f"✅ WebSocket authenticated for user: {user_id}")
+                logger.info(f"WebSocket authenticated for user: {user_id}")
             except Exception as e:
-                logger.error(f"❌ WebSocket token verification failed: {e}")
+                logger.error(f"WebSocket token verification failed: {e}")
                 try:
                     await websocket.send_json({
                         "error": "Authentication failed",
@@ -344,7 +344,7 @@ def create_app() -> FastAPI:
                     pass
                 return
         else:
-            logger.warning("⚠️ WebSocket connection without token")
+            logger.warning("WebSocket connection without token")
             try:
                 await websocket.send_json({
                     "error": "Authentication required",
@@ -356,7 +356,7 @@ def create_app() -> FastAPI:
             return
 
         if not user_id:
-            logger.error("❌ WebSocket: No user ID after token verification")
+            logger.error("WebSocket: No user ID after token verification")
             try:
                 await websocket.send_json({
                     "error": "Authentication failed",
@@ -369,17 +369,17 @@ def create_app() -> FastAPI:
 
         # Connect to log manager
         await log_manager.connect(websocket, user_id)
-        logger.info(f"✅ WebSocket connected to log manager for user: {user_id}")
+        logger.info(f"WebSocket connected to log manager for user: {user_id}")
         
         try:
             while True:
                 # Keep connection alive by receiving messages
                 await websocket.receive_text()
         except WebSocketDisconnect:
-            logger.info(f"🔌 WebSocket disconnected for user: {user_id}")
+            logger.info(f"WebSocket disconnected for user: {user_id}")
             log_manager.disconnect(websocket, user_id)
         except Exception as e:
-            logger.error(f"❌ WebSocket error for user {user_id}: {e}")
+            logger.error(f"WebSocket error for user {user_id}: {e}")
             log_manager.disconnect(websocket, user_id)
 
     return app

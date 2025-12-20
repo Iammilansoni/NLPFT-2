@@ -12,7 +12,7 @@ export default function EditTemplatePage() {
   const router = useRouter()
   const templateId = params.id as string
   const { user, isLoading: authLoading, isAuthenticated } = useAuth()
-  
+
   const [template, setTemplate] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -37,7 +37,7 @@ export default function EditTemplatePage() {
         setLoading(false)
       }
     }
-    
+
     if (templateId) {
       loadTemplate()
     }
@@ -60,7 +60,7 @@ export default function EditTemplatePage() {
         <div className="flex flex-col items-center gap-4 text-center">
           <div className="text-destructive text-lg font-semibold">Error loading template</div>
           <p className="text-muted-foreground">{error}</p>
-          <button 
+          <button
             onClick={() => router.push("/templates")}
             className="text-primary hover:underline"
           >
@@ -76,7 +76,7 @@ export default function EditTemplatePage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-center">
           <div className="text-lg font-semibold">Template not found</div>
-          <button 
+          <button
             onClick={() => router.push("/templates")}
             className="text-primary hover:underline"
           >
@@ -106,7 +106,6 @@ export default function EditTemplatePage() {
     json_schema: template.json_schema || {},
     sample_requests: transformedSampleRequests,
     side_effects: template.side_effects || '',
-    security_classification: template.security_classification || 'public',
     domain_tags: template.domain_tags || template.intent_keywords || [],
     status: template.status || 'draft',
     reviewer_notes: template.reviewer_notes || template.expert_notes || '',

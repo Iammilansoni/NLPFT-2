@@ -40,10 +40,30 @@ from .csv_data_schemas import (
 
 # Embedding schemas
 from .embedding_schemas import (
+    # Basic CRUD
     EmbeddingCreate,
     EmbeddingResponse,
     VectorSearchRequest,
     VectorSearchResult,
+    # Enums
+    EmbeddingStatus,
+    ErrorCode,
+    # Error responses
+    ModelMismatchError,
+    EmbeddingError,
+    # Dataset models
+    DatasetInfo,
+    DatasetEmbeddingStatus,
+    # Request models
+    ReembedDatasetRequest,
+    SearchDatasetRequest,
+    # Response models
+    ReembedDatasetResponse,
+    SearchResult,
+    SearchDatasetResponse,
+    EmbedProgressResponse,
+    # Internal models
+    EmbeddingTask,
 )
 
 # Search schemas
@@ -82,6 +102,11 @@ from .ranking_schemas import (
     DetailedRankedResult,
     DetailedRankingResponse,
     RerankerInfoResponse,
+    # Semantic Retrieval Pipeline
+    SemanticRetrievalRequest,
+    SemanticRetrievalResponse,
+    SemanticRetrievalMetadata,
+    AlternativeAPI,
 )
 
 __all__ = [
@@ -142,4 +167,9 @@ __all__ = [
     "DetailedRankedResult",
     "DetailedRankingResponse",
     "RerankerInfoResponse",
+    # Semantic Retrieval Pipeline
+    "SemanticRetrievalRequest",
+    "SemanticRetrievalResponse",
+    "SemanticRetrievalMetadata",
+    "AlternativeAPI",
 ]

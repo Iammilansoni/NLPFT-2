@@ -33,12 +33,12 @@ import {
 
 const nodes = [
   { id: 'n1', label: 'Login\n& Onboarding', icon: LogIn, color: 'from-sky-500 to-indigo-500' },
-  { id: 'n2', label: 'Define Your\nAPI Once', icon: FileText, color: 'from-violet-500 to-pink-500' },
+  { id: 'n2', label: 'Define Your\nAPI Once', icon: FileText, color: 'from-blue-500 to-sky-500' },
   { id: 'n3', label: 'AI Generates\nThousands of Tests', icon: Bot, color: 'from-fuchsia-500 to-rose-500' },
   { id: 'n4', label: 'Smart CSV\n+ Deep Metadata', icon: File, color: 'from-emerald-500 to-teal-500' },
   { id: 'n5', label: 'Embeddings\n(Your Model Choice)', icon: Cpu, color: 'from-lime-500 to-emerald-500' },
   { id: 'n6', label: 'High-Speed\nRedis Vector Search', icon: Database, color: 'from-orange-400 to-red-500' },
-  { id: 'n7', label: 'AI Query\nUnderstanding\n+ Re-Ranking', icon: Shuffle, color: 'from-indigo-500 to-purple-500' },
+  { id: 'n7', label: 'AI Query\nUnderstanding\n+ Re-Ranking', icon: Shuffle, color: 'from-blue-500 to-sky-500' },
   { id: 'n8', label: 'Automated API Calls\n+ Browser Testing', icon: PlayCircle, color: 'from-cyan-500 to-blue-500' },
   { id: 'n9', label: 'Test Insights •\nScreenshots • Logs', icon: Camera, color: 'from-rose-500 to-pink-500' },
   { id: 'n10', label: 'Clean Dashboard\nWith Real-Time Results', icon: BarChart3, color: 'from-emerald-500 to-green-500' },

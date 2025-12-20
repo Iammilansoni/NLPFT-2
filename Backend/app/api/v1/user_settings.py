@@ -115,7 +115,7 @@ async def update_user_settings(
         except ValueError as e:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Invalid embedding model: {update_data.default_embedding_model}. Supported models: all-minilm, nomic-embed-text, BAAI/bge-large-en-v1.5, mxbai-embed-large"
+                detail=f"Invalid embedding model: {update_data.default_embedding_model}. Supported models: nomic-embed-text, all-minilm, mxbai-embed-large"
             )
     
     # Get or create user settings
@@ -173,15 +173,15 @@ async def update_user_settings(
     await db.commit()
     await db.refresh(settings)
     
-    # Audit log: settings updated
+    
     await audit_service.log_settings_updated(
         db=db,
-        user_id=current_user.user_id,
+        user_id=current_user.u_id,
         request=http_request,
         changes=changes
     )
     
-    logger.info(f"✅ Settings saved successfully for user {current_user.user_id}")
+    logger.info(f"Settings saved successfully for user {current_user.u_id}")
     
     return UserSettingsSaveResponse(
         status="ok",

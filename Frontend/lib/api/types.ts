@@ -35,7 +35,6 @@ export interface DatasetInfo {
   num_examples: number
   paths: {
     csv: string
-    json: string
   }
   redis_keys?: number
 }
@@ -172,7 +171,6 @@ export interface DatasetGenerateResponse {
   num_examples: number
   paths: {
     csv: string
-    json: string
   }
   message: string
 }

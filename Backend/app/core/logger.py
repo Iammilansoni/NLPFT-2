@@ -72,19 +72,19 @@ def setup_logger(name: str = "nlpforge", level: str = "INFO") -> logging.Logger:
 
 def log_request(method: str, url: str, status_code: int, duration: float) -> None:
     """Log HTTP request information."""
-    logger.info(f"🌐 {method} {url} → {status_code} ({duration:.3f}s)")
+    logger.info(f"HTTP {method} {url} -> {status_code} ({duration:.3f}s)")
 
 
 def log_health_check(status: str, checks: Dict[str, Any]) -> None:
     """Log health check results."""
-    emoji = "✅" if status == "healthy" else "⚠️" if status == "degraded" else "❌"
-    logger.info(f"{emoji} Health Check → {status} | {checks}")
+    status_label = "[OK]" if status == "healthy" else "[DEGRADED]" if status == "degraded" else "[UNHEALTHY]"
+    logger.info(f"{status_label} Health Check -> {status} | {checks}")
 
 
 def log_error(error: Exception, context: str = "") -> None:
     """Log error with context."""
     context_str = f" | Context: {context}" if context else ""
-    logger.error(f"❌ Error: {str(error)}{context_str}", exc_info=True)
+    logger.error(f"Error: {str(error)}{context_str}", exc_info=True)
 
 
 def log_startup(component: str) -> None:
@@ -94,7 +94,7 @@ def log_startup(component: str) -> None:
 
 def log_shutdown(component: str) -> None:
     """Log component shutdown."""
-    logger.info(f"🛑 Shutting down {component}...")
+    logger.info(f"Shutting down {component}...")
 
 
 # Global logger instance

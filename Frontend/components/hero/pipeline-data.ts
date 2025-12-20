@@ -1,10 +1,10 @@
 import {
   Lock,
   LayoutTemplate,
-  Bot,
+  Boxes,
   FileSpreadsheet,
   BrainCircuit,
-  Zap,
+  Gauge,
   Search,
   Globe,
   LineChart
@@ -46,10 +46,10 @@ export const PIPELINE_STEPS: PipelineStep[] = [
   {
     id: 'ai_data',
     title: 'AI Test Data',
-    icon: Bot,
+    icon: Boxes,
     description: 'LLM-powered generation',
-    color: 'from-violet-400 to-purple-500',
-    glowColor: '#8b5cf6' // violet-500
+    color: 'from-blue-400 to-sky-500',
+    glowColor: '#3b82f6' // blue-500
   },
   {
     id: 'csv_context',
@@ -70,7 +70,7 @@ export const PIPELINE_STEPS: PipelineStep[] = [
   {
     id: 'redis',
     title: 'Redis Vectors',
-    icon: Zap,
+    icon: Gauge,
     description: 'Lightning-fast storage',
     color: 'from-amber-400 to-yellow-500',
     glowColor: '#f59e0b' // amber-500

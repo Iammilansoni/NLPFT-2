@@ -28,7 +28,6 @@ export interface GenerateDatasetResponse {
   total_generated: number;
   requested: number;
   csv_path: string;
-  json_path: string;
   csv_preview?: string[][];
   download_url?: string;
   // Legacy fields for compatibility
@@ -71,7 +70,6 @@ export interface DatasetStatusResponse {
   };
   files?: {
     csv?: string;
-    json?: string;
   };
   statistics?: Record<string, any>;
 }
@@ -190,7 +188,7 @@ export class DatasetApiClient {
   triggerDownload(taskId: string, filename?: string, format: string = 'csv'): void {
     const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : '';
     const url = `${API_BASE_URL}/api/v1/datasets/download/${taskId}/${format}`;
-    
+
     // Create temporary link
     const link = document.createElement('a');
     link.href = token ? `${url}?token=${token}` : url;
@@ -206,7 +204,7 @@ export class DatasetApiClient {
   triggerDownloadByFilename(filename: string): void {
     const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : '';
     const url = `${API_BASE_URL}/api/v1/datasets/download-file/${filename}`;
-    
+
     // Create temporary link
     const link = document.createElement('a');
     link.href = token ? `${url}?token=${token}` : url;

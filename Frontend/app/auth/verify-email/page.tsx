@@ -2,7 +2,6 @@
 
 import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { motion } from 'framer-motion'
 import { Mail, ArrowRight, Loader2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,7 +14,7 @@ function VerifyEmailContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const email = searchParams.get('email') || ''
-  
+
   const [otp, setOtp] = useState('')
   const [isVerifying, setIsVerifying] = useState(false)
   const [isResending, setIsResending] = useState(false)
@@ -34,7 +33,7 @@ function VerifyEmailContent() {
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    
+
     if (!otp || otp.length !== 6) {
       setError('Please enter a valid 6-digit OTP')
       return
@@ -49,7 +48,7 @@ function VerifyEmailContent() {
       })
 
       setIsVerified(true)
-      
+
       toast({
         title: "Email Verified!",
         description: "Your email has been verified successfully. Redirecting to login...",
@@ -84,7 +83,7 @@ function VerifyEmailContent() {
       })
 
       setCountdown(60) // 60 second cooldown
-      
+
       toast({
         title: "OTP Resent",
         description: "A new OTP has been sent to your email.",
@@ -108,13 +107,9 @@ function VerifyEmailContent() {
         <Card className="max-w-md w-full">
           <CardContent className="pt-6">
             <div className="text-center space-y-4">
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", duration: 0.5 }}
-              >
+              <div>
                 <CheckCircle2 className="h-16 w-16 text-green-600 mx-auto" />
-              </motion.div>
+              </div>
               <h2 className="text-2xl font-bold">Email Verified!</h2>
               <p className="text-muted-foreground">
                 Your email has been verified successfully. Redirecting to login...
@@ -129,11 +124,7 @@ function VerifyEmailContent() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md"
-      >
+      <div className="w-full max-w-md">
         <Card>
           <CardHeader className="space-y-1">
             <div className="flex items-center justify-center mb-4">
@@ -145,7 +136,7 @@ function VerifyEmailContent() {
               Verify Your Email
             </CardTitle>
             <CardDescription className="text-center">
-              We've sent a 6-digit code to<br/>
+              We've sent a 6-digit code to<br />
               <span className="font-semibold text-foreground">{email}</span>
             </CardDescription>
           </CardHeader>
@@ -238,7 +229,7 @@ function VerifyEmailContent() {
             </form>
           </CardContent>
         </Card>
-      </motion.div>
+      </div>
     </div>
   )
 }

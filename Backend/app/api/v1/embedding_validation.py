@@ -14,8 +14,7 @@ from uuid import UUID
 
 from app.core.postgres import get_db
 from app.api.v1.auth import get_current_user
-from app.models.database_models import UserSettings, Metadata
-from app.models.schemas import UserResponse
+from app.models.database_models import UserSettings, Metadata, User
 from app.services.embedding_service import get_enhanced_embedding_service
 from app.core.logger import logger
 
@@ -46,7 +45,7 @@ class ReembedRequest(BaseModel):
 @router.get("/validate/{template_id}", response_model=EmbeddingValidationResponse)
 async def validate_embedding_model(
     template_id: str,
-    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -154,7 +153,7 @@ async def validate_embedding_model(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error validating embeddings: {e}", exc_info=True)
+        logger.error(f"Error validating embeddings: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error validating embeddings: {str(e)}"
@@ -164,7 +163,7 @@ async def validate_embedding_model(
 @router.post("/reembed")
 async def reembed_dataset(
     request: ReembedRequest,
-    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -205,10 +204,10 @@ async def reembed_dataset(
         keys = list(embedding_service.redis_service.redis_client.scan_iter(match=pattern, count=1000))
         if keys:
             embedding_service.redis_service.redis_client.delete(*keys)
-            logger.info(f"🗑️ Deleted {len(keys)} old embeddings")
+            logger.info(f"Deleted {len(keys)} old embeddings")
         
         # Re-embed with current model
-        logger.info(f"🔄 Re-embedding dataset with user's current model")
+        logger.info(f"Re-embedding dataset with user's current model")
         task_id = await embedding_service.auto_embed_generated_dataset(
             user_id=current_user.u_id,
             template_id=UUID(request.template_id),
@@ -225,7 +224,7 @@ async def reembed_dataset(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error re-embedding dataset: {e}", exc_info=True)
+        logger.error(f"Error re-embedding dataset: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error re-embedding dataset: {str(e)}"

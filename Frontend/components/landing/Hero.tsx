@@ -3,17 +3,17 @@
 import { useEffect, useRef, useState, MouseEvent } from 'react'
 import Link from 'next/link'
 import { MotionConfig, motion, useReducedMotion, useScroll, useTransform } from 'framer-motion'
-import { GlowButton } from '@/components/ui/glow-button'
-import { GlassCard } from '@/components/ui/glass-card'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Sparkles, Play, ArrowRight, Shield, Award, TrendingUp, Zap, CheckCircle2, Brain } from 'lucide-react'
+import { Cpu, Play, ArrowRight, Shield, Award, TrendingUp, Gauge, CheckCircle2, Network } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // import { HeroDemo } from './HeroDemo'
 
 const STATS = [
   { value: '50K+', label: 'Tests / day', Icon: TrendingUp },
-  { value: '45ms', label: 'Avg latency', Icon: Zap },
+  { value: '45ms', label: 'Avg latency', Icon: Gauge },
   { value: '99.8%', label: 'Accuracy', Icon: CheckCircle2 },
 ]
 
@@ -78,7 +78,7 @@ export function Hero() {
             {/* LEFT: copy / CTAs */}
             <div className="relative z-10 space-y-6">
               <Badge className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary/30 bg-primary/8 text-sm font-semibold shadow-sm backdrop-blur-sm">
-                <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+                <Cpu className="h-4 w-4 text-primary" />
                 AI-Powered Test Generation
               </Badge>
 
@@ -109,11 +109,11 @@ export function Hero() {
                   <Link href="/run/new" className="relative inline-block group">
                     <div className="absolute -inset-1 rounded-2xl blur-xl opacity-60 group-hover:opacity-100 transition-opacity duration-300"
                       style={{ background: 'linear-gradient(90deg, rgba(6,182,212,0.3), rgba(124,58,237,0.3))' }} />
-                    <GlowButton className="relative h-14 px-8 py-3 rounded-2xl font-semibold inline-flex items-center gap-3 text-base">
+                    <Button size="lg" className="relative h-14 px-8 py-3 rounded-2xl font-semibold inline-flex items-center gap-3 text-base">
                       <Play className="h-5 w-5" />
                       Try a Sample Run
                       <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
-                    </GlowButton>
+                    </Button>
                   </Link>
 
                   <Link href="#how-it-works" className="inline-block group">
@@ -134,17 +134,17 @@ export function Hero() {
               </motion.div>
 
               {/* Stats / trust row */}
-              <motion.div 
-                initial={{ opacity: 0, y: 6 }} 
-                animate={{ opacity: 1, y: 0 }} 
-                transition={{ duration: 0.6, delay: 0.2 }} 
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
                 className="pt-8 border-t border-border/30"
               >
                 <div className="flex flex-col gap-6">
                   {/* Stats */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {STATS.map((s, i) => (
-                      <motion.div 
+                      <motion.div
                         key={s.label}
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -166,7 +166,7 @@ export function Hero() {
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Trusted by:</div>
                     {TRUST.map((t, i) => (
-                      <motion.div 
+                      <motion.div
                         key={t.name}
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -183,10 +183,10 @@ export function Hero() {
             </div>
 
             {/* RIGHT: MacBook-style interactive demo */}
-            <motion.div 
-              initial={{ opacity: 0, x: 20, scale: 0.95 }} 
-              animate={{ opacity: 1, x: 0, scale: 1 }} 
-              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1]}} 
+            <motion.div
+              initial={{ opacity: 0, x: 20, scale: 0.95 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
               className="relative z-10"
             >
               {/* <HeroDemo /> */}
@@ -259,7 +259,7 @@ function DemoInline() {
         {steps.slice(0, Math.min(step, steps.length)).map((s, i) => (
           <div key={s} className="flex items-center gap-3 text-sm">
             <div className={cn('h-7 w-7 rounded-md flex items-center justify-center', i < step - 1 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-primary/10 text-primary')}>
-              {i < step - 1 ? <CheckCircle2 className="h-4 w-4" /> : <Brain className="h-4 w-4" />}
+              {i < step - 1 ? <CheckCircle2 className="h-4 w-4" /> : <Network className="h-4 w-4" />}
             </div>
             <div className="flex-1">
               <div className="font-medium text-sm">{s}</div>
@@ -278,7 +278,7 @@ function DemoInline() {
             <div>
               <div className="text-xs text-muted-foreground">Detected JSON</div>
               <pre className="mt-2 text-xs bg-transparent p-2 rounded-md font-mono text-sm overflow-auto max-h-40">
-{`{
+                {`{
   "intent": "login",
   "template": "user_login",
   "slots": {
@@ -295,7 +295,7 @@ function DemoInline() {
               <div className="text-xs text-muted-foreground">Confidence</div>
               <div className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-green-400">{confidence}%</div>
               <Link href="/run/new">
-                <GlowButton className="h-10 px-4 text-sm">Run with Selenium</GlowButton>
+                <Button size="sm" className="h-10 px-4 text-sm">Run with Selenium</Button>
               </Link>
             </div>
           </div>

@@ -2,24 +2,23 @@
 
 import * as React from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { motion, AnimatePresence } from "framer-motion"
 import {
   FileCode,
   Plus,
   Edit,
   Trash2,
   Copy,
+  Eye,
   RefreshCw,
-  Upload,
-  Download,
   Search,
   Filter,
   Clock,
   CheckCircle,
   AlertCircle,
   XCircle,
-  ToggleLeft,
-  ToggleRight,
+  MoreHorizontal,
+  ArrowUpDown,
+  Calendar,
 } from "lucide-react"
 import { apiClient } from "@/lib/api"
 import type { TemplateModel, TemplateFilters } from "@/lib/api-types"
@@ -32,8 +31,21 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { CardGridSkeleton } from "@/components/ui/skeleton"
 import { SearchInput } from "@/components/ui/search-input"
 import { useToast } from "@/hooks/use-toast"
-
 import { useRouter } from "next/navigation"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 export default function TemplatesPage() {
   const router = useRouter()
@@ -61,13 +73,7 @@ export default function TemplatesPage() {
     },
   })
 
-  // Sync from JSON mutation
-  const syncMutation = useMutation({
-    mutationFn: () => apiClient.syncTemplates(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["templates"] })
-    },
-  })
+
 
   // Delete mutation
   const deleteMutation = useMutation({
@@ -93,7 +99,7 @@ export default function TemplatesPage() {
   // Filter templates
   const filteredTemplates = React.useMemo(() => {
     if (!templates) return []
-    
+
     return templates.filter((template) => {
       // Search filter
       if (searchQuery) {
@@ -102,7 +108,7 @@ export default function TemplatesPage() {
           template.api_name.toLowerCase().includes(searchLower) ||
           template.description.toLowerCase().includes(searchLower) ||
           template.intent_keywords.some((k) => k.toLowerCase().includes(searchLower))
-        
+
         if (!matchesSearch) return false
       }
 
@@ -132,13 +138,9 @@ export default function TemplatesPage() {
       return apiClient.toggleTemplateVisibility(templateId)
     },
     onMutate: async (templateId: string) => {
-      // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: ["templates"] })
-      
-      // Snapshot the previous value
       const previousTemplates = queryClient.getQueryData(["templates"])
-      
-      // Optimistically update - toggle the status immediately
+
       queryClient.setQueryData(["templates"], (old: any) => {
         if (!old) return old
         return old.map((t: any) => {
@@ -150,13 +152,12 @@ export default function TemplatesPage() {
           return t
         })
       })
-      
+
       return { previousTemplates }
     },
     onSuccess: (data, templateId) => {
       setTogglingTemplateId(null)
-      
-      // Update cache with actual server response
+
       queryClient.setQueryData(["templates"], (old: any) => {
         if (!old) return old
         return old.map((t: any) => {
@@ -167,23 +168,22 @@ export default function TemplatesPage() {
           return t
         })
       })
-      
+
       const isApproved = data.status === "approved"
       toast({
         title: isApproved ? "Template Approved" : "Template Drafted",
-        description: isApproved 
-          ? "Template is approved and available for dataset generation." 
+        description: isApproved
+          ? "Template is approved and available for dataset generation."
           : "Template is in draft state.",
       })
     },
     onError: (error: any, templateId, context) => {
       setTogglingTemplateId(null)
-      
-      // Rollback to previous state on error
+
       if (context?.previousTemplates) {
         queryClient.setQueryData(["templates"], context.previousTemplates)
       }
-      
+
       toast({
         title: "Toggle Failed",
         description: error?.detail || error?.message || "Failed to toggle status",
@@ -192,379 +192,324 @@ export default function TemplatesPage() {
     },
   })
 
-  const getStatusBadge = (status?: string) => {
-    switch (status) {
-      case "approved":
-        return (
-          <Badge variant="success" className="gap-1">
-            <CheckCircle className="h-3 w-3" />
-            Approved
-          </Badge>
-        )
-      case "review":
-        return (
-          <Badge variant="warning" className="gap-1">
-            <AlertCircle className="h-3 w-3" />
-            In Review
-          </Badge>
-        )
-      case "draft":
-        return (
-          <Badge variant="secondary" className="gap-1">
-            <Clock className="h-3 w-3" />
-            Draft
-          </Badge>
-        )
-      case "rejected":
-        return (
-          <Badge variant="destructive" className="gap-1">
-            <XCircle className="h-3 w-3" />
-            Rejected
-          </Badge>
-        )
-      default:
-        return (
-          <Badge variant="secondary" className="gap-1">
-            <Clock className="h-3 w-3" />
-            Draft
-          </Badge>
-        )
+  // UI Helpers
+  const getMethodBadgeVariant = (method: string) => {
+    switch (method.toUpperCase()) {
+      case 'GET': return 'bg-blue-500/10 text-blue-700 dark:text-blue-400 hover:bg-blue-500/20 border-blue-200 dark:border-blue-900'
+      case 'POST': return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 border-emerald-200 dark:border-emerald-900'
+      case 'PUT': return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 border-amber-200 dark:border-amber-900'
+      case 'DELETE': return 'bg-red-500/10 text-red-700 dark:text-red-400 hover:bg-red-500/20 border-red-200 dark:border-red-900'
+      default: return 'bg-muted text-muted-foreground'
     }
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <motion.header
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.3 }}
-        className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40"
-      >
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <FileCode className="h-8 w-8 text-primary" />
-              <div>
-                <h1 className="text-3xl font-bold">Templates</h1>
-                <p className="text-sm text-muted-foreground">
-                  Manage API templates without code changes
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => syncMutation.mutate()}
-                disabled={syncMutation.isPending}
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Sync from JSON
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => reloadMutation.mutate()}
-                disabled={reloadMutation.isPending}
-              >
-                <RefreshCw
-                  className={cn(
-                    "h-4 w-4 mr-2",
-                    reloadMutation.isPending && "animate-spin"
-                  )}
-                />
-                Hot Reload
-              </Button>
-              <Button onClick={() => router.push("/templates/new")}>
-                <Plus className="h-4 w-4 mr-2" />
-                New Template
-              </Button>
+    <div className="min-h-screen bg-background font-sans">
+      {/* Header Section */}
+      <header className="px-6 py-8 md:py-10 max-w-7xl mx-auto border-b border-border/40">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+          <div className="space-y-1.5">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">Templates</h1>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <p className="text-sm">Manage standard API patterns</p>
+              <span>•</span>
+              <Badge variant="secondary" className="px-2 py-0.5 h-auto text-[10px] font-medium rounded-full bg-muted/50">
+                {isLoading ? "..." : (filteredTemplates.length === templates?.length ? `${templates?.length || 0} Total` : `${filteredTemplates.length} Filtered`)}
+              </Badge>
             </div>
           </div>
 
-          {/* Search & Filters */}
-          <div className="flex gap-3">
+          <div className="flex items-center gap-3">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => reloadMutation.mutate()}
+                    disabled={reloadMutation.isPending}
+                    className="h-9 gap-2 text-muted-foreground hover:text-foreground border-dashed"
+                  >
+                    <RefreshCw className={cn("h-4 w-4", reloadMutation.isPending && "animate-spin")} />
+                    Reload
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Reload Templates from Disk</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <div className="h-6 w-px bg-border/60 mx-1" />
+
+            <Button onClick={() => router.push("/templates/new")} className="shadow-sm">
+              <Plus className="h-4 w-4 mr-2" />
+              New Template
+            </Button>
+          </div>
+        </div>
+
+        {/* Search & Toolbar */}
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div className="w-full sm:max-w-md relative">
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
-              placeholder="Search templates by name, description, or keywords..."
-              className="flex-1"
+              placeholder="Search by name, endpoint, or keywords..."
+              className="w-full h-11 bg-muted/30 border-transparent focus:bg-background transition-all"
             />
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => setShowFilters(!showFilters)}
-              className={cn(showFilters && "bg-accent")}
-            >
-              <Filter className="h-4 w-4 mr-2" />
-              Filters
-            </Button>
           </div>
 
-          {/* Filters Panel */}
-          <AnimatePresence>
-            {showFilters && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
+          <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              className={cn(
+                "h-9 border-dashed font-medium text-xs uppercase tracking-wide px-3",
+                showFilters && "bg-muted border-solid"
+              )}
+            >
+              <Filter className="h-3.5 w-3.5 mr-2" />
+              Filters
+            </Button>
+
+            {(filters.status && filters.status.length > 0) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setFilters({ ...filters, status: [] })}
+                className="h-8 px-2 text-muted-foreground hover:text-foreground"
               >
-                <div className="mt-4 p-4 border rounded-lg bg-muted/30 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium">Filters</h3>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setFilters({ status: [], intent: [] })}
-                    >
-                      Clear all
-                    </Button>
-                  </div>
-
-                  {/* Status Filter */}
-                  <div>
-                    <h4 className="text-sm font-medium mb-2">Status</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {(["draft", "active", "deprecated"] as const).map((status) => (
-                        <Button
-                          key={status}
-                          variant={filters.status?.includes(status) ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => {
-                            const newStatus = filters.status?.includes(status)
-                              ? filters.status.filter((s) => s !== status)
-                              : [...(filters.status || []), status]
-                            setFilters({ ...filters, status: newStatus })
-                          }}
-                        >
-                          {status === "draft" && <Clock className="h-3 w-3 mr-1" />}
-                          {status === "active" && <CheckCircle className="h-3 w-3 mr-1" />}
-                          {status === "deprecated" && <XCircle className="h-3 w-3 mr-1" />}
-                          {status.charAt(0).toUpperCase() + status.slice(1)}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
+                Reset
+                <XCircle className="h-3 w-3 ml-2" />
+              </Button>
             )}
-          </AnimatePresence>
+          </div>
         </div>
-      </motion.header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        {isLoading && <CardGridSkeleton count={6} />}
+        {/* Collapsible Filters */}
+        {showFilters && (
+          <div className="mt-4 pt-4 border-t border-border/40 animate-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center gap-4">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status:</span>
+              <div className="flex flex-wrap gap-2">
+                {(["draft", "active", "deprecated"] as const).map((status) => {
+                  const isActive = filters.status?.includes(status)
+                  return (
+                    <button
+                      key={status}
+                      onClick={() => {
+                        const newStatus = isActive
+                          ? filters.status?.filter((s) => s !== status)
+                          : [...(filters.status || []), status]
+                        setFilters({ ...filters, status: newStatus })
+                      }}
+                      className={cn(
+                        "px-3 py-1.5 rounded-full text-xs font-medium border transition-all",
+                        isActive
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background text-muted-foreground border-border hover:border-foreground/30"
+                      )}
+                    >
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+      </header>
+
+      {/* Main Content Area */}
+      <main className="px-6 py-8 max-w-7xl mx-auto">
+        {isLoading && (
+          <div className="space-y-4">
+            <div className="h-12 w-full bg-muted/10 rounded-lg animate-pulse" />
+            <CardGridSkeleton count={4} />
+          </div>
+        )}
 
         {error && (
-          <div className="p-4 border border-destructive rounded-lg bg-destructive/10 text-destructive">
-            <p className="font-medium">Error loading templates</p>
-            <p className="text-sm mt-1">
-              {error instanceof Error ? error.message : "Unknown error"}
+          <div className="p-6 border border-destructive/20 rounded-xl bg-destructive/5 text-destructive flex flex-col items-center justify-center text-center space-y-2">
+            <AlertCircle className="h-8 w-8 mb-2" />
+            <p className="font-semibold">Error loading templates</p>
+            <p className="text-sm opacity-90 max-w-md">
+              {error instanceof Error ? error.message : "An unexpected error occurred while fetching templates."}
             </p>
           </div>
         )}
 
         {!isLoading && !error && templates && templates.length === 0 && (
-          <EmptyState
-            icon={<FileCode className="h-16 w-16" />}
-            title="No templates yet"
-            description="Create your first API template to get started"
-            action={{
-              label: "Create Template",
-              onClick: () => router.push("/templates/new"),
-            }}
-          />
+          <div className="mt-12">
+            <EmptyState
+              icon={<FileCode className="h-12 w-12 text-muted-foreground/50" />}
+              title="No templates yet"
+              description="Create your first API template to get started with semantic generation."
+              action={{
+                label: "Create First Template",
+                onClick: () => router.push("/templates/new"),
+              }}
+            />
+          </div>
         )}
 
         {!isLoading && !error && filteredTemplates.length === 0 && templates && templates.length > 0 && (
-          <EmptyState
-            icon={<Search className="h-16 w-16" />}
-            title="No templates found"
-            description="No templates match your search criteria. Try adjusting your filters."
-          />
+          <div className="mt-12">
+            <EmptyState
+              icon={<Search className="h-12 w-12 text-muted-foreground/50" />}
+              title="No matches found"
+              description="Adjust your search or filters to find what you're looking for."
+              action={{
+                label: "Clear Filters",
+                onClick: () => {
+                  setSearchQuery("")
+                  setFilters({ status: [], intent: [] })
+                }
+              }}
+            />
+          </div>
         )}
 
+        {/* Template List - Modern Grid/Table */}
         {filteredTemplates.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="space-y-4"
-          >
-            <div className="text-sm text-muted-foreground mb-4">
-              Showing {filteredTemplates.length} of {templates?.length || 0} templates
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredTemplates.map((template, index) => (
-                <motion.div
-                  key={template.api_name}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05, duration: 0.2 }}
-                  whileHover={{ scale: 1.02, y: -4 }}
-                  className="group border rounded-lg p-6 bg-card cursor-pointer transition-shadow hover:shadow-lg"
-                  onClick={() => {
-                    // Go to edit page
-                    router.push(`/templates/${template.template_id || template.api_name}/edit`)
-                  }}
-                >
-                  {/* Header */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-lg mb-1 truncate">
-                        {toTitleCase(template.api_name)}
-                      </h3>
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {template.description}
-                      </p>
-                    </div>
-                    {template.confidence !== undefined && template.confidence !== null && template.confidence > 0 && (
-                      <ConfidenceBadge
-                        confidence={template.confidence}
-                        showLabel={false}
-                        animated={false}
-                      />
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div className="space-y-3 mb-4">
-                    <div className="flex items-center gap-2 text-xs">
-                      <Badge variant="outline">{template.method}</Badge>
-                      {getStatusBadge(template.status)}
-                    </div>
-
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Endpoint</p>
-                      <p className="text-xs font-mono bg-muted px-2 py-1 rounded truncate">
-                        {template.endpoint}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-2">Intent Keywords</p>
-                      <div className="flex flex-wrap gap-1">
-                        {template.intent_keywords.slice(0, 3).map((keyword) => (
-                          <Badge key={keyword} variant="secondary" className="text-xs">
-                            {keyword}
-                          </Badge>
-                        ))}
-                        {template.intent_keywords.length > 3 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{template.intent_keywords.length - 3}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    {template.updated_at && (
-                      <p className="text-xs text-muted-foreground">
-                        Updated {formatDate(template.updated_at)}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex flex-col gap-2 pt-4 border-t">
-                    {/* Continue Editing - For draft or rejected templates */}
-                    {(template.status === "draft" || template.status === "rejected") && (
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        className="w-full border-primary text-primary hover:bg-primary/10"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          router.push(`/templates/${template.template_id || template.api_name}/edit`)
-                        }}
-                      >
-                        <Edit className="h-3 w-3 mr-1" />
-                        Continue Editing
-                      </Button>
-                    )}
-
-                    {/* Draft/Approved Toggle */}
-                    <div 
-                      className={cn(
-                        "flex items-center justify-between p-2 rounded-lg border",
-                        template.status === "approved" 
-                          ? "bg-green-50 border-green-200" 
-                          : "bg-muted/50 border-gray-200"
-                      )}
-                      onClick={(e) => e.stopPropagation()}
+          <div className="rounded-xl border border-border/40 bg-card overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead>
+                  <tr className="border-b border-border/40 bg-muted/40">
+                    <th className="px-6 py-4 font-medium text-xs text-muted-foreground uppercase tracking-wider w-[30%]">Template Name</th>
+                    <th className="px-6 py-4 font-medium text-xs text-muted-foreground uppercase tracking-wider w-[10%]">Method</th>
+                    <th className="px-6 py-4 font-medium text-xs text-muted-foreground uppercase tracking-wider w-[15%]">Status</th>
+                    <th className="px-6 py-4 font-medium text-xs text-muted-foreground uppercase tracking-wider w-[25%] hidden md:table-cell">Base URL</th>
+                    <th className="px-6 py-4 font-medium text-xs text-muted-foreground uppercase tracking-wider w-[10%] hidden lg:table-cell">Updated</th>
+                    <th className="px-4 py-4 font-medium text-xs text-muted-foreground uppercase tracking-wider w-[10%] text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/40">
+                  {filteredTemplates.map((template) => (
+                    <tr
+                      key={template.api_name}
+                      className="group hover:bg-muted/30 transition-colors cursor-pointer"
+                      onClick={() => router.push(`/templates/${template.template_id || template.api_name}/edit`)}
                     >
-                      <div className="flex items-center gap-2">
-                        {template.status === "approved" ? (
-                          <>
-                            <CheckCircle className="h-4 w-4 text-green-600" />
-                            <span className="text-sm font-medium text-green-700">Approved</span>
-                          </>
-                        ) : (
-                          <>
-                            <Clock className="h-4 w-4 text-gray-400" />
-                            <span className="text-sm font-medium text-gray-500">Draft</span>
-                          </>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={template.status === "approved"}
-                          onCheckedChange={(checked) => {
-                            toggleVisibilityMutation.mutate(template.template_id || template.api_name)
-                          }}
-                          disabled={togglingTemplateId === (template.template_id || template.api_name)}
-                          className="data-[state=checked]:bg-green-600"
-                        />
-                      </div>
-                    </div>
+                      {/* Name Col */}
+                      <td className="px-6 py-4 align-top">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-foreground text-base leading-tight">
+                              {toTitleCase(template.api_name)}
+                            </p>
+                            {template.confidence !== undefined && template.confidence > 0 && (
+                              <ConfidenceBadge confidence={template.confidence} showLabel={false} className="scale-90 origin-left" />
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed max-w-sm">
+                            {template.description || "No description provided."}
+                          </p>
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {template.intent_keywords.slice(0, 3).map((keyword) => (
+                              <span key={keyword} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground">
+                                {keyword}
+                              </span>
+                            ))}
+                            {template.intent_keywords.length > 3 && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground">
+                                +{template.intent_keywords.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
 
-                    {/* Standard Actions - Show on hover */}
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {/* Only show Edit for non-draft/rejected templates since they have Continue Editing */}
-                      {template.status !== "draft" && template.status !== "rejected" && (
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="flex-1"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            router.push(`/templates/${template.template_id || template.api_name}/edit`)
-                          }}
-                        >
-                          <Edit className="h-3 w-3 mr-1" />
-                          Edit
-                        </Button>
-                      )}
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        title="Copy template"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Copy className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-destructive hover:bg-destructive/10"
-                        title="Delete template"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          if (confirm(`Delete template "${template.api_name}"?`)) {
-                            deleteMutation.mutate(template.template_id || template.api_name)
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+                      {/* Method Col */}
+                      <td className="px-6 py-4 align-top">
+                        <span className={cn(
+                          "inline-flex px-2.5 py-1 rounded-md text-xs font-bold ring-1 ring-inset",
+                          getMethodBadgeVariant(template.method)
+                        )}>
+                          {template.method}
+                        </span>
+                      </td>
+
+                      {/* Status Col */}
+                      <td className="px-6 py-4 align-top" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2 min-w-[90px]">
+                            <span
+                              className={cn(
+                                "flex h-2.5 w-2.5 rounded-full",
+                                template.status === "approved" ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]" : "bg-neutral-400"
+                              )}
+                            />
+                            <span className={cn(
+                              "text-sm font-medium",
+                              template.status === "approved" ? "text-foreground" : "text-muted-foreground"
+                            )}>
+                              {template.status === "approved" ? "Active" : "Draft"}
+                            </span>
+                          </div>
+                          <Switch
+                            checked={template.status === "approved"}
+                            onCheckedChange={() => toggleVisibilityMutation.mutate(template.template_id || template.api_name)}
+                            disabled={togglingTemplateId === (template.template_id || template.api_name)}
+                            className="scale-75 data-[state=checked]:bg-green-600"
+                          />
+                        </div>
+                      </td>
+
+                      {/* Base URL Col */}
+                      <td className="px-6 py-4 align-top hidden md:table-cell">
+                        <code className="text-xs font-mono text-muted-foreground bg-muted/50 px-2 py-1.5 rounded-md break-all block">
+                          {template.base_url || template.endpoint || "No URL defined"}
+                        </code>
+                      </td>
+
+                      {/* Updated Col */}
+                      <td className="px-6 py-4 align-top hidden lg:table-cell">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          {template.updated_at ? formatDate(template.updated_at) : "Never"}
+                        </div>
+                      </td>
+
+                      {/* Actions Col */}
+                      <td className="px-4 py-4 align-middle text-right" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-[160px]">
+                            <DropdownMenuItem onClick={() => router.push(`/templates/${template.template_id || template.api_name}`)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => router.push(`/templates/${template.template_id || template.api_name}/edit`)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => {
+                                if (confirm(`Delete template "${template.api_name}"?`)) {
+                                  deleteMutation.mutate(template.template_id || template.api_name)
+                                }
+                              }}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </motion.div>
+          </div>
         )}
       </main>
     </div>

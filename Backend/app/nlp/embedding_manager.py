@@ -77,7 +77,7 @@ class EmbeddingManager:
             # Check if index exists
             self.redis_client.ft(self.index_name).info()
             logger.info(f"Index {self.index_name} already exists")
-        except:
+        except redis.exceptions.ResponseError:
             # Create index
             logger.info(f"Creating index {self.index_name}")
             
@@ -379,7 +379,7 @@ class EmbeddingManager:
                         slots = json.loads(request_data)
                     else:
                         slots = request_data
-                except:
+                except json.JSONDecodeError:
                     slots = {}
                 
                 matches.append({

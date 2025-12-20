@@ -103,7 +103,7 @@ export function useRunPolling({
  */
 export function getStepProgress(step: string | undefined): number {
   if (!step) return 0
-  
+
   const stepMap: Record<string, number> = {
     'queued': 0.05,
     'parse_intent': 0.2,
@@ -117,7 +117,7 @@ export function getStepProgress(step: string | undefined): number {
     'error': 0,
     'failed': 0,
   }
-  
+
   return stepMap[step] ?? 0
 }
 
@@ -126,20 +126,20 @@ export function getStepProgress(step: string | undefined): number {
  */
 export function getStepDescription(step: string | undefined): string {
   if (!step) return 'Initializing...'
-  
+
   const descriptions: Record<string, string> = {
     'queued': 'Your request is queued',
     'parse_intent': 'Understanding your request...',
     'dataset_generated': 'Creating dataset...',
     'embeddings_done': 'Computing embeddings...',
     'vector_search_done': 'Performing vector search...',
-    'ready': 'Ready! JSON meaning found ✅',
+    'ready': 'Ready! JSON meaning found',
     'selenium_running': 'Running Selenium tests...',
-    'selenium_done': 'Selenium tests complete ✅',
-    'complete': 'Complete ✅',
-    'error': 'An error occurred ❌',
-    'failed': 'Run failed ❌',
+    'selenium_done': 'Selenium tests complete',
+    'complete': 'Complete',
+    'error': 'An error occurred',
+    'failed': 'Run failed',
   }
-  
+
   return descriptions[step] ?? 'Processing...'
 }

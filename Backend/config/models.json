@@ -1,25 +1,8 @@
 {
   "version": "1.0",
-  "last_updated": "2025-12-03",
+  "last_updated": "2025-12-13",
+  "description": "Single embedding model + Ollama LLM for dataset generation",
   "embedding_models": [
-    {
-      "model_id": "all-minilm",
-      "type": "embedding",
-      "name": "All-MiniLM",
-      "dimension": 384,
-      "context_tokens": 512,
-      "cpu_friendly": true,
-      "provider": "ollama",
-      "ollama_model": "all-minilm",
-      "notes": "Super-Fast Lightweight Embedding Model. Perfect for speed-focused scenarios.",
-      "status": "active",
-      "use_cases": ["development", "testing", "low-resource", "real-time"],
-      "performance": {
-        "speed": "fast",
-        "quality": "good",
-        "memory_mb": 90
-      }
-    },
     {
       "model_id": "nomic-embed-text",
       "type": "embedding",
@@ -29,71 +12,41 @@
       "cpu_friendly": true,
       "provider": "ollama",
       "ollama_model": "nomic-embed-text",
-      "notes": "High-Quality, Balanced Default Embedding Model. Best balance between speed, context, and accuracy.",
+      "notes": "High-Quality, Balanced Embedding Model. Best balance between speed, context window (8192 tokens), and accuracy.",
       "status": "active",
-      "use_cases": ["production", "balanced", "rag", "semantic-search"],
+      "use_cases": [
+        "production",
+        "balanced",
+        "rag",
+        "semantic-search"
+      ],
       "performance": {
         "speed": "fast",
         "quality": "excellent",
         "memory_mb": 274
       }
-    },
-    {
-      "model_id": "mxbai-embed-large",
-      "type": "embedding",
-      "name": "MXBai-Embed-Large",
-      "dimension": 1024,
-      "context_tokens": 512,
-      "cpu_friendly": false,
-      "provider": "ollama",
-      "ollama_model": "mxbai-embed-large",
-      "notes": "High-Precision, Heavy-Duty Embedding Model. Ideal for precision-critical search.",
-      "status": "active",
-      "use_cases": ["high-quality", "enterprise", "legal", "medical"],
-      "performance": {
-        "speed": "moderate",
-        "quality": "superior",
-        "memory_mb": 670
-      }
     }
   ],
   "llm_models": [
     {
-      "model_id": "gemini-2.5-pro",
+      "model_id": "llama3.1:8b-instruct-q4_K_M",
       "type": "llm",
-      "name": "Gemini 2.5 Pro",
+      "name": "Llama 3.1 8B Instruct (Ollama)",
       "dimension": null,
-      "context_tokens": 1000000,
-      "cpu_friendly": false,
-      "provider": "google",
-      "api_required": true,
-      "notes": "Primary dataset generation model via Gemini API. High quality, large context. Requires API key.",
+      "context_tokens": 128000,
+      "cpu_friendly": true,
+      "provider": "ollama",
+      "api_required": false,
+      "notes": "Primary dataset generation model via Ollama. Local CPU inference, quantized for speed. High variation, deterministic, schema-safe output.",
       "status": "active",
-      "use_cases": ["dataset-generation", "api"],
-      "pricing": {
-        "model": "pay-per-use",
-        "cost_per_1k_tokens": 0.00125
-      }
+      "use_cases": [
+        "dataset-generation",
+        "local-inference"
+      ]
     }
   ],
   "default_models": {
     "embedding": "nomic-embed-text",
-    "llm": "gemini-2.5-pro"
-  },
-  "compatibility_matrix": {
-    "embedding_models": {
-      "all-minilm": {
-        "compatible_with": ["all-minilm"],
-        "migration_path": ["nomic-embed-text"]
-      },
-      "nomic-embed-text": {
-        "compatible_with": ["nomic-embed-text"],
-        "migration_path": ["mxbai-embed-large"]
-      },
-      "mxbai-embed-large": {
-        "compatible_with": ["mxbai-embed-large"],
-        "migration_path": []
-      }
-    }
+    "llm": "llama3.1:8b-instruct-q4_K_M"
   }
 }

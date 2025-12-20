@@ -6,7 +6,7 @@ Endpoints:
 - GET /api/v1/audit/logs/{log_id} - Get specific audit log entry
 - GET /api/v1/audit/stats - Get audit statistics
 
-🔒 Multi-tenant isolation: Users can only access their own audit logs
+Multi-tenant isolation: Users can only access their own audit logs
 """
 
 from typing import Optional, List
@@ -104,7 +104,7 @@ async def create_audit_log(
         db.add(new_log)
         await db.commit()
         
-        logger.info(f"📝 Audit log created: {data.action} by user {current_user.u_id}")
+        logger.info(f"Audit log created: {data.action} by user {current_user.u_id}")
         
         return {"success": True, "log_id": str(new_log.log_id)}
         
@@ -129,7 +129,7 @@ async def get_audit_logs(
     """
     Get audit logs for current user with filters
     
-    🔒 Multi-tenant isolation: Users can only see their own logs
+    Multi-tenant isolation: Users can only see their own logs
     
     Filters:
     - action: Specific action type (create_template, generate_dataset, etc.)
@@ -200,7 +200,7 @@ async def get_audit_logs(
             for log in logs
         ]
         
-        logger.info(f"📊 Retrieved {len(log_responses)}/{total} audit logs for user {current_user.u_id}")
+        logger.info(f"Retrieved {len(log_responses)}/{total} audit logs for user {current_user.u_id}")
         
         return AuditLogsListResponse(
             total=total,
@@ -226,7 +226,7 @@ async def get_audit_log(
     """
     Get specific audit log entry by ID
     
-    🔒 Multi-tenant isolation: Users can only access their own logs
+    Multi-tenant isolation: Users can only access their own logs
     """
     try:
         # Query with multi-tenant isolation
@@ -338,7 +338,7 @@ async def get_audit_stats(
             for log in recent_logs
         ]
         
-        logger.info(f"📊 Retrieved audit stats for user {current_user.u_id}: {total_actions} actions in last {days} days")
+        logger.info(f"Retrieved audit stats for user {current_user.u_id}: {total_actions} actions in last {days} days")
         
         return AuditStatsResponse(
             total_actions=total_actions,

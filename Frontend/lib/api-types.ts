@@ -58,6 +58,7 @@ export interface TemplateModel {
   api_name: string;
   description: string;
   endpoint: string;
+  base_url?: string;
   method: string;
   intent_keywords: string[];
   parameters: ParameterModel[];
@@ -185,7 +186,7 @@ export interface DatasetGenerateResponse {
 }
 
 export interface DatasetExportRequest {
-  format: 'csv' | 'json';
+  format: 'csv';
   intent?: string;
   from_date?: string;
   to_date?: string;

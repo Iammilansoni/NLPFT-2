@@ -7,10 +7,10 @@ import {
   Check,
   Loader2,
   AlertCircle,
-  Brain,
+  Network,
   FileJson,
   Database,
-  Zap,
+  Gauge,
   Play,
   BarChart3,
   ChevronDown,
@@ -43,10 +43,10 @@ interface ProgressDrawerProps {
 }
 
 const stepIcons = {
-  intent: Brain,
+  intent: Network,
   json: FileJson,
   dataset: Database,
-  embed: Zap,
+  embed: Gauge,
   execute: Play,
   results: BarChart3
 }
@@ -125,7 +125,7 @@ export function ProgressDrawer({
                   </p>
                 )}
               </div>
-              
+
               <div className="flex items-center gap-2">
                 {canCancel && currentStep?.status === "running" && (
                   <Button variant="outline" size="sm" onClick={onCancel}>
@@ -198,7 +198,7 @@ export function ProgressDrawer({
                           <div className="flex-1 text-left">
                             <div className="font-semibold">{step.label}</div>
                             <div className="text-sm text-muted-foreground">{step.description}</div>
-                            
+
                             {/* Step Progress */}
                             {step.status === "running" && step.progress !== undefined && (
                               <div className="mt-2">

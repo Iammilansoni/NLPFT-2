@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, Sparkles } from 'lucide-react'
+import { ArrowRight, Cpu } from 'lucide-react'
 import Link from 'next/link'
 
 export function CTABanner() {
@@ -30,7 +30,7 @@ export function CTABanner() {
             className="space-y-6 max-w-3xl mx-auto"
           >
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
-              <Sparkles className="h-4 w-4 text-primary" />
+              <Cpu className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium">Ready to transform your testing?</span>
             </div>
 
@@ -42,7 +42,7 @@ export function CTABanner() {
             </h2>
 
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Join teams who've already automated their API testing with natural language. 
+              Join teams who've already automated their API testing with natural language.
               No credit card required for your 14-day trial.
             </p>
 

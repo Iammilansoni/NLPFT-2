@@ -15,7 +15,7 @@ sqlalchemy==2.0.23  # SQL toolkit and ORM
 alembic==1.13.0  # Database migrations
 
 # Redis dependencies
-redis==4.6.0  # Redis client (compatible with celery)
+redis==4.6.0  # Redis client
 redis[hiredis]==4.6.0  # Redis with C parser for performance
 
 # Authentication and Security
@@ -43,10 +43,6 @@ tqdm==4.66.1  # Progress bars
 
 # Rate limiting
 slowapi==0.1.9  # Rate limiting with Redis backend
-
-# Background tasks
-celery==5.3.4  # Distributed task queue
-celery[redis]==5.3.4  # Celery with Redis backend
 
 # Development and testing
 pytest==7.4.3

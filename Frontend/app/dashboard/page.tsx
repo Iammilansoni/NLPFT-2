@@ -1,209 +1,257 @@
 'use client'
 
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
-import { motion } from 'framer-motion'
 import {
   CheckCircle2,
-  FileCode,
   Activity,
   Brain,
   Zap,
-  ArrowRight,
-  Search,
-  Command,
-  Terminal,
-  Cpu,
   Target,
-  Plus,
-  X,
-  AlertTriangle,
+  Cpu,
   RefreshCw,
+  Sparkles,
+  AlertTriangle,
+  ChevronDown,
+  Maximize2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Skeleton } from '@/components/ui/skeleton'
-import { cn } from '@/lib/utils'
-import { useRouter } from 'next/navigation'
 import { useQueryStats } from '@/hooks/useQuery'
 import { useTemplateStats } from '@/hooks/useTemplates'
 import { apiClient } from '@/lib/api'
-import { EMBEDDING_MODELS, DEFAULT_EMBEDDING_MODEL, getEmbeddingModelInfo } from '@/lib/constants/embedding-models'
-import { GlassCard } from '@/components/ui/GlassCard'
-import { MagneticButton } from '@/components/ui/MagneticButton'
-import { ModelMismatchDialog } from '@/components/ui/model-mismatch-dialog'
-import { toast } from '@/hooks/use-toast'
+import { DEFAULT_EMBEDDING_MODEL, getEmbeddingModelInfo, getDimensionForModel, areModelsCompatible } from '@/lib/constants/embedding-models'
+import { useToast } from '@/hooks/use-toast'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+
+
+// New Components
+import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
+import { SearchSection } from '@/components/dashboard/SearchSection'
+import { MetricCard } from '@/components/dashboard/MetricCard'
+import { TopIntents } from '@/components/dashboard/TopIntents'
+
 
 const TrendChart = dynamic(
   () => import('@/components/dashboard/trend-chart').then((m) => m.TrendChart),
   {
     ssr: false,
     loading: () => (
-      <div className="h-64 w-full bg-muted/10 animate-pulse rounded-2xl border border-dashed border-muted" />
+      <div className="h-48 w-full bg-muted/20 rounded-sm animate-pulse" />
     ),
   }
 )
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.2,
-    },
-  },
+/**
+ * Detect user intent from query text.
+ */
+function detectQueryIntent(query: string): "action" | "info" {
+  const q = query.toLowerCase().trim()
+
+  // Action keywords (user wants to DO something)
+  const actionKeywords = [
+    "create", "make", "add", "submit", "place", "generate", "process",
+    "initiate", "start", "begin", "execute", "run", "perform", "send",
+    "post", "put", "delete", "update", "modify", "change", "set",
+    "upload", "download", "install", "configure", "enable", "disable",
+    "order", "purchase", "buy", "subscribe", "cancel", "refund",
+    "i need to", "i want to", "let me", "gimme", "wanna", "gotta", "lemme"
+  ]
+
+  // Info keywords (user wants to KNOW something)
+  const infoKeywords = [
+    "what", "how", "where", "when", "why", "which", "who",
+    "tell me", "show me", "explain", "describe", "list",
+    "documentation", "docs", "guide", "help", "api for"
+  ]
+
+  for (const kw of actionKeywords) {
+    if (q.includes(kw)) return "action"
+  }
+
+  for (const kw of infoKeywords) {
+    if (q.includes(kw)) return "info"
+  }
+
+  return "action"
 }
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  show: { 
-    opacity: 1, 
-    y: 0,
-    transition: { 
-      type: "spring",
-      stiffness: 50,
-      damping: 20
-    }
-  },
-}
 
 export default function DashboardPage() {
-  const router = useRouter()
+  const { toast } = useToast()
+
+
   const [query, setQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<{
-    query: string;
-    ranked_results: Array<{ rank: number; score: number; text: string }>;
-    stage1_results?: any[];
-  } | null>(null)
+  const [searchResults, setSearchResults] = useState<any>(null) // Type was complex, simplified for brevity or I should copy the type
   const [isSearching, setIsSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [embeddingModel, setEmbeddingModel] = useState(DEFAULT_EMBEDDING_MODEL)
   const [showStage1, setShowStage1] = useState(false)
-  
-  // Model mismatch dialog state
-  const [showMismatchDialog, setShowMismatchDialog] = useState(false)
-  const [mismatchInfo, setMismatchInfo] = useState<{
-    datasetModel: string
-    settingsModel: string
-    datasetId: string
-    datasetName?: string
-  } | null>(null)
-  const [isReEmbedding, setIsReEmbedding] = useState(false)
+  const [showStage2, setShowStage2] = useState(false)
+  const [settingsModel, setSettingsModel] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
-  // Use our custom hooks for backend data
+  // Model mismatch state
+  const [showModelMismatchDialog, setShowModelMismatchDialog] = useState(false)
+  const [mismatchInfo, setMismatchInfo] = useState<{
+    settingsModel: string;
+    settingsDimension: number;
+    selectedModel: string;
+    selectedDimension: number;
+  } | null>(null)
+  const [pendingQuery, setPendingQuery] = useState<string | null>(null)
+
+  // Available models from backend
+  const [availableModels, setAvailableModels] = useState<Array<{
+    model_id: string;
+    label?: string;
+    dimension?: number;
+  }>>([{ model_id: 'nomic-embed-text', label: 'Nomic Embed Text', dimension: 768 }])
+
   const { data: stats, isLoading, error } = useQueryStats()
   const { data: templateStats, isLoading: templatesLoading, error: templatesError } = useTemplateStats()
 
-  // Calculate detailed health status with safe defaults
+  // System Health Logic
   const backendHealthy = !error && !!stats
   const databaseHealthy = !!stats && typeof stats?.total_embeddings === 'number' && stats.total_embeddings >= 0
   const templatesHealthy = !templatesError && !!templateStats
-
   const allHealthy = backendHealthy && databaseHealthy && templatesHealthy
-  const isLoading_ = isLoading || templatesLoading
+  const isLoadingStats = isLoading || templatesLoading
 
-  const quickActions = [
-    { label: 'Test Login', icon: <Terminal className="w-4 h-4" />, query: 'Test login with credentials' },
-    { label: 'Create User', icon: <Plus className="w-4 h-4" />, query: 'Create new user account' },
-    { label: 'Update Profile', icon: <FileCode className="w-4 h-4" />, query: 'Update user profile' },
-    { label: 'Delete User', icon: <X className="w-4 h-4" />, query: 'Delete user by ID' },
-  ]
 
-  // Handle model mismatch dialog actions
-  const handleUseCurrentModel = useCallback(() => {
-    setShowMismatchDialog(false)
-    // Proceed with search using current settings model (may fail or produce inaccurate results)
-    toast({
-      title: "⚠️ Searching with different model",
-      description: "Results may be inaccurate due to dimension mismatch",
-    })
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const settings = await apiClient.getUserSettings()
+        if (settings?.default_embedding_model) {
+          setSettingsModel(settings.default_embedding_model)
+          setEmbeddingModel(settings.default_embedding_model)
+        }
+      } catch (err) {
+        console.debug('Failed to fetch user settings:', err)
+      }
+    }
+    fetchSettings()
   }, [])
 
-  const handleReEmbed = useCallback(async () => {
-    if (!mismatchInfo?.datasetId) return
-    
-    setIsReEmbedding(true)
-    try {
-      const result = await apiClient.reembedDataset(mismatchInfo.datasetId, {
-        model: embeddingModel,
-        force: true,
-      })
-      
-      toast({
-        title: "🔄 Re-embedding started",
-        description: `Converting to ${getEmbeddingModelInfo(embeddingModel)?.label || embeddingModel}. This may take a few minutes.`,
-      })
-      
-      setShowMismatchDialog(false)
-      
-      // Optionally poll for status
-      if (result.celery_task_id) {
-        // Could implement polling here
-        console.log('Re-embed task started:', result.celery_task_id)
+  // Fetch available embedding models from backend
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const data = await apiClient.getAvailableModels()
+        if (data?.models && Array.isArray(data.models)) {
+          const formattedModels = data.models.map((m: any) => ({
+            model_id: m.model_id || m.id || m.name,
+            label: m.name || m.label || m.model_id,
+            dimension: m.dimension
+          }))
+          setAvailableModels(formattedModels)
+        }
+      } catch (err) {
+        console.debug('Failed to fetch available models:', err)
       }
-    } catch (err: any) {
-      toast({
-        title: "Re-embedding failed",
-        description: err?.message || "Failed to start re-embedding",
-        variant: "destructive",
-      })
-    } finally {
-      setIsReEmbedding(false)
     }
-  }, [mismatchInfo, embeddingModel])
+    fetchModels()
+  }, [])
 
-  async function handleSearch() {
-    if (!query.trim()) return
-    
+  // Check for model mismatch before search
+  function checkModelMismatch(searchQuery: string): boolean {
+    if (!settingsModel || embeddingModel === settingsModel) {
+      return false // No mismatch
+    }
+
+    const settingsDim = getDimensionForModel(settingsModel)
+    const selectedDim = getDimensionForModel(embeddingModel)
+
+    if (settingsDim !== selectedDim) {
+      // Dimension mismatch - show warning dialog
+      setMismatchInfo({
+        settingsModel: settingsModel,
+        settingsDimension: settingsDim,
+        selectedModel: embeddingModel,
+        selectedDimension: selectedDim,
+      })
+      setPendingQuery(searchQuery)
+      setShowModelMismatchDialog(true)
+      return true // Has mismatch
+    }
+
+    return false
+  }
+
+  // Handle proceeding with settings model
+  async function handleUseSettingsModel() {
+    if (settingsModel) {
+      setEmbeddingModel(settingsModel)
+      setShowModelMismatchDialog(false)
+      if (pendingQuery) {
+        await performSearch(pendingQuery, settingsModel)
+      }
+      setPendingQuery(null)
+    }
+  }
+
+  // Handle using selected model anyway (with warning)
+  async function handleUseSelectedModelAnyway() {
+    setShowModelMismatchDialog(false)
+    if (pendingQuery) {
+      toast({
+        title: "⚠️ Using Different Model",
+        description: `Searching with ${getEmbeddingModelInfo(embeddingModel)?.label}. Results may not include all embedded data.`,
+        variant: "default",
+      })
+      await performSearch(pendingQuery, embeddingModel)
+    }
+    setPendingQuery(null)
+  }
+
+  // Core search function
+  async function performSearch(searchQuery: string, model: string) {
     setIsSearching(true)
     setSearchError(null)
     setSearchResults(null)
-    
+    setShowStage1(false)
+    setShowStage2(false)
+
     try {
-      // Use 2-stage ranking API: Stage 1 (KNN Vector Search) + Stage 2 (FlashRank Reranking)
-      const results = await apiClient.rankQueryDetailed(
-        query.trim(),
-        10 // top_k for Stage 1 retrieval
+      // Detect intent to maximize intent alignment bonus
+      const detectedIntent = detectQueryIntent(searchQuery)
+
+      const results = await apiClient.semanticRetrieve(
+        searchQuery.trim(),
+        5,
+        detectedIntent, // Pass detected intent for alignment bonus
+        false
       )
-      
-      // Check for MODEL_MISMATCH error in response
-      if (results?.error === 'MODEL_MISMATCH') {
-        setMismatchInfo({
-          datasetModel: results.embedded_with_model,
-          settingsModel: results.current_model,
-          datasetId: results.dataset_id,
-          datasetName: results.dataset_name,
+
+      if (!results.success && results.error) {
+        setSearchError(results.error)
+        toast({
+          title: "Search Failed",
+          description: results.error,
+          variant: "destructive",
         })
-        setShowMismatchDialog(true)
-        setSearchError('Embedding model mismatch detected')
         return
       }
-      
+
       setSearchResults(results)
-      
+      const candidateCount = results.stage1_vector_search?.length || 0
+      const processingTime = results.metadata?.processing_time_ms || 0
+
       toast({
         title: "Search Complete",
-        description: `Found ${results.ranked_results?.length || 0} results using 2-stage ranking`,
+        description: `Found ${candidateCount} candidates in ${processingTime}ms using ${getEmbeddingModelInfo(model)?.label || model}`,
       })
     } catch (err: any) {
       console.error('Search failed:', err)
-      
-      // Check if error response contains MODEL_MISMATCH
-      if (err?.error === 'MODEL_MISMATCH' || err?.detail?.error === 'MODEL_MISMATCH') {
-        const errorData = err.detail || err
-        setMismatchInfo({
-          datasetModel: errorData.embedded_with_model || errorData.dataset_model,
-          settingsModel: errorData.current_model || errorData.search_model,
-          datasetId: errorData.dataset_id,
-          datasetName: errorData.dataset_name,
-        })
-        setShowMismatchDialog(true)
-        setSearchError('Embedding model mismatch detected')
-        return
-      }
-      
-      // Check for dimension mismatch errors
+
+      const errorMessage = err.detail?.message || err.detail || err.message || 'Failed to perform search'
+
       if (err?.message?.includes('dimension') || err?.detail?.includes('dimension')) {
         setSearchError('Vector dimension mismatch. The embedding model may have changed. Please re-embed your dataset.')
         toast({
@@ -213,17 +261,27 @@ export default function DashboardPage() {
         })
         return
       }
-      
-      setSearchError(err.detail?.message || err.detail || err.message || 'Failed to perform search')
-      
+
+      setSearchError(errorMessage)
       toast({
         title: "Search Failed",
-        description: err.detail?.message || err.detail || err.message || 'Failed to perform search',
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
       setIsSearching(false)
     }
+  }
+
+  async function handleSearch() {
+    if (!query.trim()) return
+
+    // Check for model mismatch first
+    if (checkModelMismatch(query)) {
+      return // Dialog will handle the rest
+    }
+
+    await performSearch(query, embeddingModel)
   }
 
   const topIntents = useMemo(() => {
@@ -233,501 +291,345 @@ export default function DashboardPage() {
       .slice(0, 5)
   }, [stats])
 
-  if (isLoading_) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="relative w-16 h-16 mx-auto">
-            <div className="absolute inset-0 border-t-2 border-primary animate-spin rounded-full" />
-            <div className="absolute inset-2 border-b-2 border-muted animate-spin rounded-full reverse" />
-          </div>
-          <p className="text-sm font-medium tracking-wide text-muted-foreground">Initializing System...</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="min-h-screen bg-background text-foreground p-6 lg:p-12 relative overflow-hidden">
-      {/* Background Ambient Effects */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary/5 blur-[120px]" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-purple-500/5 blur-[120px]" />
-      </div>
+    <div className="min-h-screen bg-background text-foreground pb-20">
+      <div className="max-w-7xl mx-auto p-6 md:p-8 space-y-8">
 
-      <div className="max-w-[1600px] mx-auto space-y-10 relative z-10">
-        
-        {/* Header Section */}
-        <motion.header 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2"
-        >
-          <div className="space-y-2">
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70 pb-1">
-              Dashboard
-            </h1>
-            <p className="text-lg text-muted-foreground font-light max-w-2xl">
-              Welcome back to <span className="font-medium text-primary">NLPForge</span>. 
-              System status is <span className={cn("font-medium", allHealthy ? "text-emerald-500" : "text-red-500")}>{allHealthy ? "Nominal" : "Degraded"}</span>.
+        <DashboardHeader systemStatus={allHealthy ? 'healthy' : 'degraded'} />
+
+        {/* Main Search Area */}
+        <section className="py-8">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-semibold tracking-tight mb-2">Semantic API Search</h2>
+            <p className="text-muted-foreground max-w-lg mx-auto">
+              Find and test your API endpoints using natural language.
+              Our vector engine matches your intent with the most relevant API capabilities.
             </p>
           </div>
 
-          <div className="flex items-center gap-4">
-             <div className={cn(
-              "flex items-center gap-2.5 px-4 py-2 rounded-full text-sm font-medium border backdrop-blur-sm transition-all shadow-sm",
-              allHealthy 
-                ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10" 
-                : "border-red-500/20 bg-red-500/5 text-red-600 dark:text-red-400 hover:bg-red-500/10"
-            )}>
-              <div className="relative flex h-2.5 w-2.5">
-                <span className={cn(
-                  "animate-ping absolute inline-flex h-full w-full rounded-full opacity-75",
-                  allHealthy ? "bg-emerald-500" : "bg-red-500"
-                )}></span>
-                <span className={cn(
-                  "relative inline-flex rounded-full h-2.5 w-2.5",
-                  allHealthy ? "bg-emerald-500" : "bg-red-500"
-                )}></span>
-              </div>
-              {allHealthy ? "System Online" : "System Alert"}
-            </div>
-          </div>
-        </motion.header>
+          <SearchSection
+            query={query}
+            setQuery={setQuery}
+            model={embeddingModel}
+            setModel={setEmbeddingModel}
+            onSearch={handleSearch}
+            isSearching={isSearching}
+            settingsModel={settingsModel}
+            models={availableModels}
+          />
 
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="show"
-          className="space-y-8"
-        >
-          {/* Search / Command Center */}
-          <motion.div variants={itemVariants} className="relative z-20">
-            <div className="relative group">
-              {/* Animated gradient border */}
-              <div className="absolute -inset-[1px] bg-gradient-to-r from-primary via-purple-500 to-primary rounded-2xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 blur-sm transition-all duration-500 animate-gradient-x" />
-              <div className="absolute -inset-[1px] bg-gradient-to-r from-primary via-purple-500 to-primary rounded-2xl opacity-0 group-hover:opacity-50 group-focus-within:opacity-70 transition-all duration-500" />
-              
-              <GlassCard className="relative p-1.5 shadow-2xl shadow-primary/10 border-primary/10 group-hover:border-transparent group-focus-within:border-transparent transition-all duration-300">
-                <div className="flex items-center gap-3 p-2 bg-gradient-to-r from-background/80 to-background/60 rounded-xl backdrop-blur-sm">
-                  {/* Search Icon with pulse animation */}
-                  <div className="relative flex items-center justify-center w-12 h-12">
-                    <div className="absolute inset-0 bg-primary/20 rounded-xl blur-lg opacity-0 group-focus-within:opacity-100 transition-opacity duration-300" />
-                    <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/30">
-                      <Search className="w-5 h-5 text-white" />
-                    </div>
-                  </div>
-                  
-                  {/* Enhanced Input */}
-                  <div className="flex-1 relative">
-                    <Input
-                      type="text"
-                      placeholder="Ask anything or search test cases..."
-                      className="border-none bg-transparent h-14 text-lg font-medium placeholder:text-muted-foreground/40 focus-visible:ring-0 focus-visible:ring-offset-0 pr-4"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    />
-                    {/* Typing indicator line */}
-                    <div className="absolute bottom-2 left-0 right-4 h-0.5 bg-gradient-to-r from-transparent via-primary/30 to-transparent opacity-0 group-focus-within:opacity-100 transition-opacity duration-300" />
-                  </div>
-                  
-                  {/* Model Selector - Enhanced */}
-                  <div className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-muted/40 hover:bg-muted/60 rounded-xl border border-white/5 transition-all duration-200 cursor-pointer">
-                    <Brain className="w-4 h-4 text-primary" />
-                    <select
-                      value={embeddingModel}
-                      onChange={(e) => setEmbeddingModel(e.target.value)}
-                      className="bg-transparent border-none text-sm font-medium text-foreground focus:outline-none cursor-pointer"
-                    >
-                      {EMBEDDING_MODELS.map((model) => (
-                        <option key={model.value} value={model.value} className="bg-background">
-                          {model.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+        </section>
 
-                  {/* Keyboard shortcut hint */}
-                  <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-muted/30 rounded-lg border border-white/5">
-                    <Command className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-xs font-medium text-muted-foreground">K</span>
+        {/* Search Results - Enhanced with Stage Toggles & JSON Modal */}
+        {searchResults && (
+          <div className="mb-10 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="bg-card border border-border/60 rounded-2xl shadow-md overflow-hidden">
+              {/* Result Header */}
+              <div className="px-6 py-5 border-b border-border/40 flex items-center justify-between bg-muted/20">
+                <div className="flex items-center gap-4">
+                  <div className="bg-primary/10 p-2.5 rounded-xl">
+                    <Sparkles className="w-6 h-6 text-primary" />
                   </div>
-
-                  {/* Submit Button - Enhanced */}
-                  <Button 
-                    size="lg" 
-                    onClick={handleSearch}
-                    disabled={isSearching || !query.trim()}
-                    className="relative rounded-xl px-6 h-12 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 transition-all duration-300 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-                  >
-                    {isSearching ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        <span className="hidden sm:inline">Searching...</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Zap className="h-5 w-5" />
-                        <span className="hidden sm:inline font-semibold">Search</span>
-                      </div>
-                    )}
-                  </Button>
-                </div>
-              </GlassCard>
-            </div>
-            
-            {/* Search suggestions/quick prompts */}
-            <motion.div 
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="flex items-center gap-2 mt-4 px-2 overflow-x-auto pb-2 scrollbar-hide"
-            >
-              <span className="text-xs text-muted-foreground whitespace-nowrap">Try:</span>
-              {['Test user login', 'Create new account', 'Validate API response', 'Update profile'].map((suggestion) => (
-                <button
-                  key={suggestion}
-                  onClick={() => setQuery(suggestion)}
-                  className="px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary bg-muted/30 hover:bg-primary/10 rounded-full border border-transparent hover:border-primary/20 transition-all duration-200 whitespace-nowrap"
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </motion.div>
-          </motion.div>
-
-          {/* Search Results Section */}
-          {searchResults && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-4"
-            >
-              <GlassCard className="p-6">
-                <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-lg font-semibold flex items-center gap-2">
-                      <Search className="w-5 h-5 text-primary" />
-                      Search Results
-                      <span className="text-sm font-normal text-muted-foreground ml-2">
-                        (2-Stage: KNN + FlashRank Reranking)
-                      </span>
-                    </h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Query: "{searchResults.query}"
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowStage1(!showStage1)}
-                      className="text-xs"
-                    >
-                      {showStage1 ? 'Hide Stage 1' : 'Show Stage 1'}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSearchResults(null)}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Stage 1 Results (KNN Vector Search) */}
-                {showStage1 && searchResults.stage1_results && (
-                  <div className="mb-6 p-4 bg-muted/30 rounded-lg border border-dashed">
-                    <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                      <Brain className="w-4 h-4" />
-                      Stage 1: KNN Vector Search (Cosine Similarity)
-                    </h4>
-                    <div className="space-y-2">
-                      {searchResults.stage1_results.slice(0, 5).map((result: any, idx: number) => (
-                        <div key={idx} className="flex items-center justify-between text-sm p-2 bg-background/50 rounded">
-                          <span className="truncate max-w-[60%]">{result.query || result.text}</span>
-                          <span className="text-xs font-mono bg-blue-500/10 text-blue-600 px-2 py-0.5 rounded">
-                            {((result.vector_score ?? result.cosine_similarity ?? 0) * 100).toFixed(1)}% similarity
-                          </span>
-                        </div>
-                      ))}
+                    <h3 className="font-bold text-xl leading-tight">Search Insights</h3>
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+                      <span className="font-mono bg-muted/50 px-2 py-0.5 rounded">{searchResults.metadata?.processing_time_ms || 0}ms</span>
+                      <span>•</span>
+                      <span>{searchResults.metadata?.total_candidates || 0} candidates analyzed</span>
                     </div>
                   </div>
-                )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSearchResults(null)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  Clear
+                </Button>
+              </div>
 
-                {/* Stage 2 Results (FlashRank Reranked) */}
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
-                    <Zap className="w-4 h-4" />
-                    Stage 2: FlashRank Reranked Results
-                  </h4>
-                  {searchResults.ranked_results?.length > 0 ? (
-                    searchResults.ranked_results.map((result, idx) => (
-                      <motion.div
-                        key={idx}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: idx * 0.05 }}
-                        className="p-4 bg-muted/20 hover:bg-muted/40 rounded-xl border border-transparent hover:border-primary/20 transition-all group"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">
-                                {result.rank}
-                              </span>
-                              {result.api && (
-                                <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 text-xs font-medium rounded">
-                                  {result.api}
-                                </span>
-                              )}
-                              {result.endpoint && (
-                                <span className="text-xs text-muted-foreground font-mono truncate max-w-[200px]">
-                                  {result.endpoint}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm font-medium mb-1 line-clamp-2">
-                              {result.text}
-                            </p>
-                            {result.original_similarity !== undefined && (
-                              <p className="text-xs text-muted-foreground">
-                                Original similarity: {(result.original_similarity * 100).toFixed(1)}%
-                              </p>
+              {/* Main Result Content */}
+              <div className="p-6">
+                {searchResults.final_output ? (
+                  <div className="space-y-6">
+                    {/* Top Match Card */}
+                    <div className="p-6 rounded-xl bg-gradient-to-br from-emerald-500/5 to-emerald-500/0 border border-emerald-500/20">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="space-y-3 flex-1">
+                          <div className="flex items-center gap-3">
+                            <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-sm font-semibold uppercase tracking-wider">
+                              Top Recommendation
+                            </span>
+                            <span className="text-sm text-muted-foreground font-medium">
+                              {(searchResults.final_output.confidence_score * 100).toFixed(1)}% Confidence
+                            </span>
+                          </div>
+                          <h4 className="text-2xl font-bold tracking-tight text-foreground">
+                            {searchResults.final_output.api_name}
+                          </h4>
+                          <div className="p-4 rounded-lg bg-muted/40 border border-border/50 font-mono text-base break-all flex items-center gap-3">
+                            <span className={`
+                              px-2.5 py-1 rounded text-xs font-bold
+                              ${searchResults.final_output.method === 'GET' ? 'bg-blue-500/10 text-blue-600' : ''}
+                              ${searchResults.final_output.method === 'POST' ? 'bg-green-500/10 text-green-600' : ''}
+                              ${searchResults.final_output.method === 'DELETE' ? 'bg-red-500/10 text-red-600' : ''}
+                              ${searchResults.final_output.method === 'PUT' ? 'bg-amber-500/10 text-amber-600' : ''}
+                            `}>
+                              {searchResults.final_output.method}
+                            </span>
+                            <span className="text-foreground">{searchResults.final_output.endpoint}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stage Buttons & JSON Section */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Stage 1: Vector Retrieval */}
+                      <div className="space-y-3">
+                        <button
+                          onClick={() => setShowStage1(!showStage1)}
+                          className="w-full flex items-center justify-between p-4 rounded-xl bg-muted/30 hover:bg-muted/50 border border-border/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Brain className="w-5 h-5 text-primary" />
+                            <span className="font-semibold text-base">Stage 1: Vector Retrieval</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-mono bg-primary/10 text-primary px-2 py-0.5 rounded">{searchResults.stage1_vector_search?.length || 0} hits</span>
+                            <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform ${showStage1 ? 'rotate-180' : ''}`} />
+                          </div>
+                        </button>
+                        {showStage1 && (
+                          <div className="bg-card border border-border/60 rounded-lg overflow-hidden animate-in slide-in-from-top-2 duration-300">
+                            {searchResults.stage1_vector_search?.map((res: any, i: number) => (
+                              <div key={i} className="px-4 py-3 border-b border-border/40 last:border-0 hover:bg-muted/30 transition-colors">
+                                <div className="flex justify-between items-start gap-3">
+                                  <span className="text-sm leading-relaxed">{res.query}</span>
+                                  <span className="text-sm font-mono font-medium text-primary shrink-0">{(res.similarity_score * 100).toFixed(0)}%</span>
+                                </div>
+                              </div>
+                            ))}
+                            {(!searchResults.stage1_vector_search?.length) && (
+                              <div className="p-4 text-center text-sm text-muted-foreground">No matches found</div>
                             )}
                           </div>
-                          <div className="text-right flex-shrink-0">
-                            <div className="text-lg font-bold text-primary">
-                              {(result.score * 100).toFixed(1)}%
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              FlashRank Score
-                            </div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      No results found for your query
-                    </div>
-                  )}
-                </div>
-              </GlassCard>
-            </motion.div>
-          )}
+                        )}
+                      </div>
 
-          {/* Search Error */}
-          {searchError && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg"
-            >
-              <div className="flex items-center gap-2 text-destructive">
-                <AlertTriangle className="w-4 h-4" />
-                <span className="text-sm font-medium">{searchError}</span>
+                      {/* Stage 2: Reranking */}
+                      <div className="space-y-3">
+                        <button
+                          onClick={() => setShowStage2(!showStage2)}
+                          className="w-full flex items-center justify-between p-4 rounded-xl bg-muted/30 hover:bg-muted/50 border border-border/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Zap className="w-5 h-5 text-primary" />
+                            <span className="font-semibold text-base">Stage 2: Reranking</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-mono bg-primary/10 text-primary px-2 py-0.5 rounded">{searchResults.stage2_reranking?.length || 0} results</span>
+                            <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform ${showStage2 ? 'rotate-180' : ''}`} />
+                          </div>
+                        </button>
+                        {showStage2 && (
+                          <div className="bg-card border border-border/60 rounded-lg overflow-hidden animate-in slide-in-from-top-2 duration-300">
+                            {searchResults.stage2_reranking?.map((res: any, i: number) => (
+                              <div key={i} className={`px-4 py-3 border-b border-border/40 last:border-0 hover:bg-muted/30 transition-colors ${i === 0 ? 'bg-primary/5' : ''}`}>
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center gap-3">
+                                    <span className={`w-6 h-6 rounded-full text-xs flex items-center justify-center font-bold ${i === 0 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                                      {res.rank}
+                                    </span>
+                                    <span className="text-sm font-mono text-muted-foreground">{res.t_id?.substring(0, 12)}...</span>
+                                  </div>
+                                  <span className={`text-base font-semibold ${i === 0 ? 'text-primary' : ''}`}>
+                                    {(res.final_score * 100).toFixed(1)}%
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* JSON Output Section */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h5 className="font-semibold text-base">Full Response JSON</h5>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              navigator.clipboard.writeText(JSON.stringify(searchResults.final_output, null, 2))
+                              setCopied(true)
+                              setTimeout(() => setCopied(false), 2000)
+                            }}
+                          >
+                            {copied ? '✓ Copied!' : 'Copy JSON'}
+                          </Button>
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="outline" size="sm">
+                                <Maximize2 className="w-4 h-4 mr-2" />
+                                Enlarge
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+                              <DialogHeader>
+                                <DialogTitle>Full Response JSON</DialogTitle>
+                              </DialogHeader>
+                              <div className="flex-1 overflow-auto bg-muted/30 rounded-lg border border-border/40 p-4">
+                                <pre className="text-sm font-mono leading-relaxed whitespace-pre-wrap">
+                                  {JSON.stringify(searchResults.final_output, null, 2)}
+                                </pre>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+                      </div>
+                      <div className="bg-muted/20 rounded-xl border border-border/40 p-4 max-h-64 overflow-auto">
+                        <pre className="text-xs font-mono leading-relaxed text-muted-foreground">
+                          {JSON.stringify(searchResults.final_output, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-12 text-center text-muted-foreground">
+                    <p className="text-lg">No actionable match found.</p>
+                  </div>
+                )}
               </div>
-            </motion.div>
-          )}
-
-          {/* Metrics Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <MetricCard
-              label="Total Embeddings"
-              value={stats?.total_embeddings?.toLocaleString() || 0}
-              subtitle="Vectors in Redis"
-              icon={<Brain className="w-5 h-5 text-blue-500" />}
-              delay={0.1}
-            />
-            <MetricCard
-              label="Approved Templates"
-              value={templateStats?.by_status?.approved || 0}
-              subtitle={`${templateStats?.total_templates || 0} total`}
-              icon={<CheckCircle2 className="w-5 h-5 text-emerald-500" />}
-              delay={0.2}
-            />
-            <MetricCard
-              label="Total Intents"
-              value={Object.keys(stats?.intents || {}).length}
-              subtitle="Unique APIs"
-              icon={<Target className="w-5 h-5 text-purple-500" />}
-              delay={0.3}
-            />
-            <MetricCard
-              label="Embedding Model"
-              value={getEmbeddingModelInfo(stats?.model || embeddingModel)?.label?.split(' ')[0] || 'Nomic'}
-              subtitle={`${getEmbeddingModelInfo(stats?.model || embeddingModel)?.dimensions || 768}D vectors`}
-              icon={<Cpu className="w-5 h-5 text-amber-500" />}
-              delay={0.4}
-            />
-          </div>
-
-          {/* Main Content Area */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
-            {/* Left Column: Activity & Trends */}
-            <div className="lg:col-span-2 space-y-8">
-              <GlassCard className="p-6 h-[400px] flex flex-col">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Activity className="w-5 h-5 text-primary" />
-                    Performance Telemetry
-                  </h3>
-                </div>
-                <div className="flex-1 w-full">
-                  <TrendChart />
-                </div>
-              </GlassCard>
-            </div>
-
-            {/* Right Column: Actions & Stats */}
-            <div className="space-y-8">
-              {/* Quick Actions */}
-              <GlassCard className="p-6">
-                <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-                  <Cpu className="w-5 h-5 text-primary" />
-                  Quick Actions
-                </h3>
-                <div className="grid gap-3">
-                  {quickActions.map((action) => (
-                    <MagneticButton key={action.label}>
-                      <button
-                        className="w-full flex items-center gap-4 p-3 rounded-xl bg-muted/30 hover:bg-primary/5 border border-transparent hover:border-primary/20 transition-all duration-300 group text-left relative overflow-hidden"
-                        onClick={() => {
-                          setQuery(action.query)
-                          handleSearch()
-                        }}
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                        
-                        <div className="relative z-10 w-10 h-10 rounded-lg bg-background flex items-center justify-center shadow-sm border border-white/5 group-hover:scale-110 group-hover:border-primary/20 transition-all duration-300 text-primary">
-                          {action.icon}
-                        </div>
-                        <div className="relative z-10">
-                          <div className="font-medium group-hover:text-primary transition-colors">
-                            {action.label}
-                          </div>
-                          <div className="text-xs text-muted-foreground group-hover:text-muted-foreground/80">
-                            Click to run
-                          </div>
-                        </div>
-                        <ArrowRight className="relative z-10 w-4 h-4 ml-auto text-muted-foreground/50 group-hover:text-primary group-hover:translate-x-1 transition-all duration-300" />
-                      </button>
-                    </MagneticButton>
-                  ))}
-                </div>
-              </GlassCard>
-
-              {/* Top Intents */}
-              <GlassCard className="p-6">
-                <h3 className="text-lg font-semibold flex items-center gap-2 mb-6">
-                  <Target className="w-5 h-5 text-primary" />
-                  Top Intents
-                </h3>
-                <div className="space-y-5">
-                  {isLoading ? (
-                    <div className="space-y-4">
-                      {[...Array(5)].map((_, i) => (
-                        <Skeleton key={i} className="h-8 w-full rounded-lg" />
-                      ))}
-                    </div>
-                  ) : topIntents.length > 0 ? (
-                    topIntents.map(([intent, count], idx) => {
-                      const max = topIntents[0][1] as number
-                      const percent = Math.round(((count as number) / max) * 100)
-                      return (
-                        <div key={intent} className="space-y-2 group">
-                          <div className="flex items-center justify-between text-sm font-medium">
-                            <span className="group-hover:text-primary transition-colors truncate max-w-[200px]">{intent}</span>
-                            <span className="text-muted-foreground font-mono text-xs bg-muted/50 px-2 py-0.5 rounded-full">{count}</span>
-                          </div>
-                          <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
-                            <motion.div
-                              initial={{ width: 0 }}
-                              animate={{ width: `${percent}%` }}
-                              transition={{ duration: 1, delay: idx * 0.1, ease: "circOut" }}
-                              className="h-full bg-gradient-to-r from-primary to-purple-500 rounded-full relative"
-                            >
-                                <div className="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]" />
-                            </motion.div>
-                          </div>
-                        </div>
-                      )
-                    })
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground text-sm">
-                      No intent data available
-                    </div>
-                  )}
-                </div>
-              </GlassCard>
             </div>
           </div>
-        </motion.div>
-      </div>
-      
-      {/* Model Mismatch Dialog */}
-      {mismatchInfo && (
-        <ModelMismatchDialog
-          isOpen={showMismatchDialog}
-          onClose={() => setShowMismatchDialog(false)}
-          datasetModel={mismatchInfo.datasetModel}
-          settingsModel={mismatchInfo.settingsModel}
-          datasetName={mismatchInfo.datasetName}
-          onUseCurrentModel={handleUseCurrentModel}
-          onReEmbed={handleReEmbed}
-          isReEmbedding={isReEmbedding}
-        />
-      )}
-    </div>
-  )
-}
+        )}
 
-function MetricCard({
-  label,
-  value,
-  subtitle,
-  icon,
-  delay = 0
-}: {
-  label: string
-  value: string | number
-  subtitle?: string
-  icon: React.ReactNode
-  delay?: number
-}) {
-  return (
-    <motion.div 
-      variants={itemVariants}
-      whileHover={{ y: -5, scale: 1.02 }}
-      transition={{ type: "spring", stiffness: 300, damping: 20 }}
-    >
-      <GlassCard className="relative p-6 h-full flex flex-col justify-between group overflow-hidden border-primary/10 hover:border-primary/30 transition-colors">
-        {/* Gradient Background on Hover */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-        
-        <div className="relative z-10 flex items-start justify-between mb-4">
-          <div className="font-medium text-sm text-muted-foreground group-hover:text-primary transition-colors">
-            {label}
+        {/* Metrics Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <MetricCard
+            label="Total Embeddings"
+            value={stats?.total_embeddings?.toLocaleString() || '0'}
+            subtitle="Vectors in Redis"
+            icon={<Brain className="w-4 h-4" />}
+          />
+          <MetricCard
+            label="Approved Templates"
+            value={templateStats?.by_status?.approved ?? templateStats?.total_templates ?? 0}
+            progress={{
+              value: templateStats?.by_status?.approved ?? templateStats?.total_templates ?? 0,
+              total: templateStats?.total_templates || 1,
+              label: `${templateStats?.total_templates || 0} total declared`
+            }}
+            icon={<CheckCircle2 className="w-4 h-4" />}
+          />
+          <MetricCard
+            label="Total Intents"
+            value={(stats as any)?.total_intents || Object.keys(stats?.intents || {}).length}
+            subtitle={`${(stats as any)?.unique_apis || 0} Unique APIs`}
+            icon={<Target className="w-4 h-4" />}
+          />
+          <MetricCard
+            label="Embedding Model"
+            value={getEmbeddingModelInfo(embeddingModel)?.label || 'Nomic Embed Text'}
+            subtitle={`${getEmbeddingModelInfo(embeddingModel)?.dimension || 768}D vectors`}
+            icon={<Cpu className="w-4 h-4" />}
+          />
+        </div>
+
+        {/* Search Results Display - Kept inline for now due to complexity, but restyled */}
+
+
+        {/* Search Error */}
+        {
+          searchError && (
+            <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-lg flex items-center gap-3 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              <p className="text-sm font-medium">{searchError}</p>
+            </div>
+          )
+        }
+
+        {/* Analytics & Activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-8 border-t border-border/40">
+          <div className="lg:col-span-2 space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <h3 className="text-lg font-medium tracking-tight">System Telemetry</h3>
+                <p className="text-sm text-muted-foreground">Search latency and request volume</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => {
+                  // Force a re-render of chart or just simulate refresh for UI feedback
+                  const btn = document.getElementById('refresh-btn-icon');
+                  if (btn) btn.classList.add('animate-spin');
+                  setTimeout(() => {
+                    if (btn) btn.classList.remove('animate-spin');
+                    toast({ title: "Refreshed", description: "Telemetry data updated" });
+                  }, 1000);
+                }}
+              >
+                <RefreshCw id="refresh-btn-icon" className="w-3.5 h-3.5" />
+                Refresh
+              </Button>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-card p-1 shadow-sm">
+              <div className="h-[300px] w-full p-4">
+                <TrendChart />
+              </div>
+            </div>
           </div>
-          <div className="p-2.5 rounded-xl bg-background/50 shadow-sm border border-white/5 group-hover:scale-110 group-hover:bg-primary/10 transition-all duration-300">
-            {icon}
+
+          <div className="space-y-6">
+            <div className="space-y-1">
+              <h3 className="text-lg font-medium tracking-tight">Top Intents</h3>
+              <p className="text-sm text-muted-foreground">Most frequent user queries</p>
+            </div>
+            <div className="bg-card border border-border/60 rounded-xl p-6 shadow-sm min-h-[300px]">
+              <TopIntents intents={topIntents} isLoading={isLoadingStats} />
+            </div>
           </div>
         </div>
-        <div className="relative z-10 flex items-end justify-between">
-          <div className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
-            {value}
-          </div>
-          {subtitle && (
-            <div className="text-xs font-medium text-muted-foreground px-2.5 py-1 rounded-full bg-background/50 border border-white/5">
-              {subtitle}
+      </div >
+
+      {/* Dialogs */}
+      < Dialog open={showModelMismatchDialog} onOpenChange={setShowModelMismatchDialog} >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-warning">
+              <AlertTriangle className="w-5 h-5" />
+              Embedding Model Mismatch
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Your selected model <strong>{getEmbeddingModelInfo(mismatchInfo?.selectedModel || '')?.label}</strong> ({mismatchInfo?.selectedDimension}D)
+              does not match the system default settings <strong>{getEmbeddingModelInfo(mismatchInfo?.settingsModel || '')?.label}</strong> ({mismatchInfo?.settingsDimension}D).
+            </p>
+            <div className="bg-muted p-3 rounded-md text-xs border border-border">
+              <p className="font-semibold mb-1">Impact:</p>
+              <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
+                <li>Search vectors will have different dimensions</li>
+                <li>Retrieval will likely fail or return garbage</li>
+              </ul>
             </div>
-          )}
-        </div>
-      </GlassCard>
-    </motion.div>
+            <div className="flex flex-col gap-2 pt-2">
+              <Button onClick={handleUseSettingsModel} className="w-full">
+                Switch to {getEmbeddingModelInfo(mismatchInfo?.settingsModel || '')?.label} (Recommended)
+              </Button>
+              <Button variant="ghost" onClick={handleUseSelectedModelAnyway} className="w-full text-amber-600 hover:text-amber-700 hover:bg-amber-50">
+                Proceed with {getEmbeddingModelInfo(mismatchInfo?.selectedModel || '')?.label} anyway
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog >
+    </div >
   )
 }

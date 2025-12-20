@@ -1,59 +1,56 @@
 """
-Dataset Service - Celery tasks for dataset generation
+Dataset Service - Validation utilities for dataset generation
+==============================================================
+Provides validation functions for template parameters and generation settings.
+Dataset generation is handled directly in the API endpoint (app/api/v1/datasets.py).
 """
 
-from celery import shared_task
+from typing import Dict, List, Any
+
 from app.core.logger import logger
 
 
-@shared_task(name="app.services.dataset_service.generate_dataset_async")
-def generate_dataset_async(template_id: str, user_id: str, parameters: dict):
+# =============================================================================
+# VALIDATION FUNCTIONS
+# =============================================================================
+
+def validate_template_parameters(parameters: List[Dict], values: Dict) -> None:
     """
-    Async task to generate dataset from template
+    Validate that all required template parameters are provided.
     
     Args:
-        template_id: Template UUID
-        user_id: User UUID
-        parameters: Generation parameters (num_samples, etc.)
-    
-    Returns:
-        dict: Generation result with status and file paths
+        parameters: List of parameter definitions from template
+        values: Dictionary of provided values
+        
+    Raises:
+        ValueError: If a required parameter is missing
     """
-    try:
-        logger.info(f"🚀 Starting dataset generation: template={template_id}", extra={"user_id": user_id})
+    for param in parameters:
+        param_name = param.get("name", "")
+        is_required = param.get("is_required", False)
         
-        # TODO: Implement dataset generation logic
-        # 1. Load template
-        logger.info("📄 Loading template...", extra={"user_id": user_id})
+        if is_required and param_name not in values:
+            raise ValueError(f"Required parameter '{param_name}' is missing")
+
+
+def validate_generation_parameters(parameters: Dict) -> Dict:
+    """
+    Validate and normalize generation parameters.
+    
+    Args:
+        parameters: Raw generation parameters
         
-        # 2. Generate samples using AI/ML models
-        logger.info(f"🤖 Generating {parameters.get('num_samples', 0)} samples with AI model...", extra={"user_id": user_id})
-        
-        # 3. Save to file
-        logger.info("💾 Saving dataset to CSV...", extra={"user_id": user_id})
-        
-        # 4. Return results
-        
-        result = {
-            "status": "completed",
-            "message": "Dataset generation completed",
-            "template_id": template_id,
-            "user_id": user_id,
-            "files": [],
-            "statistics": {
-                "total_samples": parameters.get("num_samples", 0),
-                "generation_time": 0
-            }
-        }
-        
-        logger.info(f"✅ Dataset generation completed successfully", extra={"user_id": user_id})
-        return result
-        
-    except Exception as e:
-        logger.error(f"Dataset generation failed: {e}", exc_info=True)
-        return {
-            "status": "failed",
-            "message": str(e),
-            "template_id": template_id,
-            "user_id": user_id
-        }
+    Returns:
+        Validated and normalized parameters
+    """
+    validated = {
+        "num_samples": min(max(int(parameters.get("num_samples", 50)), 5), 500),
+        "user_prompt": str(parameters.get("user_prompt", "")),
+        "focus_areas": parameters.get("focus_areas", []),
+        "scenario_distribution": parameters.get("scenario_distribution", {
+            "valid": 0.70,
+            "edge": 0.20,
+            "extreme": 0.10
+        })
+    }
+    return validated

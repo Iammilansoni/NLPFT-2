@@ -2,19 +2,19 @@
 PostgreSQL Database Models - Enterprise Multi-Tenant AI-Powered API Testing Platform
 Schema for complex domain APIs (Telecom, Defense, RF, Satellite, 5G/6G, Drones)
 
-🎯 Platform Purpose:
+Platform Purpose:
 Understanding & testing cryptic domain APIs like:
 - Create_fft_with_no_pilot_signal()
 - Compute_phase_noise_map()
 - Generate_beamforming_vectors()
 - Run_harq_retransmission()
 
-✅ Postman-Style Template Builder with strict validation (min 500 words, 3+ samples)
-✅ LLM-powered dataset generation with high variation & error injection
-✅ Multi-tenant isolation with approval workflow (draft→review→approved)
-✅ Vector embeddings for semantic search (Redis)
+Postman-Style Template Builder with strict validation (min 500 words, 3+ samples)
+LLM-powered dataset generation with high variation & error injection
+Multi-tenant isolation with approval workflow (draft→review→approved)
+Vector embeddings for semantic search (Redis)
 
-🚀 Dataset Generation Flow:
+Dataset Generation Flow:
 1. User creates template with 500+ word description, JSON schema, samples, domain tags
 2. Template goes through approval workflow (draft → review → approved)
 3. LLM receives full template context + user's custom prompt
@@ -22,14 +22,14 @@ Understanding & testing cryptic domain APIs like:
 5. Output includes: variations, typos, mistakes, boundary conditions, realistic noise
 6. CSV stored, embeddings created, semantic search enabled
 
-🔄 Automatic Embeddings → Redis Vector DB:
+Automatic Embeddings → Redis Vector DB:
 After dataset generation:
-✅ System automatically embeds dataset rows using user's selected model (Settings)
-✅ Supported models: 384-dim (MiniLM, CPU-friendly), 768-dim (SBERT), 1536-dim (High accuracy)
-✅ Vectors stored in Redis ONLY: embedding:{u_id}:{t_id}:{csv_id}
-✅ Metadata stored in PostgreSQL: model_name, dimension, redis_namespace, timestamps
-✅ Redis HNSW index created per-dimension (384/768/1536)
-✅ High-speed similarity search with multi-tenant separation
+System automatically embeds dataset rows using user's selected model (Settings)
+Supported models: 384-dim (MiniLM, CPU-friendly), 768-dim (SBERT), 1536-dim (High accuracy)
+Vectors stored in Redis ONLY: embedding:{u_id}:{t_id}:{csv_id}
+Metadata stored in PostgreSQL: model_name, dimension, redis_namespace, timestamps
+Redis HNSW index created per-dimension (384/768/1536)
+High-speed similarity search with multi-tenant separation
 
 Tables (as per diagram):
 1. USERS - User authentication (u_id, user_name, email, password, created_at)
@@ -84,10 +84,10 @@ class UserSettings(Base):
     USER_SETTINGS table - User preferences for embedding models and LLMs
     
     Supported Embedding Models:
-    ✅ 384-dim: MiniLM (CPU-friendly, fast)
-    ✅ 768-dim: SBERT (balanced performance)
-    ✅ 1536-dim: High accuracy (resource-intensive)
-    ✅ Future expansion supported
+    384-dim: MiniLM (CPU-friendly, fast)
+    768-dim: SBERT (balanced performance)
+    1536-dim: High accuracy (resource-intensive)
+    Future expansion supported
     
     After dataset generation, system automatically embeds rows using selected model
     """
@@ -118,12 +118,12 @@ class Template(Base):
     Core fields from diagram: PK=t_id, FK=u_id, api_name, description, base_url, method, created_at, Field
     
     Enhanced for Enterprise Template Builder:
-    ✅ Detailed description (MINIMUM 500 words) explaining domain context
-    ✅ JSON Schema for strict request/response validation
-    ✅ Sample requests & responses (minimum 3 examples)
-    ✅ Domain tags (telecom, fft, mimo, encryption, etc.)
-    ✅ Auth configuration & headers
-    ✅ Rate limiting & assertions
+    Detailed description (MINIMUM 500 words) explaining domain context
+    JSON Schema for strict request/response validation
+    Sample requests & responses (minimum 3 examples)
+    Domain tags (telecom, fft, mimo, encryption, etc.)
+    Auth configuration & headers
+    Rate limiting & assertions
     """
     __tablename__ = "templates"
     
@@ -239,10 +239,10 @@ class Metadata(Base):
     Core fields from diagram: PK=m_id, FK=u_id, FK=t_id, confidence, remarks, created_at
     
     Enhanced for Template Builder:
-    ✅ Expert notes for domain-specific annotations
-    ✅ Security classification (public, internal, secret, highly-restricted)
-    ✅ Template status (draft → review → approved)
-    ✅ Dataset generation only allowed when status='approved'
+    Expert notes for domain-specific annotations
+    Security classification (public, internal, secret, highly-restricted)
+    Template status (draft → review → approved)
+    Dataset generation only allowed when status='approved'
     """
     __tablename__ = "metadata"
     
@@ -254,9 +254,6 @@ class Metadata(Base):
     
     # Expert annotations for domain-specific use cases
     expert_notes = Column(Text, nullable=True)  # Detailed technical notes from domain experts
-    
-    # Security & access control
-    security_classification = Column(Text, nullable=False, default="public")  # public, internal, secret, highly-restricted
     
     # Template approval workflow
     status = Column(Text, nullable=False, default="draft")  # draft, review, approved
@@ -287,23 +284,23 @@ class Dataset(Base):
     """
     DATASETS table - Top-level dataset entity for embedding model governance
     
-    🎯 Key Design Principle: ONE EMBEDDING MODEL PER DATASET
+    Key Design Principle: ONE EMBEDDING MODEL PER DATASET
     Once a dataset is embedded with a specific model, ALL rows must use that model.
     Re-embedding requires explicit user action and wipes previous embeddings.
     
     This model tracks:
-    ✅ Which embedding model was used (embedding_model)
-    ✅ Embedding dimension (embedding_dimension)  
-    ✅ When embedding started/completed
-    ✅ Embedding status (pending, in_progress, completed, failed)
-    ✅ Progress tracking (0-100%)
-    ✅ Total rows and embedded count
+    Which embedding model was used (embedding_model)
+    Embedding dimension (embedding_dimension)  
+    When embedding started/completed
+    Embedding status (pending, in_progress, completed, failed)
+    Progress tracking (0-100%)
+    Total rows and embedded count
     """
     __tablename__ = "datasets"
     
     dataset_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     u_id = Column(UUID(as_uuid=True), ForeignKey("users.u_id", ondelete="CASCADE"), nullable=False)
-    t_id = Column(UUID(as_uuid=True), ForeignKey("templates.t_id", ondelete="CASCADE"), nullable=False)
+    t_id = Column(UUID(as_uuid=True), ForeignKey("templates.t_id", ondelete="SET NULL"), nullable=True)  # Optional: NULL for uploaded datasets without template
     
     # Dataset identification
     name = Column(Text, nullable=True)  # User-friendly name
@@ -334,8 +331,8 @@ class Dataset(Base):
     generation_prompt = Column(Text, nullable=True)  # User's custom prompt
     scenario_distribution = Column(JSONB, nullable=True)  # {"valid": 70, "edge": 20, "extreme": 10}
     
-    # Celery task tracking
-    celery_task_id = Column(Text, nullable=True)  # Current Celery task ID
+    # Background task tracking
+    task_id = Column(Text, nullable=True)  # Current background task ID
     
     # Relationships
     user = relationship("User", back_populates="datasets")
@@ -356,28 +353,28 @@ class CSVData(Base):
     """
     CSV_DATA table - Individual rows of LLM-generated test data
     
-    🚀 Dataset Generation (LLM-Driven):
+    Dataset Generation (LLM-Driven):
     LLM receives:
     - Full template (500+ word description, JSON schema, samples, domain tags)
     - System prompt with strict rules
     - User's custom prompt (e.g., "Generate edge cases with pilot disabled")
     
     LLM outputs CSV with:
-    ✅ 70% valid cases (correct, schema-compliant)
-    ✅ 20% edge cases (boundary conditions, rare combinations)
-    ✅ 10% extreme scenarios (stress tests, worst-case)
-    ✅ Variations: typos, mistakes, realistic noise
-    ✅ Synthetic but schema-correct values
+    70% valid cases (correct, schema-compliant)
+    20% edge cases (boundary conditions, rare combinations)
+    10% extreme scenarios (stress tests, worst-case)
+    Variations: typos, mistakes, realistic noise
+    Synthetic but schema-correct values
     
     Enhanced: Track quality category, variation type, error flags, full generation context
     
-    🔗 Now linked to parent Dataset for embedding model governance
+    Now linked to parent Dataset for embedding model governance
     """
     __tablename__ = "csv_data"
     
     csv_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     u_id = Column(UUID(as_uuid=True), ForeignKey("users.u_id", ondelete="CASCADE"), nullable=False)
-    t_id = Column(UUID(as_uuid=True), ForeignKey("templates.t_id", ondelete="CASCADE"), nullable=False)
+    t_id = Column(UUID(as_uuid=True), ForeignKey("templates.t_id", ondelete="SET NULL"), nullable=True)  # Optional: NULL for uploaded datasets without template
     dataset_id = Column(UUID(as_uuid=True), ForeignKey("datasets.dataset_id", ondelete="CASCADE"), nullable=True)  # Link to parent dataset
     
     query = Column(Text, nullable=True)  # User's custom prompt (e.g., "Generate edge cases with pilot disabled")
@@ -402,6 +399,10 @@ class CSVData(Base):
     is_embedded = Column(Integer, nullable=False, default=0)  # 0=no, 1=yes
     embedding_error = Column(Text, nullable=True)  # Error message if embedding failed for this row
     
+    # Semantic retrieval metadata (for grouping and re-ranking by t_id)
+    intent_type = Column(Text, nullable=True)  # "create", "read", "update", "delete", "query", "unknown"
+    confidence_score = Column(Numeric, nullable=True)  # 0.0 - 1.0 confidence score for this query
+    
     created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
     
     # Relationships
@@ -423,9 +424,7 @@ class Model(Base):
     """
     MODELS table - Unified registry for all models (embedding + LLM)
     
-    Supports both embedding models and LLM models:
-    ✅ Embedding: 384-dim, 768-dim models for vector search
-    ✅ LLM: Gemini, GPT-4, Claude, Llama for dataset generation
+   
     
     Single source of truth synced from config/models.json
     """
@@ -457,10 +456,10 @@ class EmbeddingModel(Base):
     EMBEDDING_MODELS table - Registry of supported embedding models
     
     Supported Embedding Models (3+ models, future expansion supported):
-    ✅ 384-dim: BAAI/bge-small-en-v1.5 (MiniLM, CPU-friendly, fast inference)
-    ✅ 768-dim: sentence-transformers/all-mpnet-base-v2 (SBERT, balanced)
-    ✅ 1536-dim: text-embedding-ada-002 (OpenAI, high accuracy)
-    ✅ Future: Custom fine-tuned models for domain-specific APIs
+    384-dim: BAAI/bge-small-en-v1.5 (MiniLM, CPU-friendly, fast inference)
+    768-dim: sentence-transformers/all-mpnet-base-v2 (SBERT, balanced)
+    1536-dim: text-embedding-ada-002 (OpenAI, high accuracy)
+    Future: Custom fine-tuned models for domain-specific APIs
     
     Each model has:
     - Fixed dimension (384/768/1536)
@@ -500,13 +499,13 @@ class Embedding(Base):
     EMBEDDINGS table - Vector embedding metadata for semantic search
     Core fields from diagram: PK=emb_id, FK=u_id, FK=t_id, FK=csv_id, redis_key, created_at
     
-    🚀 Automatic Embeddings → Redis Vector DB:
+    Automatic Embeddings → Redis Vector DB:
     After dataset generation, system automatically embeds rows using user's selected model
     
     Supported Models (see embedding_models table):
-    ✅ 384-dim: BAAI/bge-small-en-v1.5 (MiniLM, CPU-friendly)
-    ✅ 768-dim: sentence-transformers/all-mpnet-base-v2 (SBERT)
-    ✅ 1536-dim: OpenAI text-embedding-ada-002 (High accuracy)
+    384-dim: BAAI/bge-small-en-v1.5 (MiniLM, CPU-friendly)
+    768-dim: sentence-transformers/all-mpnet-base-v2 (SBERT)
+    1536-dim: OpenAI text-embedding-ada-002 (High accuracy)
     
     Redis Storage:
     - Key format: embedding:{u_id}:{t_id}:{csv_id}

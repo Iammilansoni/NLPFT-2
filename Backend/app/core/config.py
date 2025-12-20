@@ -90,7 +90,7 @@ DATASETS_DIR.mkdir(exist_ok=True, parents=True)
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "nlpforge_redis_secure_password_2024")
-MODEL_NAME = os.getenv("MODEL_NAME", "BAAI/bge-small-en-v1.5")
+MODEL_NAME = os.getenv("MODEL_NAME", "nomic-embed-text")  # Non-Chinese embedding model for Ollama
 INDEX_NAME = os.getenv("INDEX_NAME", "idx:api")
 TOP_K = int(os.getenv("TOP_K", "5"))
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "32"))
@@ -98,8 +98,7 @@ BATCH_SIZE = int(os.getenv("BATCH_SIZE", "32"))
 
 # Ollama Configuration (LOCAL LLM for dataset generation)
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma2:2b-instruct-q4_K_M")  # Primary: Gemma 2B Instruct (faster, lighter)
-OLLAMA_FALLBACK_MODEL = os.getenv("OLLAMA_FALLBACK_MODEL", "llama3.2:3b-instruct-q4_K_M")  # Fallback: Llama 3.2 Instruct (quantized)
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b-instruct-q4_K_M")  # Llama 3.1 8B Instruct (high quality, non-Chinese)
 
 # Intent detection method: "vector_search" or "pattern_matching"
 INTENT_DETECTION_METHOD = os.getenv("INTENT_DETECTION_METHOD", "vector_search")

@@ -3,7 +3,18 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import api from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import type { ModelMismatchError } from "@/components/ui/model-mismatch-modal";
+
+/**
+ * Model mismatch error returned when search/embedding uses different model than dataset
+ */
+export interface ModelMismatchError {
+  status: number;
+  error: "MODEL_MISMATCH";
+  detail: string;
+  current_model: string;
+  dataset_model: string;
+  dataset_id: string;
+}
 
 /**
  * Dataset embedding status from backend
@@ -20,7 +31,7 @@ export interface EmbeddingStatus {
   completed_at: string | null;
   estimated_completion: string | null;
   error_message: string | null;
-  celery_task_id: string | null;
+  task_id: string | null;
 }
 
 /**
@@ -60,17 +71,17 @@ export interface SearchResponse {
  */
 export function useEmbeddings() {
   const { toast } = useToast();
-  
+
   // State
   const [isSearching, setIsSearching] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
   const [embeddingStatus, setEmbeddingStatus] = useState<EmbeddingStatus | null>(null);
   const [modelMismatchError, setModelMismatchError] = useState<ModelMismatchError | null>(null);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  
+
   // Polling interval ref
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   /**
    * Search dataset with model validation
    * Returns MODEL_MISMATCH error if models don't match
@@ -88,7 +99,7 @@ export function useEmbeddings() {
       setIsSearching(true);
       setModelMismatchError(null);
       setSearchResults([]);
-      
+
       const response = await api.post<SearchResponse>(`/api/v1/datasets/${datasetId}/search`, {
         dataset_id: datasetId,
         query,
@@ -96,7 +107,7 @@ export function useEmbeddings() {
         filter_scenario_type: options?.filterScenarioType,
         filter_test_category: options?.filterTestCategory,
       });
-      
+
       setSearchResults(response.results);
       return response;
     } catch (error: any) {
@@ -105,7 +116,7 @@ export function useEmbeddings() {
         setModelMismatchError(error as ModelMismatchError);
         return null;
       }
-      
+
       // Handle other errors
       const message = error.detail || error.message || "Search failed";
       toast({
@@ -118,7 +129,7 @@ export function useEmbeddings() {
       setIsSearching(false);
     }
   }, [toast]);
-  
+
   /**
    * Get embedding status for a dataset
    */
@@ -132,7 +143,7 @@ export function useEmbeddings() {
       return null;
     }
   }, []);
-  
+
   /**
    * Start re-embedding a dataset
    */
@@ -146,7 +157,7 @@ export function useEmbeddings() {
   ): Promise<{ taskId: string; estimatedSeconds: number } | null> => {
     try {
       const response = await api.post<{
-        celery_task_id: string;
+        task_id: string;
         new_model: string;
         estimated_time_seconds: number;
       }>(`/api/v1/datasets/${datasetId}/reembed`, {
@@ -154,14 +165,14 @@ export function useEmbeddings() {
         force: options?.force ?? true,
         chunk_size: options?.chunkSize ?? 100,
       });
-      
+
       toast({
         title: "Re-embedding Started",
         description: `Dataset is being re-embedded with ${response.new_model}`,
       });
-      
+
       return {
-        taskId: response.celery_task_id,
+        taskId: response.task_id,
         estimatedSeconds: response.estimated_time_seconds,
       };
     } catch (error: any) {
@@ -174,7 +185,7 @@ export function useEmbeddings() {
       return null;
     }
   }, [toast]);
-  
+
   /**
    * Poll embedding status until completed
    */
@@ -187,15 +198,15 @@ export function useEmbeddings() {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
     }
-    
+
     setIsPolling(true);
-    
+
     const poll = async () => {
       const status = await getEmbeddingStatus(datasetId);
-      
+
       if (status) {
         onProgress?.(status);
-        
+
         if (status.status === "completed" || status.status === "failed") {
           // Stop polling
           if (pollingIntervalRef.current) {
@@ -203,7 +214,7 @@ export function useEmbeddings() {
             pollingIntervalRef.current = null;
           }
           setIsPolling(false);
-          
+
           if (status.status === "completed") {
             toast({
               title: "Embedding Complete",
@@ -220,13 +231,13 @@ export function useEmbeddings() {
         }
       }
     };
-    
+
     // Initial poll
     await poll();
-    
+
     // Start interval polling
     pollingIntervalRef.current = setInterval(poll, 2000);
-    
+
     // Return cleanup function
     return () => {
       if (pollingIntervalRef.current) {
@@ -236,26 +247,26 @@ export function useEmbeddings() {
       setIsPolling(false);
     };
   }, [getEmbeddingStatus, toast]);
-  
+
   /**
    * Clear model mismatch error
    */
   const clearModelMismatchError = useCallback(() => {
     setModelMismatchError(null);
   }, []);
-  
+
   /**
    * Switch user's embedding model
    */
   const switchEmbeddingModel = useCallback(async (model: string): Promise<boolean> => {
     try {
       await api.post("/api/v1/datasets/settings/embedding-model", { model_name: model });
-      
+
       toast({
         title: "Model Updated",
         description: `Default embedding model set to ${model}`,
       });
-      
+
       return true;
     } catch (error: any) {
       toast({
@@ -266,7 +277,7 @@ export function useEmbeddings() {
       return false;
     }
   }, [toast]);
-  
+
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
@@ -275,7 +286,7 @@ export function useEmbeddings() {
       }
     };
   }, []);
-  
+
   return {
     // State
     isSearching,
@@ -283,7 +294,7 @@ export function useEmbeddings() {
     embeddingStatus,
     modelMismatchError,
     searchResults,
-    
+
     // Actions
     searchDataset,
     getEmbeddingStatus,

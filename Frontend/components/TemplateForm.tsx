@@ -8,7 +8,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
   Trash2,
@@ -105,7 +104,6 @@ function clearDraftFromStorage(key: string): void {
 import { JsonEditor } from './JsonEditor';
 import {
   HttpMethod,
-  SecurityClassification,
   TemplateStatus,
   UserRole,
   Parameter,
@@ -149,14 +147,14 @@ export function TemplateForm({
   onSuccess,
 }: TemplateFormProps) {
   const router = useRouter();
-  
+
   // Draft persistence - include userId to prevent key collisions between users
   const draftKey = getDraftStorageKey(mode, initialData?.template_id, userId);
   const [hasDraft, setHasDraft] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Save mutex to prevent race conditions between auto-save and manual save
   const isSavingRef = useRef(false);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -172,7 +170,6 @@ export function TemplateForm({
     json_schema: initialData?.json_schema || {},
     sample_requests: initialData?.sample_requests || [],
     side_effects: initialData?.side_effects || '',
-    security_classification: initialData?.security_classification || 'public',
     domain_tags: initialData?.domain_tags || [],
     status: initialData?.status || 'draft',
     reviewer_notes: initialData?.reviewer_notes || '',
@@ -222,7 +219,7 @@ export function TemplateForm({
     if (savedDraft) {
       // For both create and edit mode, restore draft if it exists and is recent
       let shouldRestore = false;
-      
+
       if (mode === 'create') {
         // In create mode, always restore any saved draft
         shouldRestore = true;
@@ -231,13 +228,13 @@ export function TemplateForm({
         // This ensures user's unsaved work is preserved when they navigate away and return
         const draftAge = Date.now() - savedDraft.savedAt;
         const maxDraftAge = 24 * 60 * 60 * 1000; // 24 hours
-        
+
         if (draftAge < maxDraftAge) {
           // Auto-restore in edit mode - user expects their work to be saved
           shouldRestore = true;
         }
       }
-      
+
       if (shouldRestore) {
         setFormData(savedDraft.formData);
         setParameters(savedDraft.parameters || []);
@@ -257,7 +254,7 @@ export function TemplateForm({
   // Auto-save draft with debounce
   const saveDraft = useCallback(() => {
     if (!isInitialized) return;
-    
+
     const draftData: DraftData = {
       formData,
       parameters,
@@ -269,7 +266,7 @@ export function TemplateForm({
       activeTab,
       savedAt: Date.now(),
     };
-    
+
     saveDraftToStorage(draftKey, draftData);
     setHasDraft(true);
     setLastSaved(new Date());
@@ -278,15 +275,15 @@ export function TemplateForm({
   // Debounced save effect
   useEffect(() => {
     if (!isInitialized) return;
-    
+
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
-    
+
     saveTimeoutRef.current = setTimeout(() => {
       saveDraft();
     }, DRAFT_DEBOUNCE_MS);
-    
+
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
@@ -316,7 +313,7 @@ export function TemplateForm({
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       saveCurrentState();
-      
+
       // Show browser warning if there's unsaved content
       if (formData.api_name || formData.description || formData.base_url || parameters.length > 0) {
         e.preventDefault();
@@ -340,7 +337,7 @@ export function TemplateForm({
     window.addEventListener('beforeunload', handleBeforeUnload);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('pagehide', handlePageHide);
-    
+
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -371,7 +368,7 @@ export function TemplateForm({
     clearDraftFromStorage(draftKey);
     setHasDraft(false);
     setLastSaved(null);
-    
+
     // Reset to initial data or empty state
     setFormData({
       user_id: userId,
@@ -383,7 +380,6 @@ export function TemplateForm({
       json_schema: initialData?.json_schema || {},
       sample_requests: initialData?.sample_requests || [],
       side_effects: initialData?.side_effects || '',
-      security_classification: initialData?.security_classification || 'public',
       domain_tags: initialData?.domain_tags || [],
       status: initialData?.status || 'draft',
       reviewer_notes: initialData?.reviewer_notes || '',
@@ -507,7 +503,7 @@ export function TemplateForm({
     const newRows = [...headerRows];
     newRows[index][field] = value;
     setHeaderRows(newRows);
-    
+
     // Update formData
     const headersObj = newRows.reduce((acc, row) => {
       if (row.key) acc[row.key] = row.value;
@@ -523,7 +519,7 @@ export function TemplateForm({
   const removeHeaderRow = (index: number) => {
     const newRows = headerRows.filter((_, i) => i !== index);
     setHeaderRows(newRows);
-    
+
     // Update formData
     const headersObj = newRows.reduce((acc, row) => {
       if (row.key) acc[row.key] = row.value;
@@ -582,12 +578,12 @@ export function TemplateForm({
         // Keep empty object if JSON is invalid
       }
 
-      const dataToSubmit = { 
-        ...formData, 
+      const dataToSubmit = {
+        ...formData,
         json_schema: parsedJsonSchema,
-        status: 'draft' as TemplateStatus 
+        status: 'draft' as TemplateStatus
       };
-      
+
       // Convert parameters to the format backend expects
       const parameterSchemas = parameters.map(p => ({
         name: p.name,
@@ -596,7 +592,7 @@ export function TemplateForm({
         example: p.example,
         required: p.required,
       }));
-      
+
       if (mode === 'create') {
         const result = await createTemplate.mutateAsync({ data: dataToSubmit, parameters: parameterSchemas });
         // Clear local draft on successful save
@@ -618,7 +614,7 @@ export function TemplateForm({
   const handleSubmitForReview = async () => {
     // Save as draft immediately - no validation required
     // This allows users to save incomplete templates and return later
-    
+
     try {
       // Parse JSON schema from string - use empty object if invalid
       let parsedJsonSchema = {};
@@ -629,10 +625,10 @@ export function TemplateForm({
       }
 
       // Always save as draft first - user can submit for review from the templates list
-      const dataToSubmit = { 
-        ...formData, 
+      const dataToSubmit = {
+        ...formData,
         json_schema: parsedJsonSchema,
-        status: 'draft' as TemplateStatus 
+        status: 'draft' as TemplateStatus
       };
       let templateId: string;
 
@@ -676,7 +672,7 @@ export function TemplateForm({
       // Parse validation errors from backend
       const detail = error?.detail
       let errorMessage = 'Failed to save template'
-      
+
       if (typeof detail === 'object' && detail.errors) {
         const errorList = Array.isArray(detail.errors) ? detail.errors.join('\n') : detail.errors
         errorMessage = `${detail.message || 'Validation failed'}:\n\n${errorList}`
@@ -685,7 +681,7 @@ export function TemplateForm({
       } else if (error?.message) {
         errorMessage = error.message
       }
-      
+
       alert(errorMessage);
     }
   };
@@ -712,7 +708,6 @@ export function TemplateForm({
   };
 
   const canApprove = userRole === 'admin' || userRole === 'reviewer';
-  const requiresManualApproval = formData.security_classification === 'secret' || formData.security_classification === 'highly-restricted';
 
   // Validation summary
   const validationIssues = React.useMemo(() => {
@@ -742,7 +737,7 @@ export function TemplateForm({
             <div>
               <h1 className="text-3xl font-bold">{mode === 'create' ? 'Create Template' : 'Edit Template'}</h1>
               <p className="text-muted-foreground">Define your API template</p>
-              
+
               {/* Auto-save Status Indicator */}
               {lastSaved && (
                 <div className="mt-3 flex items-center justify-between bg-green-500/10 border border-green-500/30 rounded-lg px-4 py-2">
@@ -845,32 +840,29 @@ export function TemplateForm({
               <h2 className="text-xl font-semibold flex items-center gap-2">
                 <FileCode className="w-5 h-5" /> Request Details
               </h2>
-              
+
               <div className="flex border-b">
                 <button
                   type="button"
                   onClick={() => setActiveTab('params')}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === 'params' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
-                  }`}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'params' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
                 >
                   Params
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab('headers')}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === 'headers' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
-                  }`}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'headers' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
                 >
                   Headers
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab('body')}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === 'body' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
-                  }`}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'body' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
                 >
                   Body
                 </button>
@@ -1049,12 +1041,12 @@ export function TemplateForm({
                   <JsonEditor
                     value={sampleString.request}
                     onChange={v => {
-                      setSampleRequestStrings(prev => 
+                      setSampleRequestStrings(prev =>
                         prev.map((s, i) => i === idx ? { ...s, request: v } : s)
                       );
                       try {
                         updateSampleRequest(idx, 'request', JSON.parse(v));
-                      } catch {}
+                      } catch { }
                     }}
                     height="150px"
                     label="Request"
@@ -1062,12 +1054,12 @@ export function TemplateForm({
                   <JsonEditor
                     value={sampleString.response}
                     onChange={v => {
-                      setSampleRequestStrings(prev => 
+                      setSampleRequestStrings(prev =>
                         prev.map((s, i) => i === idx ? { ...s, response: v } : s)
                       );
                       try {
                         updateSampleRequest(idx, 'expected_response', JSON.parse(v));
-                      } catch {}
+                      } catch { }
                     }}
                     height="150px"
                     label="Expected Response"
@@ -1083,31 +1075,11 @@ export function TemplateForm({
               ))}
             </div>
 
-            {/* Security & Tags */}
+            {/* Domain Tags */}
             <div className="bg-card border rounded-xl p-6 space-y-4">
               <h2 className="text-xl font-semibold flex items-center gap-2">
-                <Shield className="w-5 h-5" /> Security & Classification
+                <Tag className="w-5 h-5" /> Domain Tags
               </h2>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Security Classification <span className="text-destructive">*</span></label>
-                <select
-                  value={formData.security_classification}
-                  onChange={e => handleFieldChange('security_classification', e.target.value as SecurityClassification)}
-                  className="w-full px-4 py-3 bg-background border border-border rounded-lg"
-                >
-                  <option value="public">Public - Accessible to all</option>
-                  <option value="internal">Internal - Company use only</option>
-                  <option value="secret">Secret - Requires approval</option>
-                  <option value="highly-restricted">Highly Restricted - Expert review</option>
-                </select>
-                {requiresManualApproval && (
-                  <p className="text-xs text-warning mt-2 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" />
-                    This classification requires manual approval and cannot use remote LLMs
-                  </p>
-                )}
-              </div>
 
               <div>
                 <label className="block text-sm font-medium mb-2">
@@ -1189,7 +1161,6 @@ export function TemplateForm({
 
               <div className="pt-4 border-t space-y-2">
                 <p className="text-xs text-muted-foreground">Status: <span className="font-medium">{formData.status}</span></p>
-                <p className="text-xs text-muted-foreground">Classification: <span className="font-medium">{formData.security_classification}</span></p>
               </div>
             </div>
           </div>
@@ -1222,91 +1193,74 @@ export function TemplateForm({
         </div>
 
         {/* Approval Modal */}
-        <AnimatePresence>
-          {showApprovalModal && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-              onClick={() => setShowApprovalModal(false)}
+        {showApprovalModal && (
+          <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowApprovalModal(false)}
+          >
+            <div
+              className="bg-card border border-border rounded-lg p-6 max-w-md w-full"
+              onClick={e => e.stopPropagation()}
             >
-              <motion.div
-                initial={{ scale: 0.9 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0.9 }}
-                className="bg-card border rounded-xl p-6 max-w-md w-full"
-                onClick={e => e.stopPropagation()}
-              >
-                <h3 className="text-xl font-semibold mb-4">Approve Template?</h3>
-                <p className="text-muted-foreground mb-6">
-                  This will mark the template as approved and allow dataset generation.
-                  {requiresManualApproval && ' Note: This template requires manual approval due to security classification.'}
-                </p>
-                <div className="flex justify-end gap-3">
-                  <button
-                    onClick={() => setShowApprovalModal(false)}
-                    className="px-4 py-2 border border-border rounded-lg hover:bg-muted"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleApprove}
-                    className="px-4 py-2 bg-success text-white rounded-lg hover:bg-success/90"
-                  >
-                    Approve
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              <h3 className="text-xl font-semibold mb-4">Approve Template?</h3>
+              <p className="text-muted-foreground mb-6">
+                This will mark the template as approved and allow dataset generation.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowApprovalModal(false)}
+                  className="px-4 py-2 border border-border rounded-md hover:bg-muted"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleApprove}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                >
+                  Approve
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Dataset Warning Modal */}
-        <AnimatePresence>
-          {showDatasetWarning && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-              onClick={() => setShowDatasetWarning(false)}
+        {showDatasetWarning && (
+          <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowDatasetWarning(false)}
+          >
+            <div
+              className="bg-card border border-border rounded-lg p-6 max-w-md w-full"
+              onClick={e => e.stopPropagation()}
             >
-              <motion.div
-                initial={{ scale: 0.9 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0.9 }}
-                className="bg-card border rounded-xl p-6 max-w-md w-full"
-                onClick={e => e.stopPropagation()}
-              >
-                <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                  <AlertCircle className="w-6 h-6 text-warning" />
-                  Template Needs Approval
-                </h3>
-                <p className="text-muted-foreground mb-6">
-                  Template needs to be approved before dataset generation. Submit for review?
-                </p>
-                <div className="flex justify-end gap-3">
-                  <button
-                    onClick={() => setShowDatasetWarning(false)}
-                    className="px-4 py-2 border border-border rounded-lg hover:bg-muted"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowDatasetWarning(false);
-                      handleSubmitForReview();
-                    }}
-                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
-                  >
-                    Submit for Review
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                <AlertCircle className="w-6 h-6 text-amber-500" />
+                Template Needs Approval
+              </h3>
+              <p className="text-muted-foreground mb-6">
+                Template needs to be approved before dataset generation. Submit for review?
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowDatasetWarning(false)}
+                  className="px-4 py-2 border border-border rounded-md hover:bg-muted"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setShowDatasetWarning(false);
+                    handleSubmitForReview();
+                  }}
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+                >
+                  Submit for Review
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

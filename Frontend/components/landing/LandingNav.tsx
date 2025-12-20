@@ -1,126 +1,193 @@
-﻿'use client'
+﻿'use client';
 
-import { useState, useEffect } from 'react'
-import { motion, useScroll } from 'framer-motion'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { ThemeToggle } from '@/components/ThemeToggle'
-import { ThemeAccentToggle } from '@/components/ui/theme-accent-toggle'
-import { Brain, Menu, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import React, { useState, useCallback, useEffect } from 'react';
+import Link from 'next/link';
+import { Menu, X, Zap } from 'lucide-react';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
-const navLinks = [
-  { label: 'Features', href: '#features' },
-  { label: 'Pricing', href: '#pricing' },
-  { label: 'Docs', href: '/docs' },
-  { label: 'Changelog', href: '/changelog' },
-  { label: 'Contact', href: '/contact' },
-]
+/**
+ * LandingNav - Enterprise-grade landing page navigation
+ * 
+ * Features:
+ * - Sticky with backdrop blur
+ * - Responsive: hamburger menu on mobile
+ * - Accessible: keyboard navigation, ARIA labels, focus management
+ * - Follows "Enterprise Calm" design direction
+ */
+
+const NAV_LINKS = [
+  { href: '/', label: 'Home' },
+  { href: '/product', label: 'Product' },
+  { href: '/about', label: 'About' },
+  { href: '/contact', label: 'Contact' },
+] as const;
 
 export function LandingNav() {
-  const [isScrolled, setIsScrolled] = useState(false)
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const { scrollY } = useScroll()
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // Close mobile menu on escape key
   useEffect(() => {
-    return scrollY.on('change', (latest) => {
-      setIsScrolled(latest > 24)
-    })
-  }, [scrollY])
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isMobileMenuOpen) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isMobileMenuOpen]);
+
+  // Lock body scroll when mobile menu is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobileMenuOpen]);
+
+  const toggleMobileMenu = useCallback(() => {
+    setIsMobileMenuOpen((prev) => !prev);
+  }, []);
+
+  const closeMobileMenu = useCallback(() => {
+    setIsMobileMenuOpen(false);
+  }, []);
 
   return (
-    <motion.header
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      transition={{ duration: 0.3 }}
-      className={cn(
-        'sticky top-0 z-50 w-full border-b transition-all duration-300',
-        isScrolled
-          ? 'bg-background/80 backdrop-blur-lg shadow-sm'
-          : 'bg-background/50 backdrop-blur-sm'
-      )}
-    >
-      <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white transition-transform group-hover:scale-105">
-              <Brain className="h-5 w-5" />
-            </div>
-            <span className="text-lg font-bold font-heading">NLPForge-Tester</span>
-          </Link>
-
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-6">
-            {navLinks.map((link) => (
-              <Link
-                key={link.label}
-                href={link.href}
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-200"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-
-          {/* Right side */}
-          <div className="flex items-center gap-2">
-            <ThemeAccentToggle />
-            <ThemeToggle />
-            <Button variant="ghost" size="sm" className="hidden md:inline-flex" asChild>
-              <Link href="/login">Sign In</Link>
-            </Button>
-            <Button size="sm" className="hidden md:inline-flex btn-gradient" asChild>
-              <Link href="/dashboard">Launch App</Link>
-            </Button>
-
-            {/* Mobile menu button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+    <>
+      <header
+        className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/95 backdrop-blur-sm supports-[backdrop-filter]:bg-background/80"
+        role="banner"
+      >
+        <nav
+          className="container mx-auto px-4 sm:px-6 lg:px-8"
+          role="navigation"
+          aria-label="Main navigation"
+        >
+          <div className="flex h-16 items-center justify-between">
+            {/* Logo */}
+            <Link
+              href="/"
+              className="flex items-center gap-2.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              aria-label="NLPForge home"
             >
-              {isMobileMenuOpen ? (
-                <X className="h-5 w-5" />
-              ) : (
-                <Menu className="h-5 w-5" />
-              )}
-            </Button>
-          </div>
-        </div>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-semibold text-sm">
+                <Zap className="h-4 w-4" />
+              </div>
+              <span className="font-semibold text-lg tracking-tight text-foreground">
+                NLPForge
+              </span>
+            </Link>
 
-        {/* Mobile Navigation */}
-        {isMobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden border-t py-4"
-          >
-            <nav className="flex flex-col gap-4">
-              {navLinks.map((link) => (
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center gap-1">
+              {NAV_LINKS.map((link) => (
                 <Link
-                  key={link.label}
+                  key={link.href}
                   href={link.href}
-                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-200"
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   {link.label}
                 </Link>
               ))}
-              <div className="flex flex-col gap-2 pt-4 border-t">
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href="/login">Sign In</Link>
-                </Button>
-                <Button size="sm" asChild>
-                  <Link href="/dashboard">Launch App</Link>
-                </Button>
-              </div>
-            </nav>
-          </motion.div>
+            </div>
+
+            {/* Desktop Actions */}
+            <div className="hidden md:flex items-center gap-3">
+              <ThemeToggle />
+              <Link
+                href="/auth/login"
+                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors rounded-md px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                Sign In
+              </Link>
+              <Button asChild size="sm" className="h-9 px-4">
+                <Link href="/dashboard">Get Started</Link>
+              </Button>
+            </div>
+
+            {/* Mobile Menu Button */}
+            <div className="flex md:hidden items-center gap-2">
+              <ThemeToggle />
+              <button
+                type="button"
+                onClick={toggleMobileMenu}
+                className="inline-flex items-center justify-center p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                aria-expanded={isMobileMenuOpen}
+                aria-controls="mobile-menu"
+                aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+              >
+                {isMobileMenuOpen ? (
+                  <X className="h-5 w-5" aria-hidden="true" />
+                ) : (
+                  <Menu className="h-5 w-5" aria-hidden="true" />
+                )}
+              </button>
+            </div>
+          </div>
+        </nav>
+      </header>
+
+      {/* Mobile Menu Overlay */}
+      <div
+        className={cn(
+          'fixed inset-0 z-40 bg-background/80 backdrop-blur-sm md:hidden transition-opacity duration-200',
+          isMobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}
+        aria-hidden="true"
+        onClick={closeMobileMenu}
+      />
+
+      {/* Mobile Menu Panel */}
+      <div
+        id="mobile-menu"
+        className={cn(
+          'fixed top-16 left-0 right-0 z-50 bg-background border-b border-border md:hidden',
+          'transform transition-transform duration-200 ease-out',
+          isMobileMenuOpen ? 'translate-y-0' : '-translate-y-full'
+        )}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Mobile navigation"
+      >
+        <nav className="container mx-auto px-4 py-4">
+          <ul className="space-y-1">
+            {NAV_LINKS.map((link) => (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  onClick={closeMobileMenu}
+                  className="block px-3 py-3 text-base font-medium text-foreground hover:bg-muted rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-4 pt-4 border-t border-border space-y-3">
+            <Link
+              href="/auth/login"
+              onClick={closeMobileMenu}
+              className="block px-3 py-3 text-base font-medium text-muted-foreground hover:text-foreground rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              Sign In
+            </Link>
+            <Button asChild className="w-full h-11">
+              <Link href="/dashboard" onClick={closeMobileMenu}>
+                Get Started
+              </Link>
+            </Button>
+          </div>
+        </nav>
       </div>
-    </motion.header>
-  )
+    </>
+  );
 }
+
+export default LandingNav;

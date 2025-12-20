@@ -1,0 +1,360 @@
+[
+  {
+    "query": "Create order for customer 12345",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "12345",
+      "items": [
+        {
+          "quantity": 1,
+          "product_id": "prod_123"
+        }
+      ],
+      "payment": {
+        "method": "cod"
+      },
+      "shipping_address": {
+        "city": "New York"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized."
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Simple order creation"
+  },
+  {
+    "query": "Creaet ordr for user 98765",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "98765",
+      "items": [
+        {
+          "quantity": 2,
+          "product_id": "prod_ABC"
+        }
+      ],
+      "payment": {
+        "method": "card"
+      },
+      "shipping_address": {
+        "city": "London"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized."
+    },
+    "scenario_type": "valid",
+    "test_category": "typo",
+    "notes": "Typos in query"
+  },
+  {
+    "query": "I want to buy product ABC",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "12345",
+      "items": [
+        {
+          "quantity": 3,
+          "product_id": "prod_ABC"
+        }
+      ],
+      "payment": {
+        "method": "upi"
+      },
+      "shipping_address": {
+        "city": "Paris"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized."
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Simple order creation with product details"
+  },
+  {
+    "query": "Place a new booking with COD payment",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "98765",
+      "items": [
+        {
+          "quantity": 1,
+          "product_id": "prod_DEF"
+        }
+      ],
+      "payment": {
+        "method": "cod"
+      },
+      "shipping_address": {
+        "city": "Berlin"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized."
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Order creation with COD payment"
+  },
+  {
+    "query": "How to cancel an order?",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "12345",
+      "items": [
+        {
+          "quantity": 2,
+          "product_id": "prod_GHI"
+        }
+      ],
+      "payment": {
+        "method": "card"
+      },
+      "shipping_address": {
+        "city": "Tokyo"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized."
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Simple order creation"
+  },
+  {
+    "query": "Create booking for user 55511",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "55511",
+      "items": [
+        {
+          "quantity": 1,
+          "product_id": "prod_JKL"
+        }
+      ],
+      "payment": {
+        "method": "upi"
+      },
+      "shipping_address": {
+        "city": "Mumbai"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized."
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Order creation with valid user ID"
+  },
+  {
+    "query": "Place an order with UPI payment",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "12345",
+      "items": [
+        {
+          "quantity": 3,
+          "product_id": "prod_MNO"
+        }
+      ],
+      "payment": {
+        "method": "upi"
+      },
+      "shipping_address": {
+        "city": "Sydney"
+      }
+    },
+    "expected_response": {
+      "status": "created",
+      "message": "Order created and payment authorized."
+    },
+    "scenario_type": "valid",
+    "test_category": "valid_flow",
+    "notes": "Order creation with UPI payment"
+  },
+  {
+    "query": "Create order with invalid payment",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "12345",
+      "items": [
+        {
+          "quantity": 1,
+          "product_id": "prod_PQR"
+        }
+      ],
+      "payment": {
+        "method": "invalid"
+      },
+      "shipping_address": {
+        "city": "New Delhi"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid payment method"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Edge case: invalid payment method"
+  },
+  {
+    "query": "Place an order with empty customer ID",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "",
+      "items": [
+        {
+          "quantity": 2,
+          "product_id": "prod_STU"
+        }
+      ],
+      "payment": {
+        "method": "card"
+      },
+      "shipping_address": {
+        "city": "Toronto"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Missing required field: customer_id"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Edge case: empty customer ID"
+  },
+  {
+    "query": "Create an order with very long text",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "12345",
+      "items": [
+        {
+          "quantity": 1,
+          "product_id": "prod_VWX"
+        }
+      ],
+      "payment": {
+        "method": "cod"
+      },
+      "shipping_address": {
+        "city": "Very long city name that exceeds maximum length"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "City name exceeds maximum length"
+      ]
+    },
+    "scenario_type": "edge",
+    "test_category": "boundary",
+    "notes": "Edge case: very long text"
+  },
+  {
+    "query": "Create an order without required fields",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "items": [
+        {
+          "quantity": 1,
+          "product_id": "prod_YZ"
+        }
+      ]
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Missing required fields: customer_id, payment"
+      ]
+    },
+    "scenario_type": "extreme",
+    "test_category": "error_case",
+    "notes": "Extreme case: missing required fields"
+  },
+  {
+    "query": "Create an order with wrong type",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "12345",
+      "items": [
+        {
+          "quantity": "abc",
+          "product_id": "prod_ABC"
+        }
+      ],
+      "payment": {
+        "method": "card"
+      },
+      "shipping_address": {
+        "city": "Bangalore"
+      }
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid type for quantity"
+      ]
+    },
+    "scenario_type": "extreme",
+    "test_category": "error_case",
+    "notes": "Extreme case: wrong type"
+  },
+  {
+    "query": "Create an order with invalid JSON",
+    "api": "Create_Customer_Order",
+    "endpoint": "/v1/orders",
+    "method": "POST",
+    "request": {
+      "customer_id": "12345",
+      "items": "Invalid JSON"
+    },
+    "expected_response": {
+      "valid": false,
+      "errors": [
+        "Invalid JSON format"
+      ]
+    },
+    "scenario_type": "extreme",
+    "test_category": "error_case",
+    "notes": "Extreme case: invalid JSON"
+  }
+]

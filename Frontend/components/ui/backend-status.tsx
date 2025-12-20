@@ -4,7 +4,6 @@ import { useTheme } from "next-themes";
 import { Wifi, WifiOff, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
 
 interface BackendStatusProps {
   className?: string;
@@ -54,8 +53,8 @@ export function BackendStatus({ className = "", showText = true, variant = 'defa
         icon: Loader2,
         text: "Connecting...",
         dotColor: "bg-blue-500",
-        bgGradient: "from-blue-500/20 via-blue-500/10 to-transparent",
         borderColor: "border-blue-500/30",
+        bgColor: "bg-blue-500/10",
         textColor: "text-blue-600 dark:text-blue-400",
         animate: true
       };
@@ -66,8 +65,8 @@ export function BackendStatus({ className = "", showText = true, variant = 'defa
         icon: WifiOff,
         text: "Offline",
         dotColor: "bg-red-500",
-        bgGradient: "from-red-500/20 via-red-500/10 to-transparent",
         borderColor: "border-red-500/30",
+        bgColor: "bg-red-500/10",
         textColor: "text-red-600 dark:text-red-400",
         animate: false
       };
@@ -76,10 +75,10 @@ export function BackendStatus({ className = "", showText = true, variant = 'defa
     return {
       icon: Wifi,
       text: "Online",
-      dotColor: "bg-emerald-500",
-      bgGradient: "from-emerald-500/20 via-emerald-500/10 to-transparent",
-      borderColor: "border-emerald-500/30",
-      textColor: "text-emerald-600 dark:text-emerald-400",
+      dotColor: "bg-green-500",
+      borderColor: "border-green-500/30",
+      bgColor: "bg-green-500/10",
+      textColor: "text-green-600 dark:text-green-400",
       animate: false
     };
   };
@@ -91,46 +90,28 @@ export function BackendStatus({ className = "", showText = true, variant = 'defa
     return (
       <div className={cn("relative", className)} title={`Backend: ${config.text}`}>
         <span className={cn(
-          "flex h-2.5 w-2.5 rounded-full",
+          "flex h-2 w-2 rounded-full",
           config.dotColor
-        )}>
-          {isOnline && (
-            <span className={cn(
-              "absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping",
-              config.dotColor
-            )} />
-          )}
-        </span>
+        )} />
       </div>
     );
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
+    <div
       className={cn(
-        "relative inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium",
-        "border backdrop-blur-sm transition-all duration-300",
+        "inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-medium",
+        "border",
         config.borderColor,
-        `bg-gradient-to-r ${config.bgGradient}`,
+        config.bgColor,
         className
       )}
     >
-      {/* Animated Status Dot */}
-      <span className="relative flex h-2 w-2">
-        <span className={cn(
-          "relative inline-flex rounded-full h-2 w-2",
-          config.dotColor
-        )} />
-        {(isOnline || isLoading) && (
-          <span className={cn(
-            "absolute inline-flex h-full w-full rounded-full opacity-75",
-            isLoading ? "animate-ping" : "animate-pulse",
-            config.dotColor
-          )} />
-        )}
-      </span>
+      {/* Status Dot */}
+      <span className={cn(
+        "inline-flex rounded-full h-1.5 w-1.5",
+        config.dotColor
+      )} />
 
       {/* Icon */}
       <Icon className={cn(
@@ -148,10 +129,10 @@ export function BackendStatus({ className = "", showText = true, variant = 'defa
 
       {/* Latency (for detailed variant) */}
       {variant === 'detailed' && isOnline && latency !== null && (
-        <span className="text-muted-foreground text-[10px] ml-1">
+        <span className="text-muted-foreground text-[10px] tabular-nums">
           {latency}ms
         </span>
       )}
-    </motion.div>
+    </div>
   );
 }

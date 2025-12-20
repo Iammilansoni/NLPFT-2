@@ -5,7 +5,6 @@ Matches: templates, parameters, expected_responses, metadata tables
 ✅ ENTERPRISE TEMPLATE BUILDER:
 - Strict validation (500+ word descriptions, 3+ samples)
 - Approval workflow (draft → review → approved/rejected)
-- Security classification (public/internal/secret/highly-restricted)
 - Domain tags (telecom, 5g, fft, mimo, encryption, drone, defence, etc.)
 - Expert-only approve/reject operations
 """
@@ -30,12 +29,7 @@ class HTTPMethod(str, Enum):
     OPTIONS = "OPTIONS"
 
 
-class SecurityClassification(str, Enum):
-    """Security classification levels for templates"""
-    PUBLIC = "public"                      # No restrictions, publicly documented APIs
-    INTERNAL = "internal"                  # Internal use only, company-wide
-    SECRET = "secret"                      # Restricted access, security clearance required
-    HIGHLY_RESTRICTED = "highly-restricted"  # Top secret, highest clearance
+
 
 
 class TemplateStatus(str, Enum):
@@ -253,7 +247,6 @@ class EnterpriseTemplateCreate(BaseModel):
     - Sample requests: 3+ samples (valid, edge, error scenarios)
     - Parameters: Complete table with examples
     - Domain tags: At least 1 tag
-    - Security classification: Required
     - JSON schema: Structured request/response validation
     """
     api_name: str = Field(..., description="API/Template name (e.g., '5G Network Slice Management API')")
@@ -303,10 +296,7 @@ class EnterpriseTemplateCreate(BaseModel):
         description="Domain tags (minimum 1 tag: telecom, 5g, fft, mimo, encryption, drone, defence, etc.)"
     )
     
-    security_classification: SecurityClassification = Field(
-        ...,
-        description="Security classification level"
-    )
+
     
     # Additional configurations
     auth_config: Optional[Dict[str, Any]] = Field(
@@ -407,7 +397,7 @@ class EnterpriseTemplateUpdate(BaseModel):
         min_length=1,
         description="Domain tags (minimum 1 if provided)"
     )
-    security_classification: Optional[SecurityClassification] = None
+
     auth_config: Optional[Dict[str, Any]] = None
     headers: Optional[Dict[str, str]] = None
     rate_limit: Optional[Dict[str, Any]] = None
@@ -443,7 +433,7 @@ class EnterpriseTemplateResponse(BaseModel):
     json_schema: Optional[Dict[str, Any]] = None
     response_schema: Optional[Dict[str, Any]] = None
     domain_tags: Optional[List[str]] = None
-    security_classification: Optional[str] = None
+
     auth_config: Optional[Dict[str, Any]] = None
     headers: Optional[Dict[str, str]] = None
     rate_limit: Optional[Dict[str, Any]] = None
@@ -580,10 +570,7 @@ class TemplateDraftCreate(BaseModel):
         description="Domain tags (can be empty for drafts)"
     )
     
-    security_classification: Optional[SecurityClassification] = Field(
-        default=SecurityClassification.PUBLIC,
-        description="Security classification level"
-    )
+
     
     # Additional configurations
     auth_config: Optional[Dict[str, Any]] = Field(None, description="Authentication configuration")
@@ -632,10 +619,7 @@ class TemplateDraftUpdate(BaseModel):
         description="Domain tags (can be empty for drafts)"
     )
     
-    security_classification: Optional[SecurityClassification] = Field(
-        None,
-        description="Security classification level"
-    )
+
     
     # Additional configurations
     auth_config: Optional[Dict[str, Any]] = Field(None, description="Authentication configuration")

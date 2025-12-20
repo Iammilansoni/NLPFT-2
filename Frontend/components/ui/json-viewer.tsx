@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import { motion } from "framer-motion"
 import { Eye, EyeOff, Copy, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "./button"
@@ -37,25 +36,25 @@ export function JSONViewer({
 
   const maskValue = (key: string, value: any): any => {
     if (!isMasked) return value
-    
+
     const lowerKey = key.toLowerCase()
     const shouldMask = secretKeys.some(secret => lowerKey.includes(secret.toLowerCase()))
-    
+
     if (shouldMask && typeof value === 'string') {
       return '••••••••'
     }
-    
+
     return value
   }
 
   const processData = (obj: any): any => {
     if (obj === null || obj === undefined) return obj
     if (typeof obj !== 'object') return obj
-    
+
     if (Array.isArray(obj)) {
       return obj.map(item => processData(item))
     }
-    
+
     const processed: Record<string, any> = {}
     for (const [key, value] of Object.entries(obj)) {
       if (typeof value === 'object' && value !== null) {
@@ -85,7 +84,7 @@ export function JSONViewer({
 
   if (!data) {
     return (
-      <div className={cn("p-4 rounded-lg border border-dashed text-center text-muted-foreground", className)}>
+      <div className={cn("p-4 rounded-md border border-dashed text-center text-sm text-muted-foreground", className)}>
         No data available
       </div>
     )
@@ -93,18 +92,19 @@ export function JSONViewer({
 
   return (
     <div className={cn("relative", className)}>
-      <div className="absolute top-2 right-2 z-10 flex gap-2">
+      <div className="absolute top-2 right-2 z-10 flex gap-1">
         {maskSecrets && (
           <Button
             size="sm"
             variant="ghost"
             onClick={() => setIsMasked(!isMasked)}
-            className="h-8 px-2"
+            className="h-7 w-7 p-0"
+            aria-label={isMasked ? "Show sensitive values" : "Hide sensitive values"}
           >
             {isMasked ? (
-              <Eye className="h-4 w-4" />
+              <Eye className="h-3.5 w-3.5" />
             ) : (
-              <EyeOff className="h-4 w-4" />
+              <EyeOff className="h-3.5 w-3.5" />
             )}
           </Button>
         )}
@@ -112,29 +112,25 @@ export function JSONViewer({
           size="sm"
           variant="ghost"
           onClick={handleCopy}
-          className="h-8 px-2"
+          className="h-7 w-7 p-0"
+          aria-label="Copy JSON"
         >
           {isCopied ? (
-            <Check className="h-4 w-4 text-green-500" />
+            <Check className="h-3.5 w-3.5 text-green-500" />
           ) : (
-            <Copy className="h-4 w-4" />
+            <Copy className="h-3.5 w-3.5" />
           )}
         </Button>
       </div>
-      
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.2 }}
-        className="rounded-lg border bg-muted/30 overflow-hidden"
-      >
+
+      <div className="rounded-md border bg-muted/30 overflow-hidden">
         <pre
-          className="p-4 overflow-auto text-xs font-mono"
+          className="p-4 overflow-auto text-xs font-mono custom-scrollbar"
           style={{ maxHeight }}
         >
           <code>{JSON.stringify(displayData, null, 2)}</code>
         </pre>
-      </motion.div>
+      </div>
     </div>
   )
 }

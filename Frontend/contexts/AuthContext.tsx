@@ -33,24 +33,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const token = authService.getToken();
         const storedUser = authService.getUser();
 
-        console.log('🔍 Auth initialization:', { hasToken: !!token, hasUser: !!storedUser });
+        console.log('[Auth] Initialization:', { hasToken: !!token, hasUser: !!storedUser });
 
         if (token && storedUser) {
           // Set stored user immediately to prevent redirect
           setUser(storedUser);
-          console.log('✅ User loaded from storage:', storedUser.email);
-          
+          console.log('[Auth] User loaded from storage:', storedUser.email);
+
           // Try to refresh user data from API in background
           try {
             const currentUser = await authService.getCurrentUser();
             setUser(currentUser);
-            console.log('✅ User refreshed from API');
+            console.log('[Auth] User refreshed from API');
           } catch (error) {
-            console.warn('⚠️ Failed to refresh user from API, using stored user');
+            console.warn('[Auth] Failed to refresh user from API, using stored user');
             // Keep using stored user
           }
         } else {
-          console.log('❌ No token or user found in storage');
+          console.log('[Auth] No token or user found in storage');
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
@@ -66,36 +66,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (data: LoginRequest): Promise<AuthResponse> => {
     try {
       const response = await authService.login(data);
-      
-      console.log('📝 Setting user state:', response.user);
+
+      console.log('[Auth] Setting user state:', response.user);
       setUser(response.user);
-      
+
       // Sync token to cookies for middleware
       if (typeof document !== 'undefined') {
         // Set cookie with explicit domain and path
         const cookieString = `nlpforge_access_token=${response.access_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
         document.cookie = cookieString;
-        
-        console.log('🍪 Setting cookie');
+
+        console.log('[Auth] Setting cookie');
         console.log('Cookie string:', cookieString.substring(0, 80) + '...');
-        
+
         // Verify cookie was set
         const cookies = document.cookie.split(';').map(c => c.trim());
         const tokenCookie = cookies.find(c => c.startsWith('nlpforge_access_token='));
-        
-        console.log('🔍 Cookie verification:', tokenCookie ? '✅ Found' : '❌ Not found');
+
+        console.log('[Auth] Cookie verification:', tokenCookie ? 'Found' : 'Not found');
         console.log('All cookies:', document.cookie);
-        
+
         if (!tokenCookie) {
-          console.error('❌ Failed to set authentication cookie');
+          console.error('[Auth] Failed to set authentication cookie');
           throw new Error('Authentication cookie not set properly');
         }
       }
-      
-      console.log('✅ Login complete, user authenticated');
+
+      console.log('[Auth] Login complete, user authenticated');
       return response;
     } catch (error) {
-      console.error('❌ Login error in AuthContext:', error);
+      console.error('[Auth] Login error:', error);
       throw error;
     }
   };
@@ -104,23 +104,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await authService.register(data);
       setUser(response.user);
-      
+
       // Sync token to cookies for middleware (with secure flag in production)
       if (typeof document !== 'undefined') {
         const isProduction = process.env.NODE_ENV === 'production';
         const cookieString = `nlpforge_access_token=${response.access_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax${isProduction ? '; Secure' : ''}`;
         document.cookie = cookieString;
-        
+
         // Force cookie to be written immediately by reading it back
         const cookies = document.cookie.split(';').map(c => c.trim());
         const tokenCookie = cookies.find(c => c.startsWith('nlpforge_access_token='));
-        
+
         if (!tokenCookie) {
           console.error('Failed to set authentication cookie');
           throw new Error('Authentication cookie not set properly');
         }
       }
-      
+
       return response;
     } catch (error) {
       throw error;
@@ -130,12 +130,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     authService.logout();
     setUser(null);
-    
+
     // Remove token from cookies
     if (typeof document !== 'undefined') {
       document.cookie = 'nlpforge_access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
     }
-    
+
     router.push('/auth/login');
   };
 

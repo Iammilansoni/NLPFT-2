@@ -15,7 +15,6 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 from typing import Optional
 
-from celery import shared_task
 from app.core.logger import logger
 
 
@@ -51,8 +50,8 @@ class EmailService:
         """
         try:
             if not self.smtp_user or not self.smtp_password:
-                logger.warning("⚠️ Email service not configured (SMTP_USER/SMTP_PASSWORD missing)")
-                logger.info(f"📧 [DEV MODE] OTP for {to_email}: {otp}")
+                logger.warning("Email service not configured (SMTP_USER/SMTP_PASSWORD missing)")
+                logger.info(f"[DEV MODE] OTP for {to_email}: {otp}")
                 return True  # Return True in dev mode for testing
             
             # Create message
@@ -179,13 +178,13 @@ class EmailService:
                 server.login(self.smtp_user, self.smtp_password)
                 server.send_message(message)
             
-            logger.info(f"✅ Verification email sent to {to_email}")
+            logger.info(f"Verification email sent to {to_email}")
             return True
         
         except Exception as e:
-            logger.error(f"❌ Failed to send verification email to {to_email}: {e}")
+            logger.error(f"Failed to send verification email to {to_email}: {e}")
             # In development, log OTP for testing
-            logger.info(f"📧 [DEV MODE] OTP for {to_email}: {otp}")
+            logger.info(f"[DEV MODE] OTP for {to_email}: {otp}")
             return False
     
     def send_resend_otp_email(self, to_email: str, otp: str, username: str = "User") -> bool:
@@ -196,8 +195,8 @@ class EmailService:
         """
         try:
             if not self.smtp_user or not self.smtp_password:
-                logger.warning("⚠️ Email service not configured")
-                logger.info(f"📧 [DEV MODE] Resend OTP for {to_email}: {otp}")
+                logger.warning("Email service not configured")
+                logger.info(f"[DEV MODE] Resend OTP for {to_email}: {otp}")
                 return True
             
             # Create message
@@ -239,12 +238,12 @@ class EmailService:
                 server.login(self.smtp_user, self.smtp_password)
                 server.send_message(message)
             
-            logger.info(f"✅ Resend OTP email sent to {to_email}")
+            logger.info(f"Resend OTP email sent to {to_email}")
             return True
         
         except Exception as e:
-            logger.error(f"❌ Failed to send resend OTP email: {e}")
-            logger.info(f"📧 [DEV MODE] Resend OTP for {to_email}: {otp}")
+            logger.error(f"Failed to send resend OTP email: {e}")
+            logger.info(f"[DEV MODE] Resend OTP for {to_email}: {otp}")
             return False
 
     def send_password_reset_email(self, to_email: str, reset_token: str, reset_url: str, username: str = "User") -> bool:
@@ -262,9 +261,9 @@ class EmailService:
         """
         try:
             if not self.smtp_user or not self.smtp_password:
-                logger.warning("⚠️ Email service not configured (SMTP_USER/SMTP_PASSWORD missing)")
-                logger.info(f"📧 [DEV MODE] Password reset link for {to_email}: {reset_url}")
-                logger.info(f"📧 [DEV MODE] Reset token: {reset_token}")
+                logger.warning("Email service not configured (SMTP_USER/SMTP_PASSWORD missing)")
+                logger.info(f"[DEV MODE] Password reset link for {to_email}: {reset_url}")
+                logger.info(f"[DEV MODE] Reset token: {reset_token}")
                 return True  # Return True in dev mode for testing
             
             # Create message
@@ -391,13 +390,13 @@ class EmailService:
                 server.login(self.smtp_user, self.smtp_password)
                 server.send_message(message)
             
-            logger.info(f"✅ Password reset email sent to {to_email}")
+            logger.info(f"Password reset email sent to {to_email}")
             return True
         
         except Exception as e:
-            logger.error(f"❌ Failed to send password reset email to {to_email}: {e}")
+            logger.error(f"Failed to send password reset email to {to_email}: {e}")
             # In development, log reset link for testing
-            logger.info(f"📧 [DEV MODE] Password reset link for {to_email}: {reset_url}")
+            logger.info(f"[DEV MODE] Password reset link for {to_email}: {reset_url}")
             return False
 
 
@@ -413,10 +412,9 @@ def get_email_service() -> EmailService:
     return _email_service
 
 
-@shared_task(name="app.services.email_service.send_email_async")
 def send_email_async(to_email: str, otp: str, username: str = "User", email_type: str = "verification"):
     """
-    Async task to send email
+    Background task to send email
     
     Args:
         to_email: Recipient email
@@ -438,12 +436,12 @@ def send_email_async(to_email: str, otp: str, username: str = "User", email_type
             success = email_service.send_verification_email(to_email, otp, username)
         
         if success:
-            logger.info(f"✅ Email sent successfully to {to_email}")
+            logger.info(f"Email sent successfully to {to_email}")
             return {"status": "sent", "email": to_email}
         else:
-            logger.warning(f"⚠️ Email send returned false for {to_email}")
+            logger.warning(f"Email send returned false for {to_email}")
             return {"status": "warning", "email": to_email, "message": "Email service returned false"}
             
     except Exception as e:
-        logger.error(f"❌ Failed to send email to {to_email}: {e}", exc_info=True)
+        logger.error(f"Failed to send email to {to_email}: {e}", exc_info=True)
         return {"status": "failed", "email": to_email, "error": str(e)}

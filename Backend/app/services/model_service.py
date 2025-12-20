@@ -130,17 +130,17 @@ class ModelService:
         
         defaults = {}
         if embedding_models:
-            # Prefer BAAI/bge-small-en-v1.5
+            # Prefer nomic-embed-text (non-Chinese)
             default_embedding = next(
-                (m for m in embedding_models if m.model_id == "BAAI/bge-small-en-v1.5"),
+                (m for m in embedding_models if m.model_id == "nomic-embed-text"),
                 embedding_models[0]
             )
             defaults["embedding"] = default_embedding.model_id
         
         if llm_models:
-            # Prefer llama3.2:3b-instruct-q4_K_M (Ollama local)
+            # Prefer llama3.1:8b-instruct-q4_K_M (Ollama local)
             default_llm = next(
-                (m for m in llm_models if m.model_id == "llama3.2:3b-instruct-q4_K_M"),
+                (m for m in llm_models if m.model_id == "llama3.1:8b-instruct-q4_K_M"),
                 llm_models[0]
             )
             defaults["llm"] = default_llm.model_id

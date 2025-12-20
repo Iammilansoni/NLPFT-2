@@ -1,9 +1,9 @@
 """
 Ollama Embedding Service - CPU-based embedding generation using Ollama
 
-🎯 Features:
+Features:
 - HTTP API integration with Ollama (localhost:11434)
-- Supports: all-minilm (384), nomic-embed-text (768), bge-large (1024), mxbai-embed-large (1024)
+- Supports: all-minilm (384), nomic-embed-text (768), mxbai-embed-large (1024)
 - Automatic model pulling if not available
 - Batch processing for efficiency
 - Error handling and retries
@@ -42,7 +42,7 @@ class OllamaEmbeddingService:
                 response = await client.get(self.base_url, timeout=5.0)
                 return response.status_code == 200
         except Exception as e:
-            logger.warning(f"⚠️ Ollama not available: {e}")
+            logger.warning(f"Ollama not available: {e}")
             return False
     
     async def pull_model(self, model_name: str) -> bool:
@@ -56,7 +56,7 @@ class OllamaEmbeddingService:
             bool: True if successful, False otherwise
         """
         try:
-            logger.info(f"📥 Pulling Ollama model: {model_name}...")
+            logger.info(f"Pulling Ollama model: {model_name}...")
             
             async with httpx.AsyncClient(timeout=300.0) as client:  # 5 min timeout for download
                 response = await client.post(
@@ -65,14 +65,14 @@ class OllamaEmbeddingService:
                 )
                 
                 if response.status_code == 200:
-                    logger.info(f"✅ Model pulled successfully: {model_name}")
+                    logger.info(f"Model pulled successfully: {model_name}")
                     return True
                 else:
-                    logger.error(f"❌ Failed to pull model {model_name}: {response.text}")
+                    logger.error(f"Failed to pull model {model_name}: {response.text}")
                     return False
         
         except Exception as e:
-            logger.error(f"❌ Error pulling model {model_name}: {e}")
+            logger.error(f"Error pulling model {model_name}: {e}")
             return False
     
     async def generate_embedding(
@@ -107,17 +107,17 @@ class OllamaEmbeddingService:
                     return data.get("embedding")
                 elif response.status_code == 404 and retry_with_pull:
                     # Model not found, try to pull it
-                    logger.warning(f"⚠️ Model {model_name} not found, attempting to pull...")
+                    logger.warning(f"Model {model_name} not found, attempting to pull...")
                     if await self.pull_model(model_name):
                         # Retry after pulling
                         return await self.generate_embedding(model_name, text, retry_with_pull=False)
                     return None
                 else:
-                    logger.error(f"❌ Ollama API error: {response.status_code} - {response.text}")
+                    logger.error(f"Ollama API error: {response.status_code} - {response.text}")
                     return None
         
         except Exception as e:
-            logger.error(f"❌ Error generating embedding: {e}")
+            logger.error(f"Error generating embedding: {e}")
             return None
     
     async def generate_embeddings_batch(
@@ -153,12 +153,12 @@ class OllamaEmbeddingService:
             # Handle results and exceptions
             for result in batch_results:
                 if isinstance(result, Exception):
-                    logger.error(f"❌ Batch embedding error: {result}")
+                    logger.error(f"Batch embedding error: {result}")
                     embeddings.append(None)
                 else:
                     embeddings.append(result)
             
-            logger.info(f"✅ Processed batch {i//batch_size + 1}/{(len(texts) + batch_size - 1)//batch_size}")
+            logger.info(f"Processed batch {i//batch_size + 1}/{(len(texts) + batch_size - 1)//batch_size}")
         
         return embeddings
     
@@ -174,14 +174,14 @@ class OllamaEmbeddingService:
         """
         test_text = "This is a test embedding for API test case generation."
         
-        logger.info(f"🧪 Testing Ollama embedding with model: {model_name}")
+        logger.info(f"Testing Ollama embedding with model: {model_name}")
         embedding = await self.generate_embedding(model_name, test_text)
         
         if embedding:
-            logger.info(f"✅ Test successful! Embedding dimension: {len(embedding)}")
+            logger.info(f"Test successful! Embedding dimension: {len(embedding)}")
             return True
         else:
-            logger.error(f"❌ Test failed for model: {model_name}")
+            logger.error(f"Test failed for model: {model_name}")
             return False
 
 

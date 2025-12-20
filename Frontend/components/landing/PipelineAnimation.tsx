@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Database, FileJson, Sparkles, Zap, Search, BarChart3 } from 'lucide-react';
+import { Database, FileJson, Cpu, Zap, Search, BarChart3 } from 'lucide-react';
 
 const steps = [
   {
@@ -15,10 +15,10 @@ const steps = [
   {
     id: 'process',
     title: 'AI Processing',
-    icon: Sparkles,
-    color: 'text-purple-400',
-    bg: 'bg-purple-400/10',
-    border: 'border-purple-400/20',
+    icon: Cpu,
+    color: 'text-sky-400',
+    bg: 'bg-sky-400/10',
+    border: 'border-sky-400/20',
   },
   {
     id: 'generate',
@@ -51,7 +51,7 @@ export const PipelineAnimation = () => {
     <div className="w-full max-w-5xl mx-auto py-20 relative">
       {/* Connecting Line */}
       <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-primary/20 to-transparent -translate-y-1/2 hidden md:block" />
-      
+
       {/* Animated Pulse on Line */}
       <motion.div
         className="absolute top-1/2 left-0 h-0.5 w-20 bg-gradient-to-r from-transparent via-primary to-transparent -translate-y-1/2 hidden md:block blur-sm"
@@ -88,7 +88,7 @@ export const PipelineAnimation = () => {
               <h3 className="font-semibold text-sm md:text-base text-foreground/90">
                 {step.title}
               </h3>
-              
+
               {/* Hover Glow Effect */}
               <div className={`
                 absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100

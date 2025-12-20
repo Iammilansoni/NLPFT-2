@@ -1,28 +1,32 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { motion } from 'framer-motion'
 import {
   Download,
   RefreshCw,
   Database,
-  FileJson,
   FileText,
-  Sparkles,
+  FileSpreadsheet,
   Loader2,
   CheckCircle,
   XCircle,
   Clock,
   Zap,
+  Play,
+  Settings,
+  Upload,
+  X,
+  Sparkles,
+  AlertTriangle,
+  Search,
+  MoreHorizontal,
+  Trash2,
+  Eye,
+  AlertCircle,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight,
-  Play,
-  Settings,
-  TrendingUp,
-  Upload,
-  X,
+  ChevronsRight
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,9 +34,22 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
-// import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
+} from "@/components/ui/dropdown-menu"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { toast } from '@/hooks/use-toast'
 
 interface DatasetRecord {
   api: string
@@ -68,7 +85,6 @@ interface GenerationTask {
     csv_path?: string
   }
   files?: {
-    json?: string
     jsonl?: string
     csv?: string
     summary?: string
@@ -86,10 +102,22 @@ interface DatasetPreview {
   records: DatasetRecord[]
 }
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
+// New interface for persistent datasets from PostgreSQL
+interface PersistentDataset {
+  dataset_id: string
+  name: string
+  template_id?: string
+  template_name?: string
+  total_rows: number
+  embedded_rows: number
+  embedding_status: string
+  embedding_model?: string
+  source_type: 'AI_GENERATED' | 'CSV_UPLOAD'
+  created_at: string
+  updated_at?: string
 }
+
+// Animation variants removed for cleaner enterprise styling
 
 export default function DatasetGeneratorPage() {
   const [isGenerating, setIsGenerating] = useState(false)
@@ -108,6 +136,18 @@ export default function DatasetGeneratorPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
+  // New state for persistent datasets
+  const [persistentDatasets, setPersistentDatasets] = useState<PersistentDataset[]>([])
+  const [viewingDataset, setViewingDataset] = useState<PersistentDataset | null>(null)
+  const [viewingRows, setViewingRows] = useState<any[]>([])
+  const [viewTotal, setViewTotal] = useState(0)
+  const [viewPage, setViewPage] = useState(0)
+  const [isViewLoading, setIsViewLoading] = useState(false)
+  const [renamingDataset, setRenamingDataset] = useState<PersistentDataset | null>(null)
+  const [newDatasetName, setNewDatasetName] = useState('')
+  const [embeddingDatasetId, setEmbeddingDatasetId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   // Format date in unambiguous format with local timezone: "Dec 10, 2025, 7:28 PM"
@@ -116,10 +156,10 @@ export default function DatasetGeneratorPage() {
     try {
       // Parse ISO date string (handles both with and without Z suffix)
       const date = new Date(dateString.endsWith('Z') ? dateString : dateString + 'Z')
-      
+
       // Check if date is valid
       if (isNaN(date.getTime())) return dateString
-      
+
       return date.toLocaleString('en-US', {
         month: 'short',
         day: 'numeric',
@@ -153,8 +193,14 @@ export default function DatasetGeneratorPage() {
 
   const fetchPreview = useCallback(async (taskId: string, limit: number = 100, offset: number = 0) => {
     try {
+      const token = localStorage.getItem('nlpforge_access_token')
       const response = await fetch(
-        `${API_BASE}/api/v1/datasets/preview/${taskId}?limit=${limit}&offset=${offset}`
+        `${API_BASE}/api/v1/datasets/preview/${taskId}?limit=${limit}&offset=${offset}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
       )
       const data = await response.json()
       setPreviewData(data)
@@ -175,7 +221,8 @@ export default function DatasetGeneratorPage() {
       })
       if (!response.ok) throw new Error('Failed to fetch')
       const data = await response.json()
-      setAllTasks(data.datasets || [])
+      // Now datasets come from PostgreSQL (persistent)
+      setPersistentDatasets(data.datasets || [])
     } catch (err) {
       // Backend not available - this is expected in development
       console.log('Backend API not available')
@@ -186,7 +233,12 @@ export default function DatasetGeneratorPage() {
 
   const fetchTaskStatus = useCallback(async (taskId: string) => {
     try {
-      const response = await fetch(`${API_BASE}/api/v1/datasets/status/${taskId}`)
+      const token = localStorage.getItem('nlpforge_access_token')
+      const response = await fetch(`${API_BASE}/api/v1/datasets/status/${taskId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
       const data = await response.json()
       setCurrentTask(data)
 
@@ -248,6 +300,20 @@ export default function DatasetGeneratorPage() {
     }
   }, [currentTask, fetchTaskStatus])
 
+  // Poll for embedding status updates when any dataset is in_progress
+  useEffect(() => {
+    const hasEmbeddingInProgress = persistentDatasets.some(
+      d => d.embedding_status === 'in_progress'
+    )
+
+    if (hasEmbeddingInProgress) {
+      const interval = setInterval(() => {
+        fetchAllTasks()
+      }, 3000) // Poll every 3 seconds
+      return () => clearInterval(interval)
+    }
+  }, [persistentDatasets, fetchAllTasks])
+
   const handleGenerate = async () => {
     if (!templateId) {
       setError('Please select a template')
@@ -268,7 +334,7 @@ export default function DatasetGeneratorPage() {
       const token = localStorage.getItem('nlpforge_access_token')
       const response = await fetch(`${API_BASE}/api/v1/datasets/generate`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
@@ -296,7 +362,12 @@ export default function DatasetGeneratorPage() {
 
   const handleDownload = async (taskId: string, format: string) => {
     try {
-      const response = await fetch(`${API_BASE}/api/v1/datasets/download/${taskId}/${format}`)
+      const token = localStorage.getItem('nlpforge_access_token')
+      const response = await fetch(`${API_BASE}/api/v1/datasets/download/${taskId}/${format}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
       if (response.ok) {
         const blob = await response.blob()
         const url = window.URL.createObjectURL(blob)
@@ -326,8 +397,12 @@ export default function DatasetGeneratorPage() {
       const formData = new FormData()
       formData.append('file', uploadedFile)
 
+      const token = localStorage.getItem('nlpforge_access_token')
       const response = await fetch(`${API_BASE}/api/v1/datasets/upload`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: formData,
       })
 
@@ -360,22 +435,174 @@ export default function DatasetGeneratorPage() {
     }
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle className="w-5 h-5 text-emerald-500" />
-      case 'failed':
-        return <XCircle className="w-5 h-5 text-red-500" />
-      case 'running':
-        return <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
-      default:
-        return <Clock className="w-5 h-5 text-gray-500" />
+  // Handler: View dataset rows
+  const handleViewDataset = async (dataset: PersistentDataset) => {
+    setViewingDataset(dataset)
+    setViewPage(0)
+    setIsViewLoading(true)
+    try {
+      const token = localStorage.getItem('nlpforge_access_token')
+      const response = await fetch(
+        `${API_BASE}/api/v1/datasets/db/${dataset.dataset_id}/rows?skip=0&limit=50`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      )
+      const data = await response.json()
+      setViewingRows(data.rows || [])
+      setViewTotal(data.total || 0)
+    } catch (err) {
+      setError(formatError(err))
+    } finally {
+      setIsViewLoading(false)
     }
   }
 
+  // Handler for pagination in view modal
+  const handleViewPageChange = async (newPage: number) => {
+    if (!viewingDataset) return
+    setIsViewLoading(true)
+    setViewPage(newPage)
+    const newSkip = newPage * 50
+    try {
+      const token = localStorage.getItem('nlpforge_access_token')
+      const response = await fetch(
+        `${API_BASE}/api/v1/datasets/db/${viewingDataset.dataset_id}/rows?skip=${newSkip}&limit=50`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      )
+      const data = await response.json()
+      setViewingRows(data.rows || [])
+    } catch (err) {
+      setError(formatError(err))
+    } finally {
+      setIsViewLoading(false)
+    }
+  }
+
+  // Handler: Embed dataset to Redis
+  const handleEmbedDataset = async (datasetId: string, forceReembed: boolean = false) => {
+    setEmbeddingDatasetId(datasetId)
+
+    // Show start notification
+    toast({
+      title: forceReembed ? "⚡ Re-embedding Started" : "⚡ Embedding Started",
+      description: "Processing vectors with your current embedding model...",
+    })
+
+    try {
+      const token = localStorage.getItem('nlpforge_access_token')
+      const url = `${API_BASE}/api/v1/datasets/db/${datasetId}/embed${forceReembed ? '?force_reembed=true' : ''}`
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || 'Failed to embed dataset')
+      }
+
+      const result = await response.json()
+
+      // Show success notification
+      toast({
+        title: "✓ Embedding Completed",
+        description: `Successfully embedded ${result.embedded_count || 'all'} rows with ${result.model || 'current model'}`,
+      })
+
+      // Refresh datasets to show updated status
+      await fetchAllTasks()
+    } catch (err: any) {
+      toast({
+        title: "Embedding Failed",
+        description: err.message || formatError(err),
+        variant: "destructive",
+      })
+      setError(formatError(err))
+    } finally {
+      setEmbeddingDatasetId(null)
+    }
+  }
+
+  // Handler: Rename dataset
+  const handleRenameDataset = async () => {
+    if (!renamingDataset || !newDatasetName.trim()) return
+    try {
+      const token = localStorage.getItem('nlpforge_access_token')
+      const response = await fetch(
+        `${API_BASE}/api/v1/datasets/db/${renamingDataset.dataset_id}/rename`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ name: newDatasetName.trim() })
+        }
+      )
+      if (!response.ok) throw new Error('Failed to rename')
+      setRenamingDataset(null)
+      setNewDatasetName('')
+      await fetchAllTasks()
+    } catch (err) {
+      setError(formatError(err))
+    }
+  }
+
+  // Handler: Delete dataset
+  const handleDeleteDataset = async (datasetId: string) => {
+    if (!confirm('Are you sure you want to delete this dataset? This action cannot be undone.')) return
+    try {
+      const token = localStorage.getItem('nlpforge_access_token')
+      const response = await fetch(`${API_BASE}/api/v1/datasets/db/${datasetId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (!response.ok) throw new Error('Failed to delete')
+      await fetchAllTasks()
+    } catch (err) {
+      setError(formatError(err))
+    }
+  }
+
+  // Handler: Download dataset as CSV
+  const handleDownloadDatasetById = async (dataset: PersistentDataset) => {
+    try {
+      const token = localStorage.getItem('nlpforge_access_token')
+      // Use the dataset rows endpoint to get all rows
+      const response = await fetch(
+        `${API_BASE}/api/v1/datasets/db/${dataset.dataset_id}/rows?skip=0&limit=${dataset.total_rows}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      )
+      const data = await response.json()
+
+      // Convert to CSV
+      if (data.rows && data.rows.length > 0) {
+        const headers = ['query', 'api_name', 'endpoint', 'scenario_type']
+        const csvContent = [
+          headers.join(','),
+          ...data.rows.map((row: any) =>
+            headers.map(h => `"${(row[h] || '').toString().replace(/"/g, '""')}"`).join(',')
+          )
+        ].join('\n')
+
+        const blob = new Blob([csvContent], { type: 'text/csv' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${dataset.name || 'dataset'}.csv`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+      }
+    } catch (err) {
+      setError(formatError(err))
+    }
+  }
+
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4">
           <Loader2 className="w-12 h-12 animate-spin mx-auto text-primary" />
           <p className="text-muted-foreground">Loading datasets...</p>
@@ -385,537 +612,592 @@ export default function DatasetGeneratorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950/50">
       <div className="p-6 lg:p-8 space-y-8 max-w-[1600px] mx-auto">
         {/* Header */}
-        <motion.div initial="hidden" animate="show" variants={fadeUp}>
-          <div className="flex items-center gap-4 mb-6">
-            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-500 via-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/25">
-              <Database className="h-7 w-7" />
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground font-manrope">Datasets</h1>
+            <p className="text-muted-foreground flex items-center gap-2">
+              Manage your evaluation datasets and embeddings
+            </p>
+          </div>
+          <div className="hidden md:flex items-center gap-6 text-sm">
+            <div className="text-right">
+              <p className="text-2xl font-bold tabular-nums text-foreground">{persistentDatasets.length}</p>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total</p>
             </div>
-            <div>
-              <h1 className="text-4xl font-bold tracking-tight">Dataset Generator</h1>
-              <p className="text-muted-foreground mt-1">
-                Generate structured datasets with NLP augmentation and embeddings
+            <div className="h-8 w-px bg-border" />
+            <div className="text-right">
+              <p className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                {persistentDatasets.filter(d => d.embedding_status === 'completed').length}
               </p>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Embedded</p>
             </div>
           </div>
-        </motion.div>
+        </div>
 
-        <Tabs defaultValue="generate" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-8">
-            <TabsTrigger value="generate">Generate New Dataset</TabsTrigger>
-            <TabsTrigger value="upload">Upload for Embedding</TabsTrigger>
+        <Tabs defaultValue="generate" className="w-full space-y-6">
+          <TabsList className="grid w-full sm:w-[400px] grid-cols-2 p-1 bg-muted/50 rounded-lg">
+            <TabsTrigger
+              value="generate"
+              className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md transition-all duration-200"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Generate
+            </TabsTrigger>
+            <TabsTrigger
+              value="upload"
+              className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md transition-all duration-200"
+            >
+              <Upload className="w-4 h-4" />
+              Upload
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="generate">
-            {/* Configuration Card */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-              <Card className="border-2">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white shadow-md">
-                      <Settings className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <CardTitle>Configuration</CardTitle>
-                      <CardDescription>Set up your dataset generation parameters</CardDescription>
+          <TabsContent value="generate" className="outline-none animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+            {/* Active Generation Progress Card */}
+            {currentTask && (currentTask.status === 'running' || currentTask.status === 'pending') && (
+              <Card className="mb-6 border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-900/10 shadow-sm animate-in fade-in slide-in-from-top-2">
+                <CardContent className="p-4 flex items-center gap-4">
+                  <div className="relative">
+                    <Loader2 className="w-8 h-8 animate-spin text-blue-600 dark:text-blue-400" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-900/50" />
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Template Selector */}
-                  <div className="space-y-2">
-                    <Label htmlFor="template-select" className="text-sm font-medium">
-                      Select Template <span className="text-red-500">*</span>
+                  <div className="flex-1 space-y-1">
+                    <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 flex items-center gap-2">
+                      Generating Dataset...
+                      <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200 text-[10px] h-5 px-1.5">
+                        {currentTask.task_id}
+                      </Badge>
+                    </p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      {currentTask.message || 'Creating test cases with AI...'}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card className="border-border shadow-sm bg-card overflow-hidden">
+              <CardHeader className="bg-muted/30 border-b pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center ring-1 ring-primary/20">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg font-semibold">AI Dataset Generation</CardTitle>
+                    <CardDescription>Create synthetic evaluation data using approved templates</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6 grid gap-8 md:grid-cols-2">
+                {/* Left Column: Inputs */}
+                <div className="space-y-6">
+                  <div className="space-y-3">
+                    <Label htmlFor="template-select" className="text-sm font-medium flex items-center gap-1">
+                      Template <span className="text-red-500">*</span>
                     </Label>
                     <select
                       id="template-select"
                       value={templateId}
                       onChange={(e) => setTemplateId(e.target.value)}
                       disabled={isGenerating}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50 transition-all"
                     >
                       <option value="">Select an approved template...</option>
                       {Array.isArray(templates) && templates.length > 0 ? (
                         templates.map((template) => (
                           <option key={template.template_id || template.t_id} value={template.template_id || template.t_id}>
-                            ✓ {template.api_name}
+                            {template.api_name}
                           </option>
                         ))
                       ) : (
                         <option value="" disabled>No approved templates available</option>
                       )}
                     </select>
-                    <div className="flex items-center gap-2 p-2 bg-amber-500/10 border border-amber-500/30 rounded-md">
-                      <span className="text-amber-600 dark:text-amber-400 text-xs">
-                        💡 Only approved templates can be used for dataset generation. 
-                        {templates.length === 0 && ' Go to Templates page to create and approve templates.'}
-                      </span>
-                    </div>
+                    {templates.length === 0 && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5 mt-2">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        No approved templates found. Approve a template to continue.
+                      </p>
+                    )}
                   </div>
 
-                  {/* User Prompt */}
-                  <div className="space-y-2">
-                    <Label htmlFor="user-prompt" className="text-sm font-medium">
-                      User Prompt <span className="text-red-500">*</span>
+                  <div className="space-y-3">
+                    <Label htmlFor="num-examples" className="text-sm font-medium">Count</Label>
+                    <Input
+                      id="num-examples"
+                      type="number"
+                      min={1}
+                      max={1000}
+                      value={numExamples}
+                      onChange={(e) => setNumExamples(parseInt(e.target.value) || 100)}
+                      disabled={isGenerating}
+                      className="h-11"
+                    />
+                  </div>
+                </div>
+
+                {/* Right Column: Prompt */}
+                <div className="space-y-6 flex flex-col">
+                  <div className="space-y-3 flex-1 flex flex-col">
+                    <Label htmlFor="user-prompt" className="text-sm font-medium flex items-center gap-1">
+                      Generation Prompt <span className="text-red-500">*</span>
                     </Label>
                     <textarea
                       id="user-prompt"
                       value={userPrompt}
                       onChange={(e) => setUserPrompt(e.target.value)}
-                      placeholder="Describe the specific scenarios, edge cases, or variations you want to generate.&#10;&#10;Examples:&#10;• &quot;Focus on validation errors for invalid email formats&quot;&#10;• &quot;Generate high-risk security scenarios like SQL injection&quot;&#10;• &quot;Include mixed English and Spanish queries&quot;&#10;• &quot;Simulate slow network timeouts and partial data&quot;"
-                      rows={4}
+                      placeholder="Describe the scenarios to generate...&#10;e.g., 'Focus on edge cases for invalid dates' or 'Generate SQL injection attempts'"
+                      className="flex min-h-[160px] w-full rounded-lg border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50 resize-none flex-1 font-mono text-xs leading-relaxed"
                       disabled={isGenerating}
-                      className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-y"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      💡 Provide additional context to customize generated test cases (required for better quality)
-                    </p>
                   </div>
 
-                  {/* Parameters Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="num-examples">Number of Examples</Label>
-                      <Input
-                        id="num-examples"
-                        type="number"
-                        min={1}
-                        max={1000}
-                        value={numExamples}
-                        onChange={(e) => setNumExamples(parseInt(e.target.value) || 100)}
-                        disabled={isGenerating}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="llm-model">LLM Model</Label>
-                      <Input
-                        id="llm-model"
-                        type="text"
-                        value="Llama 3.2 Instruct (Ollama)"
-                        disabled
-                        className="bg-muted"
-                      />
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-purple-500" />
-                        Local CPU inference with quantized models
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Generate Button */}
                   <Button
                     onClick={handleGenerate}
                     disabled={isGenerating}
                     size="lg"
-                    className="w-full gap-2 shadow-lg"
+                    className="w-full gap-2 shadow-sm font-semibold h-11"
                   >
                     {isGenerating ? (
                       <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Generating Dataset...
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Generating...
                       </>
                     ) : (
                       <>
-                        <Play className="w-5 h-5" />
-                        Generate Dataset
+                        <Play className="w-4 h-4 fill-current" />
+                        Start Generation
                       </>
                     )}
                   </Button>
 
                   {error && (
-                    <div className="p-4 rounded-lg border-2 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20">
-                      <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+                    <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm font-medium flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
+                      <AlertCircle className="w-4 h-4" />
+                      {error}
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            </motion.div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
-          <TabsContent value="upload">
-            {/* Upload CSV Card */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-              <Card className="border-2">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-500 flex items-center justify-center text-white shadow-md">
-                      <Upload className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <CardTitle>Upload CSV for Embedding</CardTitle>
-                      <CardDescription>Upload an existing CSV file to generate embeddings</CardDescription>
-                    </div>
+          <TabsContent value="upload" className="outline-none animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+            <Card className="border-border shadow-sm bg-card">
+              <CardHeader className="bg-muted/30 border-b pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center ring-1 ring-border">
+                    <Upload className="h-5 w-5 text-muted-foreground" />
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <Label
-                        htmlFor="csv-upload"
-                        className="flex items-center justify-center h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="text-center">
-                          {uploadedFile ? (
-                            <div className="flex flex-col items-center gap-2">
-                              <FileText className="h-8 w-8 text-emerald-500" />
-                              <p className="text-sm font-medium">{uploadedFile.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {(uploadedFile.size / 1024).toFixed(2)} KB
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center gap-2">
-                              <Upload className="h-8 w-8 text-muted-foreground" />
-                              <p className="text-sm font-medium">Click to upload CSV</p>
-                              <p className="text-xs text-muted-foreground">or drag and drop</p>
-                            </div>
-                          )}
-                        </div>
-                        <input
-                          id="csv-upload"
-                          type="file"
-                          accept=".csv"
-                          onChange={handleFileChange}
-                          className="hidden"
-                          disabled={isUploading}
-                        />
-                      </Label>
-                    </div>
+                  <div>
+                    <CardTitle className="text-lg font-semibold">CSV Upload</CardTitle>
+                    <CardDescription>Import existing datasets for embedding</CardDescription>
                   </div>
-
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={handleFileUpload}
-                      disabled={!uploadedFile || isUploading}
-                      className="flex-1 gap-2"
-                    >
-                      {isUploading ? (
+                </div>
+              </CardHeader>
+              <CardContent className="p-8">
+                <div className="max-w-xl mx-auto space-y-6">
+                  <Label
+                    htmlFor="csv-upload"
+                    className={cn(
+                      "relative flex flex-col items-center justify-center w-full h-48 rounded-xl border-2 border-dashed transition-all cursor-pointer",
+                      uploadedFile
+                        ? "border-emerald-500/50 bg-emerald-50/10"
+                        : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/20"
+                    )}
+                  >
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
+                      {uploadedFile ? (
                         <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Uploading...
+                          <div className="h-12 w-12 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mb-3">
+                            <FileSpreadsheet className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                          </div>
+                          <p className="text-sm font-semibold text-foreground mb-1">
+                            {uploadedFile.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {(uploadedFile.size / 1024).toFixed(2)} KB
+                          </p>
                         </>
                       ) : (
                         <>
-                          <Upload className="w-4 h-4" />
-                          Upload & Process
+                          <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-3">
+                            <Upload className="h-6 w-6 text-muted-foreground" />
+                          </div>
+                          <p className="text-sm font-medium text-foreground mb-1">
+                            Click to upload or drag and drop
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            CSV files only (max 10MB)
+                          </p>
                         </>
                       )}
-                    </Button>
-                    {uploadedFile && (
+                    </div>
+                    <input
+                      id="csv-upload"
+                      type="file"
+                      accept=".csv"
+                      onChange={handleFileChange}
+                      className="hidden"
+                      disabled={isUploading}
+                    />
+                  </Label>
+
+                  {uploadedFile && (
+                    <div className="flex gap-3 animate-in fade-in slide-in-from-top-2">
+                      <Button
+                        onClick={handleFileUpload}
+                        disabled={isUploading}
+                        className="flex-1"
+                        size="lg"
+                      >
+                        {isUploading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Confirm Upload
+                          </>
+                        )}
+                      </Button>
                       <Button
                         variant="outline"
                         onClick={() => setUploadedFile(null)}
                         disabled={isUploading}
+                        size="lg"
+                        className="px-3"
                       >
                         <X className="w-4 h-4" />
                       </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
 
-        {/* Task Status */}
-        {currentTask && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="border-2">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {getStatusIcon(currentTask.status)}
-                    <div>
-                      <CardTitle>Generation Progress</CardTitle>
-                      <CardDescription>Task ID: {currentTask.task_id}</CardDescription>
-                    </div>
-                  </div>
-                  <Badge
-                    variant={
-                      currentTask.status === 'completed'
-                        ? 'default'
-                        : currentTask.status === 'failed'
-                        ? 'destructive'
-                        : 'secondary'
-                    }
-                    className="capitalize"
-                  >
-                    {currentTask.status}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Progress Bar */}
-                {(currentTask.status === 'running' || currentTask.status === 'pending') && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="font-medium">Progress</span>
-                      <span className="text-muted-foreground">{currentTask.progress || 0}%</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${currentTask.progress || 0}%` }}
-                        transition={{ duration: 0.3, ease: "easeOut" }}
-                        className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"
-                      />
-                    </div>
-                  </div>
-                )}
+        {/* ============= DATASET TABLE SECTION ============= */}
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          {/* Toolbar */}
+          <div className="p-4 border-b flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="relative w-full sm:max-w-xs group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+              <Input
+                placeholder="Filter datasets..."
+                className="pl-9 h-9 bg-muted/40 border-transparent focus:bg-background focus:border-input transition-all"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
 
-                {/* Current Step */}
-                {currentTask.current_step && (currentTask.status === 'running' || currentTask.status === 'pending') && (
-                  <div className="flex items-center gap-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                    <Loader2 className="w-5 h-5 animate-spin text-blue-500 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                        {currentTask.current_step}
-                      </p>
-                      {currentTask.message && currentTask.message !== currentTask.current_step && (
-                        <p className="text-xs text-muted-foreground mt-0.5">{currentTask.message}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-2 text-muted-foreground hover:text-foreground hidden sm:flex"
+              onClick={fetchAllTasks}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Refresh
+            </Button>
+          </div>
+
+          {/* Table Header */}
+          <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-muted/30 border-b text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <div className="col-span-4">Dataset Name</div>
+            <div className="col-span-2">Source</div>
+            <div className="col-span-2">Status</div>
+            <div className="col-span-1 text-right">Rows</div>
+            <div className="col-span-2">Date</div>
+            <div className="col-span-1 text-right">Actions</div>
+          </div>
+
+          {/* Table Body */}
+          <div className="divide-y divide-border">
+            {persistentDatasets.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                  <Database className="h-8 w-8 text-muted-foreground/50" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground">No datasets yet</h3>
+                <p className="text-sm text-muted-foreground mt-1 max-w-xs">
+                  Generate a dataset from a template or upload a CSV to get started.
+                </p>
+              </div>
+            ) : (
+              persistentDatasets
+                .filter(d => d.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                .map((dataset) => (
+                  <div
+                    key={dataset.dataset_id}
+                    className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-muted/30 transition-colors group"
+                  >
+                    {/* Name */}
+                    <div className="col-span-4 min-w-0">
+                      <div className="font-medium text-sm text-foreground truncate" title={dataset.name}>
+                        {dataset.name}
+                      </div>
+                      {dataset.template_name && (
+                        <div className="text-xs text-muted-foreground truncate flex items-center gap-1.5 mt-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-primary/40" />
+                          {dataset.template_name}
+                        </div>
                       )}
                     </div>
-                  </div>
-                )}
 
-                {/* Completed Steps History */}
-                {currentTask.steps && currentTask.steps.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-muted-foreground">Completed Steps:</p>
-                    <div className="space-y-1 max-h-40 overflow-y-auto">
-                      {currentTask.steps.map((step, index) => (
-                        <div key={index} className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                          <span className="text-muted-foreground">{step.name}</span>
+                    {/* Source */}
+                    <div className="col-span-2">
+                      <Badge variant="outline" className={cn(
+                        "font-medium text-[10px] uppercase tracking-wide border-0 px-2 py-0.5",
+                        dataset.source_type === 'AI_GENERATED' ? "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400" : "bg-sky-100 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400"
+                      )}>
+                        {dataset.source_type === 'AI_GENERATED' ? 'AI Generated' : 'Uploaded'}
+                      </Badge>
+                    </div>
+
+                    {/* Status */}
+                    <div className="col-span-2">
+                      {embeddingDatasetId === dataset.dataset_id ? (
+                        <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 font-medium">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Processing
                         </div>
-                      ))}
+                      ) : dataset.embedding_status === 'completed' ? (
+                        <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          Embedded
+                        </div>
+                      ) : dataset.embedding_status === 'in_progress' ? (
+                        <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 font-medium">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Processing
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span className="w-2 h-2 rounded-full bg-muted-foreground/30" />
+                          Pending
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Rows */}
+                    <div className="col-span-1 text-right text-sm tabular-nums text-muted-foreground font-mono">
+                      {dataset.total_rows.toLocaleString()}
+                    </div>
+
+                    {/* Date */}
+                    <div className="col-span-2 text-xs text-muted-foreground truncate">
+                      {formatDateTime(dataset.created_at)}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="col-span-1 flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-primary"
+                              onClick={() => handleViewDataset(dataset)}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>View Data</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+
+                      {dataset.embedding_status !== 'completed' && dataset.embedding_status !== 'in_progress' && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-blue-600"
+                                onClick={() => handleEmbedDataset(dataset.dataset_id)}
+                                disabled={embeddingDatasetId === dataset.dataset_id}
+                              >
+                                {embeddingDatasetId === dataset.dataset_id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Zap className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Generate Embeddings</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-[180px]">
+                          {dataset.embedding_status === 'completed' && (
+                            <>
+                              <DropdownMenuItem
+                                onClick={() => handleEmbedDataset(dataset.dataset_id, true)}
+                                className="text-blue-600 focus:text-blue-600"
+                              >
+                                <Zap className="w-4 h-4 mr-2" /> Re-embed
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                            </>
+                          )}
+                          <DropdownMenuItem onClick={() => handleDownloadDatasetById(dataset)}>
+                            <Download className="w-4 h-4 mr-2" /> Download CSV
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => handleDeleteDataset(dataset.dataset_id)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
-                )}
+                ))
+            )}
+          </div>
+        </div>
 
-                {/* Status Message for Completed/Failed */}
-                {(currentTask.status === 'completed' || currentTask.status === 'failed') && (
-                  <p className={cn(
-                    "text-sm p-3 rounded-lg",
-                    currentTask.status === 'completed' 
-                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" 
-                      : "bg-red-500/10 text-red-600 dark:text-red-400"
-                  )}>
-                    {currentTask.message || (currentTask.status === 'completed' ? 'Generation completed successfully!' : 'Generation failed')}
+        {/* ============= PREVIEW MODAL ============= */}
+        {viewingDataset && (
+          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div
+              className="bg-card w-full max-w-5xl max-h-[85vh] rounded-xl shadow-2xl border flex flex-col overflow-hidden animate-in zoom-in-95 duration-300 ring-1 ring-border"
+              role="dialog"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-5 border-b bg-muted/20">
+                <div className="space-y-1">
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    {viewingDataset.name}
+                    <Badge variant="outline" className="font-normal text-xs">{viewingDataset.source_type}</Badge>
+                  </h3>
+                  <p className="text-sm text-muted-foreground font-mono">
+                    {viewTotal.toLocaleString()} rows • {viewingDataset.embedding_status === 'completed' ? 'Embedded' : 'Not Embedded'}
                   </p>
-                )}
-
-                {/* Error Details */}
-                {currentTask.status === 'failed' && currentTask.error && (
-                  <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                    <p className="text-sm text-red-600 dark:text-red-400">
-                      <strong>Error:</strong> {currentTask.error}
-                    </p>
-                  </div>
-                )}
-
-                {/* Result Summary */}
-                {currentTask.status === 'completed' && currentTask.result?.total_generated && (
-                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                    <p className="text-sm text-emerald-600 dark:text-emerald-400">
-                      ✅ Generated <strong>{currentTask.result.total_generated}</strong> test cases
-                    </p>
-                  </div>
-                )}
-
-                {currentTask.statistics && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <StatCard
-                      label="Total APIs"
-                      value={currentTask.statistics.total_apis}
-                      gradient="from-blue-500 to-cyan-500"
-                    />
-                    <StatCard
-                      label="NL Variations"
-                      value={currentTask.statistics.total_nl_variations ?? 0}
-                      gradient="from-purple-500 to-pink-500"
-                    />
-                    <StatCard
-                      label="Avg per API"
-                      value={currentTask.statistics.avg_variations_per_api?.toFixed(1) ?? '0'}
-                      gradient="from-emerald-500 to-green-500"
-                    />
-                  </div>
-                )}
-
-                {currentTask.status === 'completed' && (
-                  <div className="flex flex-wrap gap-3 pt-4 border-t">
-                    <Button onClick={() => handleDownload(currentTask.task_id, 'json')} variant="outline" className="gap-2">
-                      <FileJson className="w-4 h-4" />
-                      Download JSON
-                    </Button>
-                    <Button onClick={() => handleDownload(currentTask.task_id, 'csv')} variant="outline" className="gap-2">
-                      <FileText className="w-4 h-4" />
-                      Download CSV
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-
-        {/* Preview Data */}
-        {previewData && previewData.records && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="border-2">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Dataset Preview</CardTitle>
-                  <Badge variant="secondary">
-                    {previewData.showing || 0} of {previewData.total_records || 0} records
-                  </Badge>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="border-b">
-                      <tr className="text-left">
-                        <th className="pb-3 font-medium">API</th>
-                        <th className="pb-3 font-medium">Natural Language Input</th>
-                        <th className="pb-3 font-medium">Definition</th>
+                <Button variant="ghost" size="icon" onClick={() => setViewingDataset(null)} className="h-9 w-9 rounded-full">
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="flex-1 overflow-auto bg-card">
+                {isViewLoading ? (
+                  <div className="flex flex-col items-center justify-center h-full min-h-[300px] space-y-4">
+                    <Loader2 className="w-10 h-10 animate-spin text-primary/50" />
+                    <p className="text-sm text-muted-foreground font-medium">Fetching records...</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-muted/40 sticky top-0 z-10 text-xs uppercase tracking-wider font-medium text-muted-foreground">
+                      <tr>
+                        <th className="px-6 py-3 w-1/2">Query</th>
+                        <th className="px-6 py-3">API Endpoint</th>
+                        <th className="px-6 py-3">Type</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y">
-                      {(previewData.records || []).map((record, index) => (
-                        <tr key={index} className="hover:bg-muted/50">
-                          <td className="py-3 font-mono text-xs">{record.api || ''}</td>
-                          <td className="py-3">{record.nl_input || ''}</td>
-                          <td className="py-3 text-xs text-muted-foreground">
-                            {(record.definition_of_api || '').substring(0, 100)}...
+                    <tbody className="divide-y divide-border">
+                      {viewingRows.map((row, i) => (
+                        <tr key={i} className="hover:bg-muted/30 transition-colors">
+                          <td className="px-6 py-3 font-mono text-xs text-foreground/80 leading-relaxed max-w-lg truncate" title={row.query}>
+                            {row.query}
+                          </td>
+                          <td className="px-6 py-3">
+                            <code className="text-[10px] bg-muted px-1.5 py-0.5 rounded border text-muted-foreground font-mono">
+                              {row.endpoint || row.api_name || '-'}
+                            </code>
+                          </td>
+                          <td className="px-6 py-3 text-muted-foreground">
+                            {row.scenario_type || '-'}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                </div>
+                )}
+              </div>
 
-                {/* Pagination */}
-                <div className="flex items-center justify-between pt-4 border-t mt-4">
-                  <div className="text-sm text-muted-foreground">
-                    Showing {previewData.offset + 1} - {previewData.offset + previewData.showing} of{' '}
-                    {previewData.total_records || 0}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => fetchPreview(currentTask!.task_id, pageSize, 0)}
-                      disabled={(previewData.offset || 0) === 0}
-                    >
-                      <ChevronsLeft className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() =>
-                        fetchPreview(currentTask!.task_id, pageSize, Math.max(0, (previewData.offset || 0) - pageSize))
-                      }
-                      disabled={(previewData.offset || 0) === 0}
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </Button>
-                    <span className="text-sm px-4">
-                      Page {currentPage + 1} of {Math.ceil((previewData.total_records || 1) / pageSize)}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => fetchPreview(currentTask!.task_id, pageSize, (previewData.offset || 0) + pageSize)}
-                      disabled={!previewData.has_more}
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() =>
-                        fetchPreview(
-                          currentTask!.task_id,
-                          pageSize,
-                          Math.floor(((previewData.total_records || 1) - 1) / pageSize) * pageSize
-                        )
-                      }
-                      disabled={!previewData.has_more}
-                    >
-                      <ChevronsRight className="w-4 h-4" />
-                    </Button>
-                  </div>
+              {/* Modal Footer with Pagination */}
+              <div className="p-4 border-t bg-muted/20 flex justify-between items-center">
+                <div className="text-xs text-muted-foreground">
+                  Page {viewPage + 1} of {Math.ceil(viewTotal / 50)}
                 </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-
-        {/* Previous Generations */}
-        {allTasks.length > 0 && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-            <Card className="border-2">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Previous Generations</CardTitle>
-                  <Button variant="ghost" size="sm" onClick={fetchAllTasks} className="gap-2">
-                    <RefreshCw className="w-4 h-4" />
-                    Refresh
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {allTasks.slice(0, 5).map((task) => (
-                  <div
-                    key={task.task_id}
-                    className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors"
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleViewPageChange(Math.max(0, viewPage - 1))}
+                    disabled={viewPage === 0 || isViewLoading}
+                    className="h-8 w-8"
                   >
-                    <div className="flex items-center gap-3">
-                      {getStatusIcon(task.status)}
-                      <div>
-                        <p className="font-medium">Dataset {task.dataset_id || task.task_id}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatDateTime(task.created_at)}
-                        </p>
-                      </div>
-                    </div>
-                    {task.status === 'completed' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setCurrentTask(task)
-                          fetchPreview(task.task_id)
-                        }}
-                      >
-                        View
-                      </Button>
-                    )}
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleViewPageChange(viewPage + 1)}
+                    disabled={(viewPage + 1) * 50 >= viewTotal || isViewLoading}
+                    className="h-8 w-8"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                  <div className="ml-4 pl-4 border-l">
+                    <Button variant="ghost" onClick={() => setViewingDataset(null)}>Close</Button>
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-          </motion.div>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
-      </div>
-    </div>
-  )
-}
 
-function StatCard({ label, value, gradient }: { label: string; value: string | number; gradient: string }) {
-  return (
-    <div className="p-4 rounded-xl border bg-card">
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <div className={cn('h-8 w-8 rounded-lg bg-gradient-to-br flex items-center justify-center', gradient)}>
-          <TrendingUp className="h-4 w-4 text-white" />
-        </div>
+        {/* Rename Dataset Modal */}
+        {renamingDataset && (
+          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-card w-full max-w-md bg-card border rounded-lg shadow-xl p-6 space-y-4">
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold">Rename Dataset</h3>
+                <p className="text-sm text-muted-foreground">Enter a new name for this dataset.</p>
+              </div>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="dataset-name">Name</Label>
+                  <Input
+                    id="dataset-name"
+                    value={newDatasetName}
+                    onChange={(e) => setNewDatasetName(e.target.value)}
+                    placeholder="Enter dataset name"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" onClick={() => setRenamingDataset(null)}>Cancel</Button>
+                  <Button onClick={handleRenameDataset}>Save Changes</Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
-      <p className="text-2xl font-bold">{value}</p>
     </div>
   )
 }

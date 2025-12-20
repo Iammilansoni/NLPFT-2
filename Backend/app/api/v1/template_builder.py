@@ -2,14 +2,14 @@
 Template Builder API - Enterprise-Grade Template Management
 Postman-Style Interface with Strict Validation & Approval Workflow
 
-✅ Minimum 500 words description (comprehensive technical documentation)
-✅ 3+ sample requests (valid, edge, error cases)
-✅ JSON Schema validation
-✅ Parameters table (name, type, required, example, description)
-✅ Domain tags (telecom, fft, mimo, encryption, drone, defence)
-✅ Security classification (public, internal, secret, highly-restricted)
-✅ Approval workflow: draft → review → approved
-✅ Dataset generation ONLY for approved templates
+Features:
+- Minimum 500 words description (comprehensive technical documentation)
+- 3+ sample requests (valid, edge, error cases)
+- JSON Schema validation
+- Parameters table (name, type, required, example, description)
+- Domain tags (telecom, fft, mimo, encryption, drone, defence)
+- Approval workflow: draft > review > approved
+- Dataset generation ONLY for approved templates
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -34,7 +34,6 @@ from app.models.schemas.template_schemas import (
     TemplateValidationResponse,
     TemplateValidationError,
     TemplateStatus,
-    SecurityClassification,
     DomainTag,
     ParameterSchema,
     TemplateDraftCreate,
@@ -53,7 +52,7 @@ from fastapi import Request
 router = APIRouter(prefix="/templates", tags=["Template Builder"])
 
 
-# ============= HELPER FUNCTIONS =============
+# --- Helper Functions ---
 
 def validate_uuid(template_id: str) -> UUID:
     """
@@ -69,7 +68,7 @@ def validate_uuid(template_id: str) -> UUID:
         )
 
 
-# ============= TEMPLATE CRUD =============
+# --- Template CRUD ---
 
 @router.post("/", response_model=TemplateResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("20/minute")  # Rate limit: 20 template creations per minute per IP
@@ -82,7 +81,7 @@ async def create_template(
     """
     Create new API template with strict validation
     
-    ⏱️ RATE LIMIT: 20 creations per minute per IP
+    RATE LIMIT: 20 creations per minute per IP
     
     **Requirements:**
     - API name: 3-200 characters
@@ -92,7 +91,6 @@ async def create_template(
     - 1+ parameters with full specifications
     - 1+ domain tags
     - JSON Schema with proper structure
-    - Security classification
     
     **Template Status:**
     - Starts as 'draft'
@@ -154,7 +152,6 @@ async def create_template(
             m_id=uuid4(),
             u_id=current_user.u_id,
             t_id=new_template.t_id,
-            security_classification=template_data.security_classification.value if hasattr(template_data.security_classification, 'value') else template_data.security_classification,
             status=TemplateStatus.DRAFT.value,
             expert_notes=None
         )
@@ -164,7 +161,7 @@ async def create_template(
         await db.commit()
         await db.refresh(new_template)
         
-        logger.info(f"✅ Template created: {new_template.api_name} (ID: {new_template.t_id}) by user {current_user.u_id}")
+        logger.info(f"Template created: {new_template.api_name} (ID: {new_template.t_id}) by user {current_user.u_id}")
         
         # Build response
         response = TemplateResponse(
@@ -181,7 +178,6 @@ async def create_template(
             sample_responses=new_template.sample_responses,
             parameters=[param.model_dump() for param in template_data.parameters],
             domain_tags=template_data.domain_tags,  # Already List[str]
-            security_classification=template_data.security_classification.value if hasattr(template_data.security_classification, 'value') else template_data.security_classification,
             expert_notes=None,
             status=TemplateStatus.DRAFT.value,
             auth_config=new_template.auth_config,
@@ -268,14 +264,10 @@ async def create_draft_template(
             db.add(expected_resp)
         
         # Create metadata with draft status
-        sec_class = template_data.security_classification
-        sec_value = sec_class.value if hasattr(sec_class, 'value') else (sec_class or 'public')
-        
         metadata = Metadata(
             m_id=uuid4(),
             u_id=current_user.u_id,
             t_id=new_template.t_id,
-            security_classification=sec_value,
             status=TemplateStatus.DRAFT.value,
             expert_notes=None
         )
@@ -285,7 +277,7 @@ async def create_draft_template(
         await db.commit()
         await db.refresh(new_template)
         
-        logger.info(f"✅ Draft template created: {new_template.api_name} (ID: {new_template.t_id}) by user {current_user.u_id}")
+        logger.info(f"Draft template created: {new_template.api_name} (ID: {new_template.t_id}) by user {current_user.u_id}")
         
         # Build response
         response = TemplateResponse(
@@ -302,7 +294,6 @@ async def create_draft_template(
             sample_responses=new_template.sample_responses,
             parameters=[p.model_dump() if hasattr(p, 'model_dump') else {'name': p.name, 'type': p.type, 'required': p.required, 'example': p.example, 'description': p.description} for p in (template_data.parameters or [])],
             domain_tags=template_data.domain_tags or [],
-            security_classification=sec_value,
             expert_notes=None,
             status=TemplateStatus.DRAFT.value,
             auth_config=new_template.auth_config,
@@ -388,8 +379,6 @@ async def update_draft_template(
             template.sample_responses = template_data.sample_responses
         if template_data.domain_tags is not None:
             template.domain_tags = template_data.domain_tags
-        if template_data.security_classification is not None and metadata:
-            metadata.security_classification = template_data.security_classification.value if hasattr(template_data.security_classification, 'value') else template_data.security_classification
         if template_data.auth_config is not None:
             template.auth_config = template_data.auth_config
         if template_data.headers is not None:
@@ -425,7 +414,7 @@ async def update_draft_template(
         await db.commit()
         await db.refresh(template)
         
-        logger.info(f"✅ Draft template updated: {template.api_name} (ID: {template.t_id}) by user {current_user.u_id}")
+        logger.info(f"Draft template updated: {template.api_name} (ID: {template.t_id}) by user {current_user.u_id}")
         
         # Get updated parameters
         params_result = await db.execute(
@@ -454,7 +443,6 @@ async def update_draft_template(
                 "description": p.description
             } for p in params],
             domain_tags=template.domain_tags or [],
-            security_classification=metadata.security_classification if metadata else "public",
             expert_notes=metadata.expert_notes if metadata else None,
             status=metadata.status if metadata else "draft",
             auth_config=template.auth_config,
@@ -530,10 +518,6 @@ async def list_templates(
             if domain_tag and domain_tag not in (template.domain_tags or []):
                 continue
             
-            # Apply security_level filter
-            if security_level and metadata and metadata.security_classification != security_level:
-                continue
-            
             response = TemplateResponse(
                 template_id=str(template.t_id),
                 user_id=str(template.u_id),
@@ -554,7 +538,6 @@ async def list_templates(
                     "description": p.description
                 } for p in params],
                 domain_tags=template.domain_tags or [],
-                security_classification=metadata.security_classification if metadata else "internal",
                 expert_notes=metadata.expert_notes if metadata else None,
                 status=metadata.status if metadata else "draft",
                 auth_config=template.auth_config,
@@ -703,7 +686,6 @@ async def get_template(
                 "description": p.description
             } for p in params],
             domain_tags=template.domain_tags or [],
-            security_classification=metadata.security_classification if metadata else "internal",
             expert_notes=metadata.expert_notes if metadata else None,
             status=metadata.status if metadata else "draft",
             auth_config=template.auth_config,
@@ -793,8 +775,6 @@ async def update_template(
         if template_data.domain_tags:
             # domain_tags is already List[str], no enum conversion needed
             template.domain_tags = template_data.domain_tags
-        if template_data.security_classification and metadata:
-            metadata.security_classification = template_data.security_classification.value if hasattr(template_data.security_classification, 'value') else template_data.security_classification
         if template_data.auth_config is not None:
             template.auth_config = template_data.auth_config
         if template_data.headers is not None:
@@ -828,9 +808,9 @@ async def update_template(
         await db.commit()
         await db.refresh(template)
         
-        logger.info(f"✅ Template updated: {template.api_name} (ID: {template.t_id})")
+        logger.info(f"Template updated: {template.api_name} (ID: {template.t_id})")
         
-        # 📝 Audit log
+        # Audit log
         audit_service = get_audit_service()
         changes = {}
         if template_data.api_name:
@@ -902,7 +882,7 @@ async def delete_template(
                 detail=f"Cannot delete template with status '{metadata.status}'. Only 'draft' templates can be deleted."
             )
         
-        # 📝 Audit log before deletion
+        # Audit log before deletion
         audit_service = get_audit_service()
         template_name = template.api_name
         template_id_for_log = template.t_id
@@ -911,7 +891,7 @@ async def delete_template(
         await db.delete(template)
         await db.commit()
         
-        logger.info(f"✅ Template deleted: {template_name} (ID: {template_id_for_log})")
+        logger.info(f"Template deleted: {template_name} (ID: {template_id_for_log})")
         
         # Audit log after successful deletion
         await audit_service.log_template_deleted(
@@ -932,7 +912,7 @@ async def delete_template(
         )
 
 
-# ============= INTERNAL VALIDATION HELPER =============
+# --- Internal Validation Helper ---
 
 async def _validate_template_internal(template_id: str, db: AsyncSession, current_user: User) -> TemplateValidationResponse:
     """
@@ -1022,7 +1002,7 @@ async def submit_template_for_review(
     """
     Submit template for expert review (simplified endpoint)
     
-    ⏱️ RATE LIMIT: 30 submissions per minute per IP
+    RATE LIMIT: 30 submissions per minute per IP
     
     Changes status from 'draft' or 'rejected' to 'review'.
     Template cannot be edited while in review.
@@ -1083,9 +1063,9 @@ async def submit_template_for_review(
         
         await db.commit()
         
-        logger.info(f"✅ Template submitted for review: {template_id} by user {current_user.u_id}")
+        logger.info(f"Template submitted for review: {template_id} by user {current_user.u_id}")
         
-        # 📝 Audit log
+        # Audit log
         audit_service = get_audit_service()
         await audit_service.log_template_submitted_for_review(
             db=db,
@@ -1168,9 +1148,9 @@ async def submit_for_review(
         
         await db.commit()
         
-        logger.info(f"✅ Template submitted for review: {template_id} by user {current_user.u_id}")
+        logger.info(f"Template submitted for review: {template_id} by user {current_user.u_id}")
         
-        # 📝 Audit log
+        # Audit log
         audit_service = get_audit_service()
         template_result = await db.execute(select(Template).where(Template.t_id == UUID(template_id)))
         template = template_result.scalar_one_or_none()
@@ -1211,7 +1191,7 @@ async def approve_template_by_id(
     """
     Approve template (Expert users only - simplified endpoint)
     
-    ⏱️ RATE LIMIT: 50 approvals per minute per IP
+    RATE LIMIT: 50 approvals per minute per IP
     
     Changes status from 'review' to 'approved'.
     Only approved templates can generate datasets.
@@ -1252,9 +1232,9 @@ async def approve_template_by_id(
         
         await db.commit()
         
-        logger.info(f"✅ Template approved: {template_id} by expert {current_user.u_id}")
+        logger.info(f"Template approved: {template_id} by expert {current_user.u_id}")
         
-        # 📝 Audit log
+        # Audit log
         audit_service = get_audit_service()
         template_result = await db.execute(select(Template).where(Template.t_id == UUID(template_id)))
         template = template_result.scalar_one_or_none()
@@ -1337,9 +1317,9 @@ async def approve_template(
         
         await db.commit()
         
-        logger.info(f"✅ Template approved: {approval_data.template_id} by expert {current_user.u_id}")
+        logger.info(f"Template approved: {approval_data.template_id} by expert {current_user.u_id}")
         
-        # 📝 Audit log
+        # Audit log
         audit_service = get_audit_service()
         template_result = await db.execute(select(Template).where(Template.t_id == UUID(approval_data.template_id)))
         template = template_result.scalar_one_or_none()
@@ -1426,9 +1406,9 @@ async def reject_template_by_id(
         
         await db.commit()
         
-        logger.info(f"❌ Template rejected: {template_id} by expert {current_user.u_id}")
+        logger.info(f"Template rejected: {template_id} by expert {current_user.u_id}")
         
-        # 📝 Audit log
+        # Audit log
         audit_service = get_audit_service()
         template_result = await db.execute(select(Template).where(Template.t_id == UUID(template_id)))
         template = template_result.scalar_one_or_none()
@@ -1513,9 +1493,9 @@ async def reject_template(
         
         await db.commit()
         
-        logger.info(f"❌ Template rejected: {rejection_data.template_id} by expert {current_user.u_id}")
+        logger.info(f"Template rejected: {rejection_data.template_id} by expert {current_user.u_id}")
         
-        # 📝 Audit log
+        # Audit log
         audit_service = get_audit_service()
         template_result = await db.execute(select(Template).where(Template.t_id == UUID(rejection_data.template_id)))
         template = template_result.scalar_one_or_none()
@@ -1595,9 +1575,9 @@ async def disable_template(
         
         await db.commit()
         
-        logger.info(f"🚫 Template disabled: {template_id} by expert {current_user.u_id}")
+        logger.info(f"Template disabled: {template_id} by expert {current_user.u_id}")
         
-        # 📝 Audit log
+        # Audit log
         audit_service = get_audit_service()
         template_result = await db.execute(select(Template).where(Template.t_id == UUID(template_id)))
         template = template_result.scalar_one_or_none()
@@ -1678,9 +1658,9 @@ async def enable_template(
         
         await db.commit()
         
-        logger.info(f"✅ Template enabled: {template_id} by expert {current_user.u_id}")
+        logger.info(f"Template enabled: {template_id} by expert {current_user.u_id}")
         
-        # 📝 Audit log
+        # Audit log
         audit_service = get_audit_service()
         template_result = await db.execute(select(Template).where(Template.t_id == UUID(template_id)))
         template = template_result.scalar_one_or_none()
@@ -1778,9 +1758,9 @@ async def toggle_template_visibility(
         metadata.updated_at = datetime.utcnow()
         await db.commit()
         
-        logger.info(f"🔄 Template visibility toggled: {template_id} -> {new_status} by user {current_user.u_id}")
+        logger.info(f"Template visibility toggled: {template_id} -> {new_status} by user {current_user.u_id}")
         
-        # 📝 Audit log
+        # Audit log
         audit_service = get_audit_service()
         await audit_service.log_action(
             db=db,

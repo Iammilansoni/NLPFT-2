@@ -1,7 +1,7 @@
 """
 Models Configuration - Ollama Embedding Models & LLM Metadata
 
-🎯 Embedding Model System:
+Embedding Model System:
 - All embeddings run through Ollama HTTP API (localhost:11434)
 - No HuggingFace/SentenceTransformers dependency
 - Models are user-selectable from Settings page
@@ -52,32 +52,12 @@ class LLMInfo(BaseModel):
 
 
 # =============================================================================
-# OLLAMA EMBEDDING MODELS
+# OLLAMA EMBEDDING MODELS (3 Models)
 # =============================================================================
 
+# All 3 embedding models available for user selection
 EMBEDDING_MODELS: List[EmbeddingModelInfo] = [
-    # � All-MiniLM - Super Fast Lightweight
-    EmbeddingModelInfo(
-        model_id="all-minilm",
-        display_name="All-MiniLM",
-        dimension=384,
-        parameters="~22 Million",
-        context_length="256-512 tokens",
-        speed=ModelSpeed.FAST,
-        accuracy=ModelAccuracy.GOOD,
-        color="blue",
-        icon="zap",
-        best_for=[
-            "Real-time applications",
-            "Low-latency search",
-            "Massive datasets",
-            "High-speed indexing"
-        ],
-        why_choose="Perfect for speed-focused scenarios and handling millions of records with minimal compute cost.",
-        ollama_pull_cmd="ollama pull all-minilm"
-    ),
-    
-    # 🟩 Nomic-Embed-Text - Recommended Default
+    # Model 1: Nomic-Embed-Text (Primary, recommended)
     EmbeddingModelInfo(
         model_id="nomic-embed-text",
         display_name="Nomic-Embed-Text",
@@ -94,30 +74,49 @@ EMBEDDING_MODELS: List[EmbeddingModelInfo] = [
             "High-quality embeddings",
             "Most production workloads"
         ],
-        why_choose="The recommended default model offering the best balance between speed, context, and accuracy.",
+        why_choose="The recommended model offering the best balance between speed, context window (8192 tokens), and accuracy.",
         ollama_pull_cmd="ollama pull nomic-embed-text"
     ),
-    
-    # 🟥 MXBai-Embed-Large - Maximum Precision
+    # Model 2: All-MiniLM (Lightweight, fast)
+    EmbeddingModelInfo(
+        model_id="all-minilm",
+        display_name="All-MiniLM L6",
+        dimension=384,
+        parameters="~22 Million",
+        context_length="512 tokens",
+        speed=ModelSpeed.FAST,
+        accuracy=ModelAccuracy.GOOD,
+        color="blue",
+        icon="zap",
+        best_for=[
+            "Fast prototyping",
+            "Low-resource environments",
+            "High-throughput applications",
+            "CPU-only deployments"
+        ],
+        why_choose="Best choice when speed is critical. Smallest dimension (384D) means fastest indexing and search.",
+        ollama_pull_cmd="ollama pull all-minilm"
+    ),
+    # Model 3: MxBai Embed Large (High accuracy)
     EmbeddingModelInfo(
         model_id="mxbai-embed-large",
-        display_name="MXBai-Embed-Large",
+        display_name="MxBai Embed Large",
         dimension=1024,
         parameters="~335 Million",
         context_length="512 tokens",
         speed=ModelSpeed.MODERATE,
         accuracy=ModelAccuracy.SUPERIOR,
-        color="red",
-        icon="target",
+        color="purple",
+        icon="brain",
         best_for=[
-            "Precision-critical search",
-            "Legal, medical, enterprise retrieval",
-            "Engineering documents",
-            "When accuracy matters most"
+            "Maximum accuracy",
+            "Enterprise search",
+            "High-precision retrieval",
+            "Complex domain queries"
         ],
-        why_choose="Ideal for scenarios requiring maximum semantic precision and deep document understanding.",
+        why_choose="Best semantic understanding. Use when accuracy matters more than speed.",
         ollama_pull_cmd="ollama pull mxbai-embed-large"
-    )
+    ),
 ]
 
 # =============================================================================
@@ -126,16 +125,10 @@ EMBEDDING_MODELS: List[EmbeddingModelInfo] = [
 
 DATASET_LLMS: List[LLMInfo] = [
     LLMInfo(
-        llm_id="llama3.2:3b-instruct-q4_K_M",
-        display_name="Llama 3.2 Instruct (Ollama)",
-        description="Local CPU inference with quantized Llama 3.2 Instruct - optimized for diverse, hallucination-free CSV datasets",
-        best_for="Complex schemas, high variation, edge cases, local inference"
-    ),
-    LLMInfo(
-        llm_id="gemma2:2b-instruct-q4_K_M",
-        display_name="Gemma 2B (Ollama Fallback)",
-        description="Lightweight fallback model for faster CPU inference when Llama is unavailable",
-        best_for="Speed, lighter CPU loads, quick generation"
+        llm_id="llama3.1:8b-instruct-q4_K_M",
+        display_name="Llama 3.1 8B Instruct (Ollama)",
+        description="Dataset generation model - 8B parameter LLM optimized for diverse, schema-compliant CSV datasets with high variation (non-Chinese)",
+        best_for="Complex schemas, high variation, edge cases, embedding-ready output, CPU-friendly on 16GB RAM"
     )
 ]
 
@@ -144,13 +137,14 @@ DATASET_LLMS: List[LLMInfo] = [
 # =============================================================================
 
 DEFAULT_EMBEDDING_MODEL = "nomic-embed-text"
-DEFAULT_DATASET_LLM = "llama3.2:3b-instruct-q4_K_M"
+DEFAULT_DATASET_LLM = "llama3.1:8b-instruct-q4_K_M"
+EMBEDDING_DIMENSION = 768
 
-# Model dimension lookup
+# Model dimension lookup (all 3 models)
 MODEL_DIMENSIONS = {
-    "all-minilm": 384,
     "nomic-embed-text": 768,
-    "mxbai-embed-large": 1024
+    "all-minilm": 384,
+    "mxbai-embed-large": 1024,
 }
 
 

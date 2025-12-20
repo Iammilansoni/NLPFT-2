@@ -74,7 +74,7 @@ async def register(
     """
     Register a new user
     
-    ⏱️ RATE LIMIT: 5 registrations per minute per IP
+    RATE LIMIT: 5 registrations per minute per IP
     
     - **email**: Valid email address (unique)
     - **username**: Username (min 3 characters, unique)
@@ -103,7 +103,7 @@ async def register(
         )
     except Exception as e:
         # Log detailed error for debugging
-        logger.error(f"❌ Failed to create user {user_data.email}: {type(e).__name__}: {e}", exc_info=True)
+        logger.error(f"Failed to create user {user_data.email}: {type(e).__name__}: {e}", exc_info=True)
         # Rollback any partial transaction
         try:
             await db.rollback()
@@ -135,7 +135,7 @@ async def register(
         db.add(verification)
         await db.commit()
     except Exception as e:
-        logger.error(f"❌ Failed to store verification for {user.email}: {type(e).__name__}: {e}", exc_info=True)
+        logger.error(f"Failed to store verification for {user.email}: {type(e).__name__}: {e}", exc_info=True)
         try:
             await db.rollback()
         except Exception as rollback_error:
@@ -153,11 +153,11 @@ async def register(
         email_service.send_verification_email(user.email, otp, username)
     except Exception as e:
         # Email service already logs errors but capture here to provide visibility
-        logger.error(f"❌ Email sending error for {user.email}: {e}", exc_info=True)
+        logger.error(f"Email sending error for {user.email}: {e}", exc_info=True)
         # we do not fail registration on email sending; continue but inform client
         # Client can request OTP resend explicitly via API
     
-    logger.info(f"✅ User registered: {user.email} (verification OTP sent)")
+    logger.info(f"User registered: {user.email} (verification OTP sent)")
     
     # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -183,7 +183,7 @@ async def login(
     """
     Login with email and password (OAuth2 form)
     
-    ⏱️ RATE LIMIT: 10 login attempts per minute per IP
+    RATE LIMIT: 10 login attempts per minute per IP
     
     Returns JWT access token for authenticated requests
     
@@ -235,7 +235,7 @@ async def login_json(
     """
     Login with JSON payload (alternative to form data)
     
-    ⏱️ RATE LIMIT: 10 login attempts per minute per IP
+    RATE LIMIT: 10 login attempts per minute per IP
     
     - **email**: User email
     - **password**: User password
@@ -310,7 +310,7 @@ async def promote_to_expert(
     await db.commit()
     await db.refresh(current_user)
     
-    logger.info(f"✅ User promoted to expert: {current_user.email}")
+    logger.info(f"User promoted to expert: {current_user.email}")
     
     return UserResponse.model_validate(current_user)
 
@@ -355,7 +355,7 @@ async def change_password(
     )
     await db.commit()
     
-    logger.info(f"✅ Password changed for user: {current_user.email}")
+    logger.info(f"Password changed for user: {current_user.email}")
     
     return MessageResponse(message="Password changed successfully")
 
@@ -380,7 +380,7 @@ async def forgot_password(
     """
     Request a password reset link
     
-    ⏱️ RATE LIMIT: 3 requests per hour per email
+    RATE LIMIT: 3 requests per hour per email
     
     - **email**: Email address of the account
     
@@ -410,7 +410,7 @@ async def forgot_password(
         recent_requests = result.scalars().all()
         
         if len(recent_requests) >= 3:
-            logger.warning(f"⚠️ Too many password reset requests for {forgot_data.email}")
+            logger.warning(f"Too many password reset requests for {forgot_data.email}")
             # Still return success to not reveal rate limiting
             return MessageResponse(
                 message="If an account with that email exists, a password reset link has been sent."
@@ -435,7 +435,7 @@ async def forgot_password(
             db.add(password_reset)
             await db.commit()
         except Exception as e:
-            logger.error(f"❌ Failed to store password reset token: {e}")
+            logger.error(f"Failed to store password reset token: {e}")
             await db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -458,13 +458,13 @@ async def forgot_password(
                 username=username
             )
         except Exception as e:
-            logger.error(f"❌ Failed to send password reset email: {e}")
+            logger.error(f"Failed to send password reset email: {e}")
             # Don't fail the request, user can try again
         
-        logger.info(f"📧 Password reset requested for: {forgot_data.email}")
+        logger.info(f"Password reset requested for: {forgot_data.email}")
     else:
         # User doesn't exist, but don't reveal this
-        logger.info(f"📧 Password reset requested for non-existent email: {forgot_data.email}")
+        logger.info(f"Password reset requested for non-existent email: {forgot_data.email}")
     
     # Always return the same message for security
     return MessageResponse(
@@ -554,7 +554,7 @@ async def reset_password(
     
     await db.commit()
     
-    logger.info(f"✅ Password reset successful for: {reset_record.email}")
+    logger.info(f"Password reset successful for: {reset_record.email}")
     
     return MessageResponse(message="Password has been reset successfully. You can now log in with your new password.")
 

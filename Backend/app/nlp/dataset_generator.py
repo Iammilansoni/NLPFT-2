@@ -20,15 +20,14 @@ from typing import Dict, List, Optional, Any, Tuple
 from uuid import UUID
 import pandas as pd
 
-from app.core.config import settings, DATASETS_DIR, OLLAMA_HOST, OLLAMA_MODEL, OLLAMA_FALLBACK_MODEL
+from app.core.config import settings, DATASETS_DIR, OLLAMA_HOST, OLLAMA_MODEL
 from app.core.logger import logger
 
-# ============= OLLAMA (LOCAL CPU INFERENCE) =============
+# --- Ollama Configuration ---
 # Uses quantized models for fast CPU inference
 _ollama_available = False
 _ollama_host = OLLAMA_HOST
 _ollama_model = OLLAMA_MODEL
-_ollama_fallback = OLLAMA_FALLBACK_MODEL
 
 try:
     import httpx
@@ -40,14 +39,9 @@ try:
         logger.info(f"Available models: {', '.join(available_models[:5])}{'...' if len(available_models) > 5 else ''}")
         
         if any(_ollama_model.split(':')[0] in m for m in available_models):
-            logger.info(f"Primary model available: {_ollama_model}")
+            logger.info(f"Model available: {_ollama_model}")
         else:
-            logger.warning(f"Primary model {_ollama_model} not found. Run: ollama pull {_ollama_model}")
-        
-        if any(_ollama_fallback.split(':')[0] in m for m in available_models):
-            logger.info(f"Fallback model available: {_ollama_fallback}")
-        else:
-            logger.warning(f"Fallback model {_ollama_fallback} not found. Run: ollama pull {_ollama_fallback}")
+            logger.warning(f"Model {_ollama_model} not found. Run: ollama pull {_ollama_model}")
 except Exception as e:
     logger.warning(f"Ollama not available at {_ollama_host}: {e}")
     logger.warning("Install Ollama: https://ollama.ai/download")
@@ -77,8 +71,7 @@ class EnterpriseDatasetGenerator:
         
         self.ollama_available = _ollama_available
         self.ollama_host = _ollama_host
-        self.ollama_model = _ollama_model  
-        self.ollama_fallback = _ollama_fallback  
+        self.ollama_model = _ollama_model
         
         if self.ollama_available:
             self.client = "ollama"
@@ -715,8 +708,8 @@ Return ONLY the JSON array, nothing else."""
                             f.write(f"Batch {batch_num + 1} Error: {extract_error}\n\n")
                             f.write(f"Response text:\n{response_text}")
                         logger.error(f"Saved debug response to: {debug_file}")
-                    except:
-                        pass
+                    except OSError as file_error:
+                        logger.debug(f"Could not save debug file: {file_error}")
                     continue  
                 
                 if batch_test_cases:
@@ -733,8 +726,8 @@ Return ONLY the JSON array, nothing else."""
                             f.write("Full Response:\n")
                             f.write(response_text)
                         logger.error(f"Saved debug response to: {debug_file}")
-                    except:
-                        pass
+                    except OSError as file_error:
+                        logger.debug(f"Could not save debug file: {file_error}")
 
             elapsed = time.time() - start_time
             test_cases = all_test_cases
@@ -834,8 +827,8 @@ Return ONLY the JSON array, nothing else."""
                     from app.services.dataset_task_manager import get_task_manager
                     task_manager = get_task_manager()
                     task_manager.update_task(task_id, status="failed", message=str(e), error=str(e))
-                except:
-                    pass
+                except Exception as task_error:
+                    logger.debug(f"Could not update task status: {task_error}")
             
             error_category = "unknown"
             if "API" in str(e) or "api" in str(e).lower():

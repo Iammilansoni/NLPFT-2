@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Loader2, Send, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react'
+import { Loader2, Send, CheckCircle2, AlertCircle, Cpu } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { QueryResponse } from '@/lib/api/types'
 
@@ -19,7 +19,7 @@ export function QueryProcessor() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!query.trim()) return
 
     processQuery(
@@ -48,7 +48,7 @@ export function QueryProcessor() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
+            <Cpu className="h-5 w-5 text-primary" />
             Natural Language Query
           </CardTitle>
           <CardDescription>
@@ -203,7 +203,7 @@ export function QueryProcessor() {
                           variant={match.score > 0.9 ? 'default' : 'secondary'}
                           className={cn(
                             match.score > 0.9 &&
-                              'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                            'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
                           )}
                         >
                           {(match.confidence * 100).toFixed(0)}% confidence

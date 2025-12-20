@@ -1,6 +1,6 @@
 /**
  * Register Page
- * User registration with validation and password strength indicator
+ * Enterprise-grade registration with accessibility and polish
  */
 
 'use client';
@@ -8,8 +8,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { Mail, Lock, User, ArrowRight, Sparkles, AlertCircle, Eye, EyeOff, CheckCircle2, XCircle } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Zap, AlertCircle, Eye, EyeOff, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface PasswordStrength {
@@ -21,7 +20,7 @@ interface PasswordStrength {
 export default function RegisterPage() {
   const router = useRouter();
   const { register } = useAuth();
-  
+
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -50,9 +49,9 @@ export default function RegisterPage() {
     if (/[^a-zA-Z\d]/.test(password)) score++;
 
     if (score <= 2) return { score, label: 'Weak', color: 'text-destructive' };
-    if (score === 3) return { score, label: 'Fair', color: 'text-warning' };
-    if (score === 4) return { score, label: 'Good', color: 'text-success' };
-    return { score, label: 'Strong', color: 'text-success' };
+    if (score === 3) return { score, label: 'Fair', color: 'text-amber-500' };
+    if (score === 4) return { score, label: 'Good', color: 'text-green-500' };
+    return { score, label: 'Strong', color: 'text-green-500' };
   };
 
   const passwordStrength = formData.password ? getPasswordStrength(formData.password) : null;
@@ -64,12 +63,14 @@ export default function RegisterPage() {
     { met: /\d/.test(formData.password), text: 'One number' },
   ];
 
+  const passwordsMatch = formData.password === formData.confirm_password;
+  const showPasswordMismatch = formData.confirm_password && !passwordsMatch;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Validation
-    if (formData.password !== formData.confirm_password) {
+    if (!passwordsMatch) {
       setError('Passwords do not match');
       return;
     }
@@ -83,12 +84,11 @@ export default function RegisterPage() {
 
     try {
       await register(formData);
-      // Redirect to verify email page with email parameter
       router.push(`/auth/verify-email?email=${encodeURIComponent(formData.email)}`);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 
-                          (Array.isArray(err.response?.data) ? err.response.data[0]?.msg : null) ||
-                          'Registration failed. Please try again.';
+      const errorMessage = err.response?.data?.detail ||
+        (Array.isArray(err.response?.data) ? err.response.data[0]?.msg : null) ||
+        'Registration failed. Please try again.';
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -96,100 +96,49 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden py-12">
-      {/* Animated gradient background */}
-      <div className="absolute inset-0 pointer-events-none">
-        <motion.div
-          animate={{
-            scale: [1, 1.3, 1],
-            rotate: [0, 120, 0],
-          }}
-          transition={{
-            duration: 25,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-          className="absolute top-0 right-0 w-[600px] h-[600px] bg-accent/10 rounded-full blur-3xl opacity-60"
-        />
-        <motion.div
-          animate={{
-            scale: [1, 1.2, 1],
-            rotate: [0, -120, 0],
-          }}
-          transition={{
-            duration: 20,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-          className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-3xl opacity-60"
-        />
-        <div className="absolute inset-0 bg-accent/5" />
-      </div>
-
-      <div className="w-full max-w-md px-6 relative z-10">
+    <div className="min-h-screen flex items-center justify-center py-12 px-4">
+      <div className="w-full max-w-sm">
         {/* Logo and Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
-        >
-          <Link href="/" className="inline-flex items-center gap-2 mb-6 group">
-            <motion.div
-              whileHover={{ scale: 1.1, rotate: -5 }}
-              className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/50"
-            >
-              <Sparkles className="w-7 h-7 text-white" />
-            </motion.div>
-            <span className="font-bold text-2xl text-foreground">NLPForge</span>
+        <div className="text-center mb-8">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 mb-6 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-opacity hover:opacity-80"
+          >
+            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
+              <Zap className="w-5 h-5 text-white" />
+            </div>
+            <span className="font-bold text-xl text-foreground">NLPForge</span>
           </Link>
-          <motion.h1
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="text-4xl font-extrabold text-foreground mb-3"
-          >
+          <h1 className="text-2xl font-bold text-foreground mb-2">
             Create an account
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="text-muted-foreground text-lg"
-          >
-            Start your journey with intelligent testing
-          </motion.p>
-        </motion.div>
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Start your journey with intelligent API testing
+          </p>
+        </div>
 
         {/* Register Form Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="relative group"
-        >
-          {/* Border glow effect */}
-          <div className="absolute -inset-0.5 bg-primary/20 rounded-2xl opacity-30 group-hover:opacity-50 blur transition-opacity" />
-          <div className="relative bg-card/95 backdrop-blur-xl border border-border/50 rounded-2xl p-8 shadow-2xl">
-          <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="bg-card border border-border rounded-xl p-6 shadow-sm transition-shadow duration-200 hover:shadow-md">
+          <form onSubmit={handleSubmit} className="space-y-4" aria-describedby={error ? 'register-error' : undefined}>
             {/* Error Alert */}
             {error && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex items-center gap-3 p-4 bg-destructive/10 border border-destructive/20 rounded-lg"
+              <div
+                id="register-error"
+                role="alert"
+                className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg"
               >
-                <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" />
+                <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-destructive">{error}</p>
-              </motion.div>
+              </div>
             )}
 
             {/* Email Field */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1.5">
                 Email address
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                 <input
                   id="email"
                   name="email"
@@ -198,7 +147,7 @@ export default function RegisterPage() {
                   required
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                  className="w-full pl-9 pr-3 py-2.5 bg-background border border-border rounded-lg text-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary focus:ring-offset-1 focus:ring-offset-background"
                   placeholder="you@example.com"
                 />
               </div>
@@ -206,11 +155,11 @@ export default function RegisterPage() {
 
             {/* Username Field */}
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-foreground mb-2">
+              <label htmlFor="username" className="block text-sm font-medium text-foreground mb-1.5">
                 Username
               </label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                 <input
                   id="username"
                   name="username"
@@ -220,20 +169,21 @@ export default function RegisterPage() {
                   minLength={3}
                   value={formData.username}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                  className="w-full pl-9 pr-3 py-2.5 bg-background border border-border rounded-lg text-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary focus:ring-offset-1 focus:ring-offset-background"
                   placeholder="johndoe"
+                  aria-describedby="username-hint"
                 />
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Minimum 3 characters</p>
+              <p id="username-hint" className="text-xs text-muted-foreground mt-1">Minimum 3 characters</p>
             </div>
 
             {/* Password Field */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1.5">
                 Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                 <input
                   id="password"
                   name="password"
@@ -243,75 +193,71 @@ export default function RegisterPage() {
                   minLength={8}
                   value={formData.password}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-12 py-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                  className="w-full pl-9 pr-10 py-2.5 bg-background border border-border rounded-lg text-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary focus:ring-offset-1 focus:ring-offset-background"
                   placeholder="••••••••"
+                  aria-describedby="password-requirements"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
 
               {/* Password Strength Indicator */}
               {formData.password && (
-                <div className="mt-2 space-y-2">
+                <div id="password-requirements" className="mt-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Password strength:</span>
+                    <span className="text-xs text-muted-foreground">Strength:</span>
                     <span className={`text-xs font-medium ${passwordStrength?.color}`}>
                       {passwordStrength?.label}
                     </span>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1" aria-hidden="true">
                     {[...Array(5)].map((_, i) => (
-                      <motion.div
+                      <div
                         key={i}
-                        initial={{ scaleX: 0 }}
-                        animate={{ scaleX: 1 }}
-                        transition={{ delay: i * 0.05 }}
-                        className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
-                          i < (passwordStrength?.score || 0)
-                            ? passwordStrength?.score === 5
-                              ? 'bg-success shadow-sm shadow-success/50'
-                              : passwordStrength?.score === 4
-                              ? 'bg-success shadow-sm shadow-success/50'
-                              : passwordStrength?.score === 3
-                              ? 'bg-warning shadow-sm shadow-warning/50'
-                              : 'bg-destructive shadow-sm shadow-destructive/50'
-                            : 'bg-border'
-                        }`}
+                        className={`h-1 flex-1 rounded-full transition-colors duration-200 ${i < (passwordStrength?.score || 0)
+                          ? passwordStrength?.score && passwordStrength.score >= 4
+                            ? 'bg-green-500'
+                            : passwordStrength?.score === 3
+                              ? 'bg-amber-500'
+                              : 'bg-destructive'
+                          : 'bg-border'
+                          }`}
                       />
                     ))}
                   </div>
 
                   {/* Password Requirements */}
-                  <div className="space-y-1">
+                  <ul className="space-y-1" role="list">
                     {passwordRequirements.map((req, index) => (
-                      <div key={index} className="flex items-center gap-2 text-xs">
+                      <li key={index} className="flex items-center gap-2 text-xs">
                         {req.met ? (
-                          <CheckCircle2 className="w-3 h-3 text-success" />
+                          <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" aria-hidden="true" />
                         ) : (
-                          <XCircle className="w-3 h-3 text-muted-foreground" />
+                          <XCircle className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" aria-hidden="true" />
                         )}
-                        <span className={req.met ? 'text-success' : 'text-muted-foreground'}>
+                        <span className={req.met ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}>
                           {req.text}
                         </span>
-                      </div>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 </div>
               )}
             </div>
 
             {/* Confirm Password Field */}
             <div>
-              <label htmlFor="confirm_password" className="block text-sm font-medium text-foreground mb-2">
+              <label htmlFor="confirm_password" className="block text-sm font-medium text-foreground mb-1.5">
                 Confirm password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                 <input
                   id="confirm_password"
                   name="confirm_password"
@@ -320,77 +266,70 @@ export default function RegisterPage() {
                   required
                   value={formData.confirm_password}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-12 py-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                  className={`w-full pl-9 pr-10 py-2.5 bg-background border rounded-lg text-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 focus:ring-offset-background ${showPasswordMismatch ? 'border-destructive focus:border-destructive' : 'border-border focus:border-primary'
+                    }`}
                   placeholder="••••••••"
+                  aria-describedby={showPasswordMismatch ? 'confirm-password-error' : undefined}
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                 >
-                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              {formData.confirm_password && formData.password !== formData.confirm_password && (
-                <p className="text-xs text-destructive mt-1">Passwords do not match</p>
+              {showPasswordMismatch && (
+                <p id="confirm-password-error" className="text-xs text-destructive mt-1" role="alert">
+                  Passwords do not match
+                </p>
               )}
             </div>
 
             {/* Terms and Privacy */}
             <p className="text-xs text-muted-foreground">
               By signing up, you agree to our{' '}
-              <Link href="/terms" className="text-primary hover:underline">
+              <Link href="/terms" className="text-primary hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                 Terms of Service
               </Link>{' '}
               and{' '}
-              <Link href="/privacy" className="text-primary hover:underline">
+              <Link href="/privacy" className="text-primary hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                 Privacy Policy
               </Link>
             </p>
 
             {/* Submit Button */}
-            <motion.button
+            <button
               type="submit"
               disabled={isLoading}
-              whileHover={{ scale: 1.02, y: -2 }}
-              whileTap={{ scale: 0.98 }}
-              className="relative w-full px-6 py-4 bg-primary text-white font-semibold rounded-xl shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 overflow-hidden group"
+              className="w-full px-4 py-2.5 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-white/20 to-primary/0 translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-700" />
-              <span className="relative z-10 flex items-center gap-2">
               {isLoading ? (
                 <>
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
-                  />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   Creating account...
                 </>
               ) : (
                 <>
                   Create account
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="w-4 h-4" />
                 </>
               )}
-              </span>
-            </motion.button>
+            </button>
           </form>
-          </div>
-        </motion.div>
+        </div>
 
         {/* Sign In Link */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="text-center mt-6 text-muted-foreground"
-        >
+        <p className="text-center mt-6 text-sm text-muted-foreground">
           Already have an account?{' '}
-          <Link href="/auth/login" className="text-primary hover:underline font-medium">
+          <Link
+            href="/auth/login"
+            className="text-primary hover:underline font-medium rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
             Sign in
           </Link>
-        </motion.p>
+        </p>
       </div>
     </div>
   );

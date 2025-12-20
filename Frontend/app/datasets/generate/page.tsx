@@ -6,22 +6,19 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Sparkles,
   Download,
   Database,
   CheckCircle2,
   AlertCircle,
   Loader2,
   Play,
-  Settings,
   FileText,
   Zap,
   TrendingUp,
   Clock,
   ChevronRight,
-  RefreshCw,
+  Wand2,
 } from 'lucide-react';
 import { useTemplatesList } from '@/hooks/useTemplateManagement';
 import {
@@ -32,17 +29,12 @@ import {
 } from '@/hooks/useDatasetManagement';
 
 const LLM_MODELS = [
-  { value: 'gpt-4', label: 'GPT-4 (Recommended)', description: 'Most accurate, slower' },
-  { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo', description: 'Fast, good quality' },
-  { value: 'claude-3-opus', label: 'Claude 3 Opus', description: 'High quality, creative' },
-  { value: 'claude-3-sonnet', label: 'Claude 3 Sonnet', description: 'Balanced performance' },
-  { value: 'demo', label: 'Demo (Mock Data)', description: 'For testing without API key' },
+  { value: 'llama3.2:3b-instruct-q4_K_M', label: 'Llama 3.2 3B (Recommended)', description: 'Fast & good quality' },
+  { value: 'llama3.1:8b-instruct-q4_K_M', label: 'Llama 3.1 8B (Slow)', description: 'Best quality, CPU-intensive' },
 ];
 
 const EMBEDDING_MODELS = [
-  { value: 'sentence-transformers/all-MiniLM-L6-v2', label: 'all-MiniLM-L6-v2 (Fast)', description: '384 dimensions' },
-  { value: 'sentence-transformers/all-mpnet-base-v2', label: 'all-mpnet-base-v2', description: '768 dimensions' },
-  { value: 'text-embedding-ada-002', label: 'OpenAI Ada-002', description: '1536 dimensions' },
+  { value: 'nomic-embed-text', label: 'Nomic-Embed-Text (Recommended)', description: '768 dimensions via Ollama' },
 ];
 
 export default function DatasetGenerationPage() {
@@ -51,10 +43,10 @@ export default function DatasetGenerationPage() {
   // Form state
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [rows, setRows] = useState(500);
-  const [llmModel, setLlmModel] = useState('gpt-4');
+  const [llmModel, setLlmModel] = useState('llama3.2:3b-instruct-q4_K_M');
   const [customPrompt, setCustomPrompt] = useState('');
   const [temperature, setTemperature] = useState(0.7);
-  const [embeddingModel, setEmbeddingModel] = useState('sentence-transformers/all-MiniLM-L6-v2');
+  const [embeddingModel, setEmbeddingModel] = useState('nomic-embed-text');
 
   // Generation state
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
@@ -139,15 +131,15 @@ export default function DatasetGenerationPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-b">
-        <div className="max-w-7xl mx-auto px-6 py-12">
+      <div className="border-b bg-card">
+        <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-primary/10 rounded-xl">
-              <Sparkles className="w-8 h-8 text-primary" />
+            <div className="p-3 bg-primary/10 rounded-lg">
+              <Wand2 className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-4xl font-bold">Dataset Generation</h1>
-              <p className="text-muted-foreground mt-2">
+              <h1 className="text-2xl font-semibold">Dataset Generation</h1>
+              <p className="text-sm text-muted-foreground mt-1">
                 Generate AI-powered datasets from approved templates
               </p>
             </div>
@@ -214,11 +206,7 @@ export default function DatasetGenerationPage() {
               </select>
 
               {selectedTemplate && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-4 p-4 bg-primary/5 border border-primary/20 rounded-lg"
-                >
+                <div className="mt-4 p-4 bg-muted/50 border rounded-lg">
                   <p className="text-sm font-medium mb-2">{selectedTemplate.api_name}</p>
                   <p className="text-sm text-muted-foreground line-clamp-2">
                     {selectedTemplate.description}
@@ -233,7 +221,7 @@ export default function DatasetGenerationPage() {
                       </span>
                     ))}
                   </div>
-                </motion.div>
+                </div>
               )}
             </div>
 
@@ -342,11 +330,7 @@ export default function DatasetGenerationPage() {
 
             {/* Step 3: Embed to Vector DB */}
             {canEmbed && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-card border rounded-xl p-6"
-              >
+              <div className="bg-card border rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white font-bold">
                     3
@@ -395,7 +379,7 @@ export default function DatasetGenerationPage() {
                     )}
                   </button>
                 </div>
-              </motion.div>
+              </div>
             )}
           </div>
 
@@ -414,12 +398,11 @@ export default function DatasetGenerationPage() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Status</span>
-                        <span className={`px-2 py-1 text-xs rounded-full font-medium ${
-                          statusData.status === 'completed' ? 'bg-success/10 text-success' :
+                        <span className={`px-2 py-1 text-xs rounded-full font-medium ${statusData.status === 'completed' ? 'bg-success/10 text-success' :
                           statusData.status === 'failed' ? 'bg-destructive/10 text-destructive' :
-                          (statusData.status === 'processing' || statusData.status === 'running') ? 'bg-warning/10 text-warning' :
-                          'bg-muted text-muted-foreground'
-                        }`}>
+                            (statusData.status === 'processing' || statusData.status === 'running') ? 'bg-warning/10 text-warning' :
+                              'bg-muted text-muted-foreground'
+                          }`}>
                           {statusData.status}
                         </span>
                       </div>
@@ -434,11 +417,9 @@ export default function DatasetGenerationPage() {
                               </span>
                             </div>
                             <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                              <motion.div
-                                initial={{ width: 0 }}
-                                animate={{ width: `${statusData.progress_percent ?? (statusData.progress > 1 ? statusData.progress : statusData.progress * 100)}%` }}
-                                transition={{ duration: 0.3, ease: "easeOut" }}
-                                className="h-full bg-primary"
+                              <div
+                                className="h-full bg-primary transition-all duration-300"
+                                style={{ width: `${statusData.progress_percent ?? (statusData.progress > 1 ? statusData.progress : statusData.progress * 100)}%` }}
                               />
                             </div>
                           </div>
@@ -459,8 +440,8 @@ export default function DatasetGenerationPage() {
                               <p className="text-xs text-muted-foreground font-medium">Progress Steps:</p>
                               <div className="space-y-1 max-h-32 overflow-y-auto">
                                 {statusData.progress_history.map((item, index) => (
-                                  <div 
-                                    key={index} 
+                                  <div
+                                    key={index}
                                     className="flex items-center gap-2 text-xs"
                                   >
                                     <CheckCircle2 className="w-3 h-3 text-success flex-shrink-0" />
@@ -475,8 +456,8 @@ export default function DatasetGenerationPage() {
                               <p className="text-xs text-muted-foreground font-medium">Completed Steps:</p>
                               <div className="space-y-1 max-h-32 overflow-y-auto">
                                 {statusData.steps.map((step, index) => (
-                                  <div 
-                                    key={index} 
+                                  <div
+                                    key={index}
                                     className="flex items-center gap-2 text-xs"
                                   >
                                     <CheckCircle2 className="w-3 h-3 text-success flex-shrink-0" />
@@ -503,9 +484,9 @@ export default function DatasetGenerationPage() {
                             <span className="font-medium">Generation Complete!</span>
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            {statusData.result?.total_generated 
+                            {statusData.result?.total_generated
                               ? `Generated ${statusData.result.total_generated} rows`
-                              : statusData.rows_generated 
+                              : statusData.rows_generated
                                 ? `Generated ${statusData.rows_generated} rows`
                                 : statusData.message || 'Dataset ready'}
                           </div>
@@ -520,14 +501,36 @@ export default function DatasetGenerationPage() {
                       )}
 
                       {canDownload && (
-                        <button
-                          onClick={handleDownload}
-                          disabled={downloadMutation.isPending}
-                          className="w-full px-4 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2"
-                        >
-                          <Download className="w-4 h-4" />
-                          Download CSV
-                        </button>
+                        <div className="space-y-3">
+                          <button
+                            onClick={handleDownload}
+                            disabled={downloadMutation.isPending}
+                            className="w-full px-4 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2"
+                          >
+                            <Download className="w-4 h-4" />
+                            Download CSV
+                          </button>
+
+                          {canEmbed && (
+                            <button
+                              onClick={handleEmbed}
+                              disabled={embedMutation.isPending}
+                              className="w-full px-4 py-3 bg-secondary text-secondary-foreground border rounded-lg hover:bg-secondary/80 disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                              {embedMutation.isPending ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  Embedding...
+                                </>
+                              ) : (
+                                <>
+                                  <Database className="w-4 h-4" />
+                                  Embed to Redis (Create Vectors)
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   ) : (
@@ -560,7 +563,7 @@ export default function DatasetGenerationPage() {
                   </div>
                   <div className="flex items-start gap-2">
                     <ChevronRight className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <span>Embed into vector database</span>
+                    <span><strong>Click "Embed to Redis"</strong> to create vectors for search</span>
                   </div>
                 </div>
               </div>
@@ -570,22 +573,15 @@ export default function DatasetGenerationPage() {
       </div>
 
       {/* Success Toast */}
-      <AnimatePresence>
-        {showSuccess && (
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 50 }}
-            className="fixed bottom-8 right-8 bg-success text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 z-50"
-          >
-            <CheckCircle2 className="w-6 h-6" />
-            <div>
-              <p className="font-semibold">Dataset Generated!</p>
-              <p className="text-sm opacity-90">Ready to download</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {showSuccess && (
+        <div className="fixed bottom-8 right-8 bg-green-600 text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 z-50">
+          <CheckCircle2 className="w-5 h-5" />
+          <div>
+            <p className="font-medium">Dataset Generated!</p>
+            <p className="text-sm opacity-90">Ready to download</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

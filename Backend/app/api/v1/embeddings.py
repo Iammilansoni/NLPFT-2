@@ -38,7 +38,7 @@ async def create_embedding(
     """
     Create a new embedding
     
-    ⏱️ RATE LIMIT: 30 embeddings per minute per IP
+    RATE LIMIT: 30 embeddings per minute per IP
     
     - Generates vector embedding using sentence-transformers
     - Stores vector in Redis for fast search
@@ -86,32 +86,63 @@ async def search_embeddings(
     request: Request,
     search_data: VectorSearchRequest,
     current_user: Annotated[UserResponse, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
     redis_service: RedisVectorService = Depends(get_redis_vector_service)
 ):
     """
     Search for similar embeddings using vector similarity
     
-    ⏱️ RATE LIMIT: 100 searches per minute per IP
+    RATE LIMIT: 100 searches per minute per IP
     
     - Uses Redis vector search with HNSW index
     - Returns top-k most similar results
     - Filters by user and optionally by template
+    - Detects and warns about embedding model mismatches
     """
-    # Get user's preferred embedding model
-    # Note: For search, we ideally want to search ALL indices or the one matching the query model
-    # But for now, we'll use the user's preferred model to encode the query
-    # TODO: Implement cross-index search or model detection
+    from sqlalchemy import select
+    from app.models.database_models import UserSettings, Dataset
+    from app.core.models_config import validate_model_compatibility, DEFAULT_EMBEDDING_MODEL
     
-    # We need a DB session here to get settings, but this endpoint doesn't inject it
-    # Let's add it
-    pass 
+    # Get user's preferred embedding model from settings
+    query_settings = await db.execute(
+        select(UserSettings).where(UserSettings.u_id == current_user.user_id)
+    )
+    user_settings = query_settings.scalar_one_or_none()
+    search_model = user_settings.default_embedding_model if user_settings else DEFAULT_EMBEDDING_MODEL
+    
+    # Check for model mismatch if searching within a specific template/dataset
+    model_mismatch_warning = None
+    if search_data.t_id:
+        # Try to get the dataset's embedding model
+        try:
+            query_dataset = await db.execute(
+                select(Dataset).where(
+                    Dataset.t_id == search_data.t_id,
+                    Dataset.u_id == current_user.user_id
+                ).order_by(Dataset.created_at.desc()).limit(1)
+            )
+            dataset = query_dataset.scalar_one_or_none()
+            
+            if dataset and dataset.embedding_model:
+                compatibility = validate_model_compatibility(
+                    dataset_model=dataset.embedding_model,
+                    search_model=search_model
+                )
+                if not compatibility.get("compatible", True):
+                    model_mismatch_warning = compatibility
+                    logger.warning(
+                        f"Model mismatch detected: dataset={dataset.embedding_model}, "
+                        f"search={search_model} for template {search_data.t_id}"
+                    )
+        except Exception as e:
+            logger.warning(f"Could not check model compatibility: {e}")
 
     results = redis_service.search_similar(
         query=search_data.query,
         user_id=current_user.user_id,
         t_id=search_data.t_id,
         top_k=search_data.top_k,
-        model_name=None # Will use default if not provided, or we should inject DB to get it
+        model_name=search_model
     )
     
     # Convert to response format
@@ -126,7 +157,13 @@ async def search_embeddings(
             csv_id=result.get("csv_id") if result.get("csv_id") else None
         ))
     
+    # If there's a mismatch warning, we need to return it
+    # For now, log it - the frontend checks via /check-compatibility endpoint
+    if model_mismatch_warning:
+        logger.info(f"Returning {len(search_results)} results with model mismatch warning")
+    
     return search_results
+
 
 
 @router.get("/count")
@@ -237,6 +274,123 @@ async def delete_template_embeddings(
     }
 
 
+@router.get("/check-compatibility")
+async def check_model_compatibility(
+    dataset_id: Optional[uuid.UUID] = Query(None),
+    template_id: Optional[uuid.UUID] = Query(None),
+    current_user = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Check if user's current embedding model is compatible with a dataset's embeddings.
+    
+    Returns compatibility info and suggestions if mismatch is detected.
+    
+    Args:
+        dataset_id: Optional dataset UUID to check
+        template_id: Optional template UUID (gets latest dataset for template)
+    
+    Returns:
+        Compatibility status with model details and recommended actions
+    """
+    from sqlalchemy import select
+    from app.models.database_models import UserSettings, Dataset
+    from app.core.models_config import (
+        validate_model_compatibility, 
+        DEFAULT_EMBEDDING_MODEL,
+        get_embedding_model_info,
+        MODEL_DIMENSIONS
+    )
+    
+    # Get user UUID from User model (u_id attribute)
+    user_uuid = current_user.u_id
+    
+    # Get user's current settings
+    query_settings = await db.execute(
+        select(UserSettings).where(UserSettings.u_id == user_uuid)
+    )
+    user_settings = query_settings.scalar_one_or_none()
+    current_model = user_settings.default_embedding_model if user_settings else DEFAULT_EMBEDDING_MODEL
+    
+    # Get dataset's embedding model
+    dataset_model = None
+    dataset_info = None
+    
+    if dataset_id:
+        query_dataset = await db.execute(
+            select(Dataset).where(
+                Dataset.d_id == dataset_id,
+                Dataset.u_id == user_uuid
+            )
+        )
+        dataset = query_dataset.scalar_one_or_none()
+        if dataset:
+            dataset_model = dataset.embedding_model
+            dataset_info = {
+                "dataset_id": str(dataset.d_id),
+                "name": dataset.file_name,
+                "embedding_model": dataset.embedding_model
+            }
+    elif template_id:
+        query_dataset = await db.execute(
+            select(Dataset).where(
+                Dataset.t_id == template_id,
+                Dataset.u_id == user_uuid
+            ).order_by(Dataset.created_at.desc()).limit(1)
+        )
+        dataset = query_dataset.scalar_one_or_none()
+        if dataset:
+            dataset_model = dataset.embedding_model
+            dataset_info = {
+                "dataset_id": str(dataset.d_id),
+                "name": dataset.file_name,
+                "embedding_model": dataset.embedding_model
+            }
+    
+    # If no dataset found or no embedding model recorded
+    if not dataset_model:
+        return {
+            "compatible": True,
+            "current_model": current_model,
+            "current_dimension": MODEL_DIMENSIONS.get(current_model, 768),
+            "dataset_model": None,
+            "message": "No dataset embeddings found to compare"
+        }
+    
+    # Check compatibility
+    compatibility = validate_model_compatibility(
+        dataset_model=dataset_model,
+        search_model=current_model
+    )
+    
+    # Enhance with model info
+    try:
+        current_model_info = get_embedding_model_info(current_model)
+        compatibility["current_model_info"] = {
+            "display_name": current_model_info.display_name,
+            "dimension": current_model_info.dimension,
+            "speed": current_model_info.speed.value
+        }
+    except ValueError as e:
+        logger.debug(f"Could not get current model info: {e}")
+    
+    try:
+        if dataset_model:
+            dataset_model_info = get_embedding_model_info(dataset_model)
+            compatibility["dataset_model_info"] = {
+                "display_name": dataset_model_info.display_name,
+                "dimension": dataset_model_info.dimension,
+                "speed": dataset_model_info.speed.value
+            }
+    except ValueError as e:
+        logger.debug(f"Could not get dataset model info: {e}")
+    
+    if dataset_info:
+        compatibility["dataset"] = dataset_info
+    
+    return compatibility
+
+
 @router.get("/health")
 async def embeddings_health(
     redis_service: RedisVectorService = Depends(get_redis_vector_service)
@@ -250,3 +404,4 @@ async def embeddings_health(
         "vector_dimension": redis_service.vector_dimension,
         "index_name": redis_service.index_name
     }
+

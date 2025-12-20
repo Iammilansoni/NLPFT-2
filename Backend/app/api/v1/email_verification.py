@@ -23,7 +23,7 @@ from app.core.logger import logger
 router = APIRouter(prefix="/auth", tags=["email-verification"])
 
 
-# ============= SCHEMAS =============
+# --- Schemas ---
 
 class SendOTPRequest(BaseModel):
     """Request to send OTP"""
@@ -44,7 +44,7 @@ class OTPResponse(BaseModel):
     expires_in_minutes: int | None = None
 
 
-# ============= ENDPOINTS =============
+# --- Endpoints ---
 
 @router.post("/send-verification-otp", response_model=OTPResponse)
 async def send_verification_otp(
@@ -114,9 +114,9 @@ async def send_verification_otp(
         sent = email_service.send_verification_email(email, otp, username)
         
         if not sent:
-            logger.warning(f"⚠️ Email not sent, but OTP created: {otp}")
+            logger.warning(f"Email not sent, but OTP created: {otp}")
         
-        logger.info(f"📧 OTP sent to {email} (expires in 10 minutes)")
+        logger.info(f"OTP sent to {email} (expires in 10 minutes)")
         
         return OTPResponse(
             success=True,
@@ -128,7 +128,7 @@ async def send_verification_otp(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error sending OTP: {e}", exc_info=True)
+        logger.error(f"Error sending OTP: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to send OTP: {str(e)}"
@@ -218,7 +218,7 @@ async def verify_otp(
         verification.is_verified = True
         await db.commit()
         
-        logger.info(f"✅ Email verified for user: {email}")
+        logger.info(f"Email verified for user: {email}")
         
         return OTPResponse(
             success=True,
@@ -229,7 +229,7 @@ async def verify_otp(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error verifying OTP: {e}", exc_info=True)
+        logger.error(f"Error verifying OTP: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to verify OTP: {str(e)}"
@@ -316,7 +316,7 @@ async def resend_otp(
         username = user.user_name or email.split('@')[0]
         sent = email_service.send_resend_otp_email(email, otp, username)
         
-        logger.info(f"📧 OTP resent to {email}")
+        logger.info(f"OTP resent to {email}")
         
         return OTPResponse(
             success=True,
@@ -328,7 +328,7 @@ async def resend_otp(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error resending OTP: {e}", exc_info=True)
+        logger.error(f"Error resending OTP: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to resend OTP: {str(e)}"
@@ -367,7 +367,7 @@ async def check_verification_status(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error checking verification status: {e}")
+        logger.error(f"Error checking verification status: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to check verification status"

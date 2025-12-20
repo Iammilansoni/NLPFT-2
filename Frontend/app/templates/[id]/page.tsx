@@ -3,7 +3,6 @@
 import * as React from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { motion } from "framer-motion"
 import {
   ArrowLeft,
   Edit,
@@ -54,16 +53,16 @@ export default function TemplateDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["template", templateId] })
       queryClient.invalidateQueries({ queryKey: ["templates"] })
       const isApproved = data.status === "approved"
-      toast({ 
-        title: isApproved ? "Template Approved" : "Template Drafted", 
-        description: isApproved 
-          ? "Template is approved and available for dataset generation." 
+      toast({
+        title: isApproved ? "Template Approved" : "Template Drafted",
+        description: isApproved
+          ? "Template is approved and available for dataset generation."
           : "Template is in draft state."
       })
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Toggle Failed", 
+      toast({
+        title: "Toggle Failed",
         description: error?.detail || error?.message || "Failed to toggle status",
         variant: "destructive"
       })
@@ -114,11 +113,7 @@ export default function TemplateDetailPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <motion.header
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="border-b bg-background/95 backdrop-blur sticky top-0 z-40"
-      >
+      <header className="border-b bg-background/95 backdrop-blur sticky top-0 z-40">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -146,25 +141,6 @@ export default function TemplateDetailPage() {
             </div>
 
             <div className="flex items-center gap-4">
-              {/* Draft/Approved Toggle */}
-              <div className="flex items-center gap-3 px-4 py-2 rounded-lg border bg-muted/50">
-                <div className="flex items-center gap-2">
-                  {isApproved ? (
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                  ) : (
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  <Label htmlFor="visibility-toggle" className="text-sm font-medium cursor-pointer">
-                    {isApproved ? "Approved" : "Draft"}
-                  </Label>
-                </div>
-                <Switch
-                  id="visibility-toggle"
-                  checked={isApproved}
-                  onCheckedChange={() => toggleVisibilityMutation.mutate()}
-                  disabled={toggleVisibilityMutation.isPending}
-                />
-              </div>
 
               {/* Edit Button */}
               <Button variant="outline" onClick={() => router.push(`/templates/${templateId}/edit`)}>
@@ -182,8 +158,8 @@ export default function TemplateDetailPage() {
 
               {/* Delete (only when draft) */}
               {!isApproved && (
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="text-destructive hover:bg-destructive/10"
                   onClick={() => {
                     if (confirm("Delete this template?")) {
@@ -198,55 +174,41 @@ export default function TemplateDetailPage() {
             </div>
           </div>
         </div>
-      </motion.header>
+      </header>
 
       {/* Content */}
       <main className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Endpoint Info */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-card border rounded-xl p-6"
-            >
+            {/* Base URL Info */}
+            <div className="bg-card border rounded-xl p-6">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <Globe className="h-5 w-5" />
-                API Endpoint
+                API Base URL
               </h2>
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="font-mono">{template.method}</Badge>
                   <code className="flex-1 bg-muted px-3 py-2 rounded text-sm font-mono truncate">
-                    {template.endpoint}
+                    {template.base_url || template.endpoint || "No URL defined"}
                   </code>
-                  <Button variant="ghost" size="icon" onClick={() => copyToClipboard(template.endpoint)}>
+                  <Button variant="ghost" size="icon" onClick={() => copyToClipboard(template.base_url || template.endpoint || "")}>
                     <Copy className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
-            </motion.div>
+            </div>
 
             {/* Description */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="bg-card border rounded-xl p-6"
-            >
+            <div className="bg-card border rounded-xl p-6">
               <h2 className="text-lg font-semibold mb-4">Description</h2>
               <p className="text-muted-foreground whitespace-pre-wrap">{template.description}</p>
-            </motion.div>
+            </div>
 
             {/* Parameters */}
             {template.parameters && template.parameters.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="bg-card border rounded-xl p-6"
-              >
+              <div className="bg-card border rounded-xl p-6">
                 <h2 className="text-lg font-semibold mb-4">Parameters ({template.parameters.length})</h2>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -270,17 +232,12 @@ export default function TemplateDetailPage() {
                     </tbody>
                   </table>
                 </div>
-              </motion.div>
+              </div>
             )}
 
             {/* Sample Requests */}
             {template.sample_requests && template.sample_requests.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="bg-card border rounded-xl p-6"
-              >
+              <div className="bg-card border rounded-xl p-6">
                 <h2 className="text-lg font-semibold mb-4">Sample Requests ({template.sample_requests.length})</h2>
                 <div className="space-y-4">
                   {template.sample_requests.map((sample: any, idx: number) => (
@@ -306,18 +263,14 @@ export default function TemplateDetailPage() {
                     </div>
                   ))}
                 </div>
-              </motion.div>
+              </div>
             )}
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Status */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="bg-card border rounded-xl p-6"
-            >
+            <div className="bg-card border rounded-xl p-6">
               <h3 className="font-semibold mb-4">Status</h3>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
@@ -335,8 +288,8 @@ export default function TemplateDetailPage() {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {isApproved 
-                    ? "This template is approved and available for dataset generation." 
+                  {isApproved
+                    ? "This template is approved and available for dataset generation."
                     : "This template is in draft state. Toggle it on to approve and make it available for dataset generation."}
                 </p>
                 {template.confidence !== undefined && template.confidence > 0 && (
@@ -346,24 +299,15 @@ export default function TemplateDetailPage() {
                   </div>
                 )}
               </div>
-            </motion.div>
+            </div>
 
             {/* Security */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 }}
-              className="bg-card border rounded-xl p-6"
-            >
+            <div className="bg-card border rounded-xl p-6">
               <h3 className="font-semibold mb-4 flex items-center gap-2">
                 <Shield className="h-4 w-4" />
                 Security
               </h3>
               <div className="space-y-3">
-                <div>
-                  <span className="text-xs text-muted-foreground">Classification</span>
-                  <p className="font-medium">{template.security_classification || "Public"}</p>
-                </div>
                 {template.requires_auth !== undefined && (
                   <div>
                     <span className="text-xs text-muted-foreground">Authentication</span>
@@ -371,16 +315,11 @@ export default function TemplateDetailPage() {
                   </div>
                 )}
               </div>
-            </motion.div>
+            </div>
 
             {/* Keywords */}
             {template.intent_keywords && template.intent_keywords.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2 }}
-                className="bg-card border rounded-xl p-6"
-              >
+              <div className="bg-card border rounded-xl p-6">
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
                   <Tag className="h-4 w-4" />
                   Intent Keywords
@@ -390,16 +329,11 @@ export default function TemplateDetailPage() {
                     <Badge key={keyword} variant="secondary">{keyword}</Badge>
                   ))}
                 </div>
-              </motion.div>
+              </div>
             )}
 
             {/* Metadata */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-              className="bg-card border rounded-xl p-6"
-            >
+            <div className="bg-card border rounded-xl p-6">
               <h3 className="font-semibold mb-4 flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
                 Details
@@ -424,7 +358,7 @@ export default function TemplateDetailPage() {
                   </div>
                 )}
               </div>
-            </motion.div>
+            </div>
           </div>
         </div>
       </main>

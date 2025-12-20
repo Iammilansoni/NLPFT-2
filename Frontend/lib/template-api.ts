@@ -13,8 +13,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 export type TemplateStatus = 'draft' | 'review' | 'approved';
-export type SecurityClassification = 'public' | 'internal' | 'secret' | 'highly-restricted';
-export type UserRole = 'user' | 'reviewer' | 'admin';
+export type UserRole = 'user' | 'expert' | 'reviewer' | 'admin';
 
 export interface Template {
   template_id: string;
@@ -27,7 +26,6 @@ export interface Template {
   json_schema: Record<string, any>;
   sample_requests?: SampleRequest[];
   side_effects?: string | null;
-  security_classification: SecurityClassification;
   domain_tags: string[];
   status: TemplateStatus;
   reviewer_notes?: string | null;
@@ -91,7 +89,6 @@ export interface CreateTemplateRequest {
   json_schema: Record<string, any>;
   sample_requests?: SampleRequest[];
   side_effects?: string | null;
-  security_classification: SecurityClassification;
   domain_tags: string[];
   status: TemplateStatus;
   reviewer_notes?: string | null;
@@ -122,7 +119,6 @@ export interface BackendTemplateRequest {
   json_schema?: Record<string, any>;
   response_schema?: Record<string, any>;
   domain_tags: string[];
-  security_classification: SecurityClassification;
   auth_config?: Record<string, any>;
   headers?: Record<string, string>;
   rate_limit?: Record<string, any>;
@@ -154,10 +150,10 @@ export interface CreateMetadataRequest {
 class TemplateApiClient {
   private getAuthHeaders(): Record<string, string> {
     // TODO: Replace with your actual auth token retrieval
-    const token = typeof window !== 'undefined' 
-      ? localStorage.getItem('nlpforge_access_token') 
+    const token = typeof window !== 'undefined'
+      ? localStorage.getItem('nlpforge_access_token')
       : null;
-    
+
     return {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -199,7 +195,6 @@ class TemplateApiClient {
       sample_responses: sampleResponses,
       json_schema: data.json_schema,
       domain_tags: data.domain_tags,
-      security_classification: data.security_classification,
       headers: data.headers,
     };
   }
@@ -240,7 +235,6 @@ class TemplateApiClient {
       sample_responses: sampleResponses,
       json_schema: data.json_schema || {},
       domain_tags: data.domain_tags || [],
-      security_classification: data.security_classification || 'public',
       headers: data.headers || {},
     };
   }
@@ -296,23 +290,22 @@ class TemplateApiClient {
    * Update existing template (strict validation)
    */
   async updateTemplate(
-    templateId: string, 
+    templateId: string,
     data: Partial<CreateTemplateRequest>,
     parameters?: ParameterSchema[]
   ): Promise<Template> {
     // Transform the data to backend format for updates
     const transformedData: Record<string, any> = {};
-    
+
     if (data.api_name) transformedData.api_name = data.api_name;
     if (data.description) transformedData.description = data.description;
     if (data.base_url) transformedData.base_url = data.base_url;
     if (data.method) transformedData.method = data.method;
     if (data.headers) transformedData.headers = data.headers;
     if (data.json_schema) transformedData.json_schema = data.json_schema;
-    if (data.security_classification) transformedData.security_classification = data.security_classification;
     if (data.domain_tags) transformedData.domain_tags = data.domain_tags;
     if (data.side_effects !== undefined) transformedData.side_effects = data.side_effects;
-    
+
     // Transform sample_requests to backend format
     if (data.sample_requests) {
       const scenarios = ['valid', 'edge', 'error'];
@@ -323,12 +316,12 @@ class TemplateApiClient {
       }));
       transformedData.sample_responses = data.sample_requests.map(sr => sr.expected_response);
     }
-    
+
     // Include parameters if provided
     if (parameters && parameters.length > 0) {
       transformedData.parameters = parameters;
     }
-    
+
     // Extract endpoint from base_url
     if (data.base_url) {
       try {
@@ -338,7 +331,7 @@ class TemplateApiClient {
         transformedData.endpoint = '/api';
       }
     }
-    
+
     const response = await axios.put<Template>(
       `${API_BASE_URL}/api/v1/templates/${templateId}`,
       transformedData,
@@ -352,12 +345,12 @@ class TemplateApiClient {
    * Use this for saving incomplete work in progress
    */
   async updateDraftTemplate(
-    templateId: string, 
+    templateId: string,
     data: Partial<CreateTemplateRequest>,
     parameters?: ParameterSchema[]
   ): Promise<Template> {
     const transformedData = this.transformToDraftFormat(data as CreateTemplateRequest, parameters);
-    
+
     try {
       const response = await axios.put<Template>(
         `${API_BASE_URL}/api/v1/templates/draft/${templateId}`,
@@ -401,7 +394,7 @@ class TemplateApiClient {
    * Bulk create parameters for a template
    */
   async createParameters(
-    templateId: string, 
+    templateId: string,
     data: CreateParametersRequest
   ): Promise<{ success: boolean; count: number }> {
     const response = await axios.post(

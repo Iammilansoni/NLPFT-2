@@ -4,14 +4,15 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useTheme } from 'next-themes'
 import { Sun, Moon, Laptop2, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useCursor } from '@/components/ui/animated-cursor'
+// Removed: useCursor from animated-cursor (deleted)
 
-
+// Cursor hooks removed - component no longer uses custom cursor
 function useSafeCursor() {
-  try {
-    return useCursor()
-  } catch {
-    return { setVariant: () => {}, setText: () => {}, reset: () => {}, isEnabled: false }
+  return {
+    setVariant: (_v?: string) => { },
+    setText: (_t?: string) => { },
+    reset: () => { },
+    isEnabled: false
   }
 }
 
@@ -40,7 +41,7 @@ export function ThemeToggle({ className }: { className?: string }) {
   const resolvedTheme = theme === 'system' ? systemTheme : theme
   const effectiveTheme: 'light' | 'dark' | 'system' = (resolvedTheme === 'light' || resolvedTheme === 'dark')
     ? resolvedTheme
-    : (activeValue === 'system' ? 'system' : 'light') 
+    : (activeValue === 'system' ? 'system' : 'light')
   const [focusIndex, setFocusIndex] = useState(() => options.findIndex(o => o.value === activeValue) || 0)
 
   useEffect(() => { setMounted(true) }, [])
@@ -51,7 +52,7 @@ export function ThemeToggle({ className }: { className?: string }) {
     reset()
   }, [reset])
 
-  
+
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent) => {
@@ -62,7 +63,7 @@ export function ThemeToggle({ className }: { className?: string }) {
     return () => window.removeEventListener('mousedown', handler)
   }, [open, close])
 
-  
+
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -81,7 +82,7 @@ export function ThemeToggle({ className }: { className?: string }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [open, close, focusIndex, setTheme])
 
-  
+
   const setAccentCursor = () => { if (isEnabled) { setVariant('accent'); setText('Theme'); } }
   const clearCursor = () => { if (isEnabled) reset() }
 

@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import Link from 'next/link'
-import { Brain, Github, Twitter, Linkedin, Mail } from 'lucide-react'
+import { Network, Github, Twitter, Linkedin, Mail } from 'lucide-react'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Separator } from '@/components/ui/separator'
 
@@ -48,17 +48,17 @@ export function LandingFooter() {
           {/* Brand Section */}
           <div className="md:col-span-2 space-y-5">
             <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-violet-500 via-purple-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
-                <Brain className="h-6 w-6 text-white" />
+              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                <Network className="h-6 w-6 text-white" />
               </div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent">
+              <span className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-sky-400 bg-clip-text text-transparent">
                 NLPForge
               </span>
             </Link>
             <p className="text-sm text-slate-400 leading-relaxed max-w-xs">
               Transform natural language into production-ready API tests with AI-powered intelligence.
             </p>
-            
+
             {/* Social Links */}
             <div className="flex items-center gap-3 pt-2">
               {socialLinks.map((social) => (
@@ -67,10 +67,10 @@ export function LandingFooter() {
                   href={social.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="h-10 w-10 rounded-lg bg-slate-800/50 hover:bg-slate-700 border border-slate-700/50 hover:border-violet-500/50 flex items-center justify-center transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-violet-500/20"
+                  className="h-10 w-10 rounded-lg bg-slate-800/50 hover:bg-slate-700 border border-slate-700/50 hover:border-blue-500/50 flex items-center justify-center transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-blue-500/20"
                   aria-label={social.label}
                 >
-                  <social.icon className="h-4.5 w-4.5 text-slate-400 group-hover:text-violet-400" />
+                  <social.icon className="h-4.5 w-4.5 text-slate-400 group-hover:text-blue-400" />
                 </a>
               ))}
             </div>
@@ -84,7 +84,7 @@ export function LandingFooter() {
                 <li key={link.label}>
                   <Link
                     href={link.href}
-                    className="text-sm text-slate-400 hover:text-violet-400 transition-colors duration-200"
+                    className="text-sm text-slate-400 hover:text-blue-400 transition-colors duration-200"
                   >
                     {link.label}
                   </Link>
@@ -101,7 +101,7 @@ export function LandingFooter() {
                 <li key={link.label}>
                   <Link
                     href={link.href}
-                    className="text-sm text-slate-400 hover:text-violet-400 transition-colors duration-200"
+                    className="text-sm text-slate-400 hover:text-blue-400 transition-colors duration-200"
                   >
                     {link.label}
                   </Link>
@@ -118,7 +118,7 @@ export function LandingFooter() {
                 <li key={link.label}>
                   <Link
                     href={link.href}
-                    className="text-sm text-slate-400 hover:text-violet-400 transition-colors duration-200"
+                    className="text-sm text-slate-400 hover:text-blue-400 transition-colors duration-200"
                   >
                     {link.label}
                   </Link>
@@ -135,7 +135,7 @@ export function LandingFooter() {
                 <li key={link.label}>
                   <Link
                     href={link.href}
-                    className="text-sm text-slate-400 hover:text-violet-400 transition-colors duration-200"
+                    className="text-sm text-slate-400 hover:text-blue-400 transition-colors duration-200"
                   >
                     {link.label}
                   </Link>
@@ -152,23 +152,23 @@ export function LandingFooter() {
           <p className="text-sm text-slate-400">
             © {new Date().getFullYear()} NLPForge. All rights reserved.
           </p>
-          
+
           <div className="flex items-center gap-6">
-            <Link 
-              href="/privacy" 
-              className="text-sm text-slate-400 hover:text-violet-400 transition-colors duration-200"
+            <Link
+              href="/privacy"
+              className="text-sm text-slate-400 hover:text-blue-400 transition-colors duration-200"
             >
               Privacy Policy
             </Link>
-            <Link 
-              href="/terms" 
-              className="text-sm text-slate-400 hover:text-violet-400 transition-colors duration-200"
+            <Link
+              href="/terms"
+              className="text-sm text-slate-400 hover:text-blue-400 transition-colors duration-200"
             >
               Terms of Service
             </Link>
-            <Link 
-              href="/cookies" 
-              className="text-sm text-slate-400 hover:text-violet-400 transition-colors duration-200"
+            <Link
+              href="/cookies"
+              className="text-sm text-slate-400 hover:text-blue-400 transition-colors duration-200"
             >
               Cookie Policy
             </Link>

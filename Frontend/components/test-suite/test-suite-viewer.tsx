@@ -25,7 +25,7 @@ export function TestSuiteViewer({ suite, onExecute, onExecuteTest }: TestSuiteVi
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-sky-500 flex items-center justify-center text-white">
               <FileCode className="h-5 w-5" />
             </div>
             <div>

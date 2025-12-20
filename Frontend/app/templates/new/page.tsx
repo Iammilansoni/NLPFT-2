@@ -35,10 +35,10 @@ export default function NewTemplatePage() {
   const userRole = user.is_expert ? "expert" : "user"
 
   return (
-    <TemplateForm 
-      mode="create" 
-      userId={userId} 
-      userRole={userRole} 
+    <TemplateForm
+      mode="create"
+      userId={userId}
+      userRole={userRole}
     />
   )
 }
