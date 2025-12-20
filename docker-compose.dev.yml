@@ -1,7 +1,8 @@
 # =============================================================================
 # NLPForge-Tester - Development Docker Compose
 # =============================================================================
-# Infrastructure services only - run backend/frontend locally for hot reload
+# Infrastructure services in Docker
+# Frontend & Backend run locally for hot reload
 # 
 # Cross-platform compatible: Windows, Linux, macOS
 #
@@ -12,13 +13,8 @@
 #   Reset:    docker-compose -f docker-compose.dev.yml down -v
 #
 # Then run locally:
-#   Windows:
-#     Backend:  cd Backend && python -m uvicorn app.main:app --reload --port 8000
-#     Frontend: cd Frontend && npm run dev
-#   
-#   Linux/macOS:
-#     Backend:  cd Backend && uvicorn app.main:app --reload --port 8000
-#     Frontend: cd Frontend && npm run dev
+#   Backend:  cd Backend && python -m uvicorn app.main:app --reload --port 8000
+#   Frontend: cd Frontend && npm run dev
 #
 # Access Points:
 #   - Backend API:    http://localhost:8000 (run locally)
@@ -26,7 +22,7 @@
 #   - RedisInsight:   http://localhost:8001
 #   - Redis Commander: http://localhost:8081
 #   - pgAdmin:        http://localhost:5050
-#   - MinIO Console:  http://localhost:9001
+#   - Ollama:         http://localhost:11434 (run locally: ollama serve)
 #
 # =============================================================================
 
@@ -36,7 +32,7 @@ services:
   # ---------------------------------------------------------------------------
   postgres:
     image: postgres:15-alpine
-    container_name: nlpforge-postgres
+    container_name: nlpforge-dev-postgres
     hostname: postgres
     ports:
       - "5432:5432"
@@ -62,7 +58,7 @@ services:
   # ---------------------------------------------------------------------------
   redis:
     image: redis/redis-stack:latest
-    container_name: nlpforge-redis
+    container_name: nlpforge-dev-redis
     hostname: redis
     ports:
       - "6379:6379"     # Redis port
@@ -91,7 +87,7 @@ services:
   # ---------------------------------------------------------------------------
   redis-commander:
     image: rediscommander/redis-commander:latest
-    container_name: nlpforge-redis-commander
+    container_name: nlpforge-dev-redis-commander
     hostname: redis-commander
     ports:
       - "8081:8081"
@@ -111,7 +107,7 @@ services:
   # ---------------------------------------------------------------------------
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: nlpforge-pgadmin
+    container_name: nlpforge-dev-pgadmin
     hostname: pgadmin
     ports:
       - "5050:80"
@@ -130,47 +126,52 @@ services:
       - nlpforge-network
 
   # ---------------------------------------------------------------------------
-  # MinIO - S3-compatible Object Storage
+  # Ollama - Local LLM & Embedding Server
   # ---------------------------------------------------------------------------
-  minio:
-    image: minio/minio:latest
-    container_name: nlpforge-minio
-    hostname: minio
-    ports:
-      - "9000:9000"     # S3 API
-      - "9001:9001"     # Web Console
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
-    command: server /data --console-address ":9001"
-    volumes:
-      - minio_data:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-      start_period: 30s
-    restart: unless-stopped
-    networks:
-      - nlpforge-network
+  # NOTE: Ollama is commented out - run locally instead for faster model loading
+  # To run Ollama locally: ollama serve
+  # Then pull models: ollama pull nomic-embed-text && ollama pull llama3.2
+  # ---------------------------------------------------------------------------
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: nlpforge-dev-ollama
+  #   hostname: ollama
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   environment:
+  #     OLLAMA_HOST: 0.0.0.0
+  #     OLLAMA_ORIGINS: "*"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+  #     start_period: 60s
+  #   restart: unless-stopped
+  #   networks:
+  #     - nlpforge-network
+
 
 # =============================================================================
 # Volumes
 # =============================================================================
+# IMPORTANT: Using same volume names as docker-compose.yml to share data
+# This ensures your account, templates, and datasets persist across dev/prod modes
 volumes:
   postgres_data:
     driver: local
-    name: nlpforge-dev-postgres-data
+    name: nlpforge-postgres-data
   redis_data:
     driver: local
-    name: nlpforge-dev-redis-data
+    name: nlpforge-redis-data
   pgadmin_data:
     driver: local
-    name: nlpforge-dev-pgadmin-data
-  minio_data:
+    name: nlpforge-pgadmin-data
+  ollama_data:
     driver: local
-    name: nlpforge-dev-minio-data
+    name: nlpforge-ollama-data
 
 # =============================================================================
 # Networks
