@@ -30,17 +30,17 @@ NLPForge is an enterprise-grade platform that bridges the gap between natural la
 ### Example
 
 ```
-Query: "Authenticate with email milansoni@example.com and password secure123"
+Query: "Authenticate with email milansoni@nlpforge.com and password secure123"
 
 ↓ NLPForge Processing ↓
 
 {
   "api_name": "User_Login",
-  "base_url": "https://api.example.com",
+  "base_url": "https://api.nlpforge.com",
   "endpoint": "/auth/login",
   "method": "POST",
   "extracted_request_body": {
-    "email": "milansoni@example.com",
+    "email": "milansoni@enlpforge.com",
     "password": "secure123"
   }
 }
@@ -109,7 +109,7 @@ Query: "Authenticate with email milansoni@example.com and password secure123"
 | **Frontend** | Next.js 14, TypeScript, Tailwind CSS, shadcn/ui |
 | **Backend** | FastAPI, Python 3.11+, SQLAlchemy, Pydantic |
 | **Database** | PostgreSQL 15 (metadata), Redis Stack (vectors) |
-| **AI/ML** | Ollama (embeddings + LLM), FlashRank (re-ranking) |
+| **AI/ML** | Ollama (embeddings + LLM, Slot extraction), FlashRank (re-ranking), Gemini(Dataset Generation) |
 | **DevOps** | Docker, Docker Compose |
 
 ---
@@ -238,21 +238,64 @@ curl -X POST "http://localhost:8000/api/v1/ranking/semantic-retrieve" \
 Create a `.env` file in the project root:
 
 ```env
-# PostgreSQL
+# =============================================================================
+# NLPForge Backend - Environment Configuration Template
+# =============================================================================
+# Copy this file to .env and fill in your actual values
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# PostgreSQL Configuration
+# -----------------------------------------------------------------------------
+DATABASE_URL=postgresql+asyncpg://nlpforge:your_secure_password@localhost:5432/nlpforge
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
 POSTGRES_USER=nlpforge
 POSTGRES_PASSWORD=your_secure_password
 POSTGRES_DB=nlpforge
 
-# Redis
+# -----------------------------------------------------------------------------
+# Redis Configuration
+# -----------------------------------------------------------------------------
+REDIS_URL=redis://:your_redis_password@localhost:6379/0
+REDIS_HOST=localhost
+REDIS_PORT=6379
 REDIS_PASSWORD=your_redis_password
+INDEX_NAME=idx:api
 
-# Application
-SECRET_KEY=your-super-secret-key-change-in-production
-ENVIRONMENT=production
+# -----------------------------------------------------------------------------
+# Application Settings
+# -----------------------------------------------------------------------------
+ENVIRONMENT=development
 LOG_LEVEL=INFO
+# Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
+SECRET_KEY=your_secret_key_here_min_32_chars
+DEBUG=true
 
-# Optional
-HUGGINGFACE_TOKEN=your_token
+# -----------------------------------------------------------------------------
+# AI/ML Configuration
+# -----------------------------------------------------------------------------
+# Gemini API (REQUIRED for dataset generation)
+# Get from: https://aistudio.google.com/apikey
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Ollama Configuration (for embeddings - runs locally)
+# Install: https://ollama.ai
+# Start: ollama serve
+# Pull model: ollama pull nomic-embed-text
+OLLAMA_HOST=http://localhost:11434
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+
+# Search Settings
+TOP_K=5
+BATCH_SIZE=32
+
+# -----------------------------------------------------------------------------
+# CORS Configuration
+# -----------------------------------------------------------------------------
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+
+
 ```
 
 ### Docker Compose Services
@@ -368,6 +411,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 <p align="center">
   Made with ❤️ by 
   <a href="https://github.com/Iammilansoni">Milan Soni</a>, 
-  Avadhi Singhal, 
-  Abhilash Joshi
+  <a href="https://github.com/Avadhi-Singhal">Avadhi Singhal</a>, 
+  <a href="https://github.com/AbhilashJoshi09">Abhilash Joshi</a>, 
 </p>
