@@ -1,97 +1,317 @@
-version: '3.8'
+# =============================================================================
+# NLPForge-Tester - Production Docker Compose
+# =============================================================================
+# Complete production setup with all services containerized
+# 
+# Cross-platform compatible: Windows, Linux, macOS
+#
+# Usage:
+#   Start:      docker-compose up -d
+#   Stop:       docker-compose down
+#   Logs:       docker-compose logs -f
+#   Rebuild:    docker-compose up -d --build
+#   Full reset: docker-compose down -v && docker-compose up -d --build
+#
+# Access Points:
+#   - Frontend:       http://localhost:3000
+#   - Backend API:    http://localhost:8000
+#   - API Docs:       http://localhost:8000/docs
+#   - RedisInsight:   http://localhost:8001
+#   - Redis Commander: http://localhost:8081
+#   - pgAdmin:        http://localhost:5050
+#   - MinIO Console:  http://localhost:9001
+#
+# =============================================================================
 
 services:
-  # PostgreSQL Database - Primary data storage
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database - Primary data storage for users, templates, etc.
+  # ---------------------------------------------------------------------------
   postgres:
     image: postgres:15-alpine
     container_name: nlpforge-postgres
+    hostname: postgres
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=nlpforge
-      - POSTGRES_PASSWORD=nlpforge_secure_password
-      - POSTGRES_DB=nlpforge
+      POSTGRES_USER: ${POSTGRES_USER:-nlpforge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nlpforge_secure_password}
+      POSTGRES_DB: ${POSTGRES_DB:-nlpforge}
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nlpforge"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nlpforge} -d ${POSTGRES_DB:-nlpforge}"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
     restart: unless-stopped
     networks:
       - nlpforge-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
-  # Redis service for vector storage and caching
+  # ---------------------------------------------------------------------------
+  # Redis Stack - Vector database with RediSearch for semantic search
+  # ---------------------------------------------------------------------------
   redis:
     image: redis/redis-stack:latest
     container_name: nlpforge-redis
+    hostname: redis
     ports:
-      - "6379:6379"
-      - "8001:8001"  # RedisInsight UI
+      - "6379:6379"     # Redis port
+      - "8001:8001"     # RedisInsight UI
+    environment:
+      REDIS_ARGS: >-
+        --requirepass ${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024}
+        --appendonly yes
+        --appendfsync everysec
+        --maxmemory 512mb
+        --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
-    environment:
-      - REDIS_ARGS=--appendonly yes
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
     restart: unless-stopped
     networks:
       - nlpforge-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
-  # Redis Commander - Alternative Web UI
+  # ---------------------------------------------------------------------------
+  # Redis Commander - Web-based Redis management UI
+  # ---------------------------------------------------------------------------
   redis-commander:
     image: rediscommander/redis-commander:latest
     container_name: nlpforge-redis-commander
-    environment:
-      - REDIS_HOSTS=local:redis:6379
+    hostname: redis-commander
     ports:
       - "8081:8081"
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024}
+      HTTP_USER: ${REDIS_COMMANDER_USER:-admin}
+      HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD:-admin123}
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - nlpforge-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
 
-  # Backend FastAPI service (canonical API)
+  # ---------------------------------------------------------------------------
+  # pgAdmin - PostgreSQL Web Administration Tool
+  # ---------------------------------------------------------------------------
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: nlpforge-pgadmin
+    hostname: pgadmin
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@nlpforge.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - nlpforge-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ---------------------------------------------------------------------------
+  # MinIO - S3-compatible Object Storage for datasets and files
+  # ---------------------------------------------------------------------------
+  minio:
+    image: minio/minio:latest
+    container_name: nlpforge-minio
+    hostname: minio
+    ports:
+      - "9000:9000"     # S3 API
+      - "9001:9001"     # Web Console
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - nlpforge-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Ollama - Local LLM and Embedding Model Server
+  # ---------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: nlpforge-ollama
+    hostname: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      OLLAMA_HOST: 0.0.0.0
+      OLLAMA_ORIGINS: "*"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - nlpforge-network
+    # Uncomment for GPU support on Linux with NVIDIA
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Backend - FastAPI Application Server
+  # ---------------------------------------------------------------------------
   backend:
     build:
       context: ./Backend
       dockerfile: Dockerfile
+    image: nlpforge-backend:latest
     container_name: nlpforge-backend
+    hostname: backend
     ports:
       - "8000:8000"
     environment:
       # PostgreSQL Configuration
-      - DATABASE_URL=postgresql://nlpforge:nlpforge_secure_password@postgres:5432/nlpforge
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_USER=nlpforge
-      - POSTGRES_PASSWORD=nlpforge_secure_password
-      - POSTGRES_DB=nlpforge
+      DATABASE_URL: postgresql://${POSTGRES_USER:-nlpforge}:${POSTGRES_PASSWORD:-nlpforge_secure_password}@postgres:5432/${POSTGRES_DB:-nlpforge}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-nlpforge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nlpforge_secure_password}
+      POSTGRES_DB: ${POSTGRES_DB:-nlpforge}
 
       # Redis Configuration
-      - REDIS_URL=redis://redis:6379/0
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024}@redis:6379/0
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024}
+
+      # Ollama Configuration (for embeddings)
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_BASE_URL: http://ollama:11434
+
+      # MinIO Configuration
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      MINIO_BUCKET: ${MINIO_BUCKET:-nlpforge}
+      MINIO_SECURE: "false"
 
       # Application Configuration
-      - ENVIRONMENT=production
-      - LOG_LEVEL=INFO
-      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN:-}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SECRET_KEY: ${SECRET_KEY:-your-super-secret-key-change-in-production}
+      
+      # Optional: HuggingFace Token (for private models)
+      HUGGINGFACE_TOKEN: ${HUGGINGFACE_TOKEN:-}
     volumes:
-      - ./Backend/storage:/app/storage
-      - ./Backend/datasets:/app/datasets
+      - backend_storage:/app/storage
+      - backend_datasets:/app/datasets
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      ollama:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    restart: unless-stopped
+    networks:
+      - nlpforge-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # ---------------------------------------------------------------------------
+  # Frontend - Next.js Web Application
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+        NEXT_PUBLIC_WS_URL: ws://localhost:8000
+    image: nlpforge-frontend:latest
+    container_name: nlpforge-frontend
+    hostname: frontend
+    ports:
+      - "3000:3000"
+    environment:
+      # Public environment variables (browser-accessible)
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+      NEXT_PUBLIC_WS_URL: ws://localhost:8000
+
+      # Server-side environment variables
+      API_URL: http://backend:8000
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -99,47 +319,45 @@ services:
     restart: unless-stopped
     networks:
       - nlpforge-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
-  # Frontend Next.js service
-  frontend:
-    build:
-      context: ./Frontend
-      dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_API_URL=http://localhost:8000
-    container_name: nlpforge-frontend
-    ports:
-      - "3000:3000"
-    environment:
-      # Public environment variables (exposed to browser)
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-      - NEXT_PUBLIC_WS_URL=ws://localhost:8000
-
-      # Server-side environment variables (Next.js SSR)
-      - API_URL=http://backend:8000
-      - NODE_ENV=production
-      - PORT=3000
-      - HOSTNAME=0.0.0.0
-    depends_on:
-      backend:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    restart: unless-stopped
-    networks:
-      - nlpforge-network
-
+# =============================================================================
+# Volumes - Persistent data storage
+# =============================================================================
 volumes:
   postgres_data:
     driver: local
+    name: nlpforge-postgres-data
   redis_data:
     driver: local
+    name: nlpforge-redis-data
+  pgadmin_data:
+    driver: local
+    name: nlpforge-pgadmin-data
+  minio_data:
+    driver: local
+    name: nlpforge-minio-data
+  ollama_data:
+    driver: local
+    name: nlpforge-ollama-data
+  backend_storage:
+    driver: local
+    name: nlpforge-backend-storage
+  backend_datasets:
+    driver: local
+    name: nlpforge-backend-datasets
 
+# =============================================================================
+# Networks - Internal container communication
+# =============================================================================
 networks:
   nlpforge-network:
     driver: bridge
+    name: nlpforge-network
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

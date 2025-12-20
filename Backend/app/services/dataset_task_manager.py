@@ -5,6 +5,7 @@ Dataset Task Manager - Manages async dataset generation tasks with progress trac
 import uuid
 from datetime import datetime
 from typing import Dict, Optional, List, Callable
+from uuid import UUID
 from app.core.logger import logger
 
 # In-memory task store (in production, use Redis or database)
@@ -17,11 +18,16 @@ class DatasetTaskManager:
     """Manages dataset generation tasks with progress tracking"""
     
     @staticmethod
-    def create_task() -> str:
-        """Create a new task and return task_id"""
+    def create_task(user_id: Optional[UUID] = None) -> str:
+        """Create a new task and return task_id
+        
+        Args:
+            user_id: UUID of the user creating the task (for multi-tenant isolation)
+        """
         task_id = str(uuid.uuid4())
         _task_store[task_id] = {
             "task_id": task_id,
+            "user_id": str(user_id) if user_id else None,  # 🔒 Store user_id for isolation
             "status": "pending",
             "message": "Task created",
             "progress": 0,
@@ -34,7 +40,7 @@ class DatasetTaskManager:
             "error": None
         }
         _progress_callbacks[task_id] = []
-        logger.info(f"Created task: {task_id}")
+        logger.info(f"Created task: {task_id} for user: {user_id}")
         return task_id
     
     @staticmethod
@@ -105,23 +111,66 @@ class DatasetTaskManager:
             _progress_callbacks[task_id].remove(callback)
     
     @staticmethod
-    def get_task(task_id: str) -> Optional[Dict]:
-        """Get task by ID"""
-        return _task_store.get(task_id)
+    def get_task(task_id: str, user_id: Optional[UUID] = None) -> Optional[Dict]:
+        """Get task by ID
+        
+        Args:
+            task_id: Task UUID
+            user_id: Optional user UUID for access control. If provided, only returns
+                     task if it belongs to this user.
+        """
+        task = _task_store.get(task_id)
+        if task and user_id:
+            # 🔒 Enforce user isolation - only return if task belongs to user
+            if task.get("user_id") and task["user_id"] != str(user_id):
+                logger.warning(f"Access denied: User {user_id} tried to access task {task_id}")
+                return None
+        return task
     
     @staticmethod
-    def list_tasks() -> list:
-        """List all tasks"""
+    def list_tasks(user_id: Optional[UUID] = None) -> list:
+        """List tasks, optionally filtered by user
+        
+        Args:
+            user_id: Optional user UUID. If provided, only returns tasks belonging to this user.
+        """
+        if user_id:
+            # 🔒 Filter tasks by user_id for multi-tenant isolation
+            user_id_str = str(user_id)
+            return [
+                task for task in _task_store.values() 
+                if task.get("user_id") == user_id_str
+            ]
+        # If no user_id provided, return all tasks (for admin purposes only)
         return list(_task_store.values())
     
     @staticmethod
-    def delete_task(task_id: str):
-        """Delete a task"""
-        if task_id in _task_store:
-            del _task_store[task_id]
-            if task_id in _progress_callbacks:
-                del _progress_callbacks[task_id]
-            logger.info(f"Deleted task: {task_id}")
+    def delete_task(task_id: str, user_id: Optional[UUID] = None) -> bool:
+        """Delete a task
+        
+        Args:
+            task_id: Task UUID to delete
+            user_id: Optional user UUID for access control. If provided, only deletes
+                     if task belongs to this user.
+                     
+        Returns:
+            True if deleted, False if not found or access denied
+        """
+        if task_id not in _task_store:
+            return False
+            
+        task = _task_store[task_id]
+        
+        # 🔒 Enforce user isolation
+        if user_id and task.get("user_id") and task["user_id"] != str(user_id):
+            logger.warning(f"Access denied: User {user_id} tried to delete task {task_id}")
+            return False
+        
+        del _task_store[task_id]
+        if task_id in _progress_callbacks:
+            del _progress_callbacks[task_id]
+        logger.info(f"Deleted task: {task_id}")
+        return True
 
 
 def get_task_manager() -> DatasetTaskManager:
