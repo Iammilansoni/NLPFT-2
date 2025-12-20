@@ -2,12 +2,22 @@
 
 """
 AI Ranking Engine - Two-Stage Retrieval Pipeline
+
+DEPRECATION WARNING:
+This module uses LEGACY hardcoded index names (embeddings_768).
+For new development, use multi_model_semantic_service.py which:
+- Uses model-specific Redis indexes (idx_vectors_{model_id})
+- Enforces model governance
+- Returns MODEL_MISMATCH errors for dimension mismatches
+
+This legacy module is retained for backward compatibility only.
+Migrate to multi_model_semantic_service.py for proper multi-model support.
+
 Stage 1: Vector retrieval (Top-K=5) from Redis Vector DB
 Stage 2: FlashRank reranking with ms-marco-MiniLM-L-12-v2
-
-This module provides a high-precision semantic search with cross-encoder reranking.
 """
 
+import warnings
 import numpy as np
 import json
 from typing import List, Dict, Any, Optional
@@ -16,16 +26,33 @@ from app.redis_config import get_redis_client
 from app.nlp.embedding_model import get_model
 from app.core.logger import logger
 
-# ===============================================================
-# CONFIGURATION
-# ===============================================================
-INDEX_NAME = "idx:api"
+# Issue deprecation warning at import time
+warnings.warn(
+    "ranking_engine.py is deprecated. Use multi_model_semantic_service.py for model-safe searches.",
+    DeprecationWarning,
+    stacklevel=2
+)
+
+# --- Configuration (Legacy) ---
+# Dimension-based indexes for different embedding models.
+# WARNING: This bypasses model governance and should NOT be used for new development.
+INDEX_MAPPING = {
+    384: "embeddings_384",
+    768: "embeddings_768",
+    1024: "embeddings_1024"
+}
+# LEGACY: Hardcoded fallback - bypasses multi-model system
+DEFAULT_INDEX = "embeddings_768"  # DEPRECATED: Use model-specific index
 DEFAULT_TOP_K = 5
 RERANKER_MODEL = "ms-marco-MiniLM-L-12-v2"
 
-# ===============================================================
-# LAZY LOADED COMPONENTS
-# ===============================================================
+def escape_redis_tag(value: str) -> str:
+    """Escape special characters in Redis TAG field values (like hyphens in UUIDs)"""
+    if value is None:
+        return value
+    return str(value).replace('-', '\\-')
+
+# --- Lazy Loaded Components ---
 _embedding_model = None
 _embed_dim = None
 _reranker = None
@@ -63,24 +90,35 @@ def _get_reranker():
     return _reranker
 
 
-def _get_redis():
-    """Lazy load Redis connection"""
-    global _redis_client, _ft
+def _get_redis(dimension: int = None):
+    """Lazy load Redis connection and get index for specified dimension"""
+    global _redis_client
     if _redis_client is None:
         logger.info("Connecting to Redis for ranking engine...")
         _redis_client = get_redis_client()
-        _ft = _redis_client.ft(INDEX_NAME)
-    return _redis_client, _ft
+    
+    # Determine index name based on dimension
+    if dimension and dimension in INDEX_MAPPING:
+        index_name = INDEX_MAPPING[dimension]
+    else:
+        index_name = DEFAULT_INDEX
+    
+    return _redis_client, _redis_client.ft(index_name), index_name
 
 
-# ===============================================================
-# STAGE 1: VECTOR RETRIEVAL (Top-K from Redis)
-# ===============================================================
-def stage1_vector_retrieval(user_query: str, top_k: int = DEFAULT_TOP_K) -> List[Dict[str, Any]]:
+# --- Stage 1: Vector Retrieval ---
+def stage1_vector_retrieval(
+    user_query: str, 
+    top_k: int = DEFAULT_TOP_K,
+    user_id: str = None
+) -> List[Dict[str, Any]]:
     """
-    Stage 1: Vector Retrieval from Redis Vector DB
+    Stage 1: Vector Retrieval from Redis Vector DB (Multi-Tenant Secure)
     
     Performs top-K nearest-neighbor vector search using embeddings stored in Redis.
+    
+    Security: Filters by user_id to ensure tenant isolation.
+    User A can ONLY search User A's embeddings.
     
     Rules:
     - Uses the embedding model associated with the dataset
@@ -92,25 +130,41 @@ def stage1_vector_retrieval(user_query: str, top_k: int = DEFAULT_TOP_K) -> List
     Args:
         user_query: The search query from the user
         top_k: Number of candidates to retrieve (default: 5)
+        user_id: User ID for multi-tenant isolation (REQUIRED for security)
     
     Returns:
         List of top-K candidate documents with their vector similarity scores
     """
-    logger.info(f"[Stage 1] Vector retrieval for: '{user_query}' (top_k={top_k})")
+    logger.info(f"[Stage 1] Vector retrieval for: '{user_query}' (top_k={top_k}, user_id={user_id})")
     
     # Get embedding model and Redis connection
     model = _get_embedding_model()
-    _, ft = _get_redis()
+    embed_dim = model.get_sentence_embedding_dimension()
+    _, ft, index_name = _get_redis(embed_dim)
+    
+    logger.info(f"[Stage 1] Using index: {index_name} (dimension={embed_dim})")
     
     # Encode query to vector
     query_vec = model.encode([user_query], normalize_embeddings=True)
     query_vec_bytes = np.asarray(query_vec, dtype=np.float32).tobytes()
     
-    # Build KNN query
+    # Build KNN query with user_id filter for multi-tenant security
+    # If user_id is provided, filter by user_id TAG field
+    # Otherwise, search all (for backward compatibility, but should require user_id in production)
+    if user_id:
+        # SECURE: Filter by user_id - only return this user's embeddings
+        escaped_user_id = escape_redis_tag(str(user_id))
+        filter_query = f"(@user_id:{{{escaped_user_id}}})"
+        knn_query = f"{filter_query}=>[KNN $k @vector $vec AS vector_score]"
+    else:
+        # WARNING: No user filter - searches ALL tenants (legacy mode)
+        logger.warning("[Stage 1] No user_id provided - searching ALL embeddings (insecure)")
+        knn_query = "*=>[KNN $k @vector $vec AS vector_score]"
+    
     q = (
-        Query("*=>[KNN $k @query_embedding $vec AS vector_score]")
+        Query(knn_query)
         .sort_by("vector_score")
-        .return_fields("query", "api", "endpoint", "request", "response", "vector_score")
+        .return_fields("query", "api", "endpoint", "method", "scenario_type", "test_category", "notes", "user_id", "t_id", "vector_score")
         .dialect(2)
     )
     
@@ -135,8 +189,11 @@ def stage1_vector_retrieval(user_query: str, top_k: int = DEFAULT_TOP_K) -> List
                 "query": text_content,
                 "api": getattr(doc, "api", ""),
                 "endpoint": getattr(doc, "endpoint", ""),
-                "request": _safe_json_parse(getattr(doc, "request", "{}")),
-                "response": _safe_json_parse(getattr(doc, "response", "{}")),
+                "method": getattr(doc, "method", "POST"),  # Default to POST if not specified
+                "scenario_type": getattr(doc, "scenario_type", "valid"),
+                "test_category": getattr(doc, "test_category", "valid_flow"),
+                "notes": getattr(doc, "notes", ""),
+                "t_id": getattr(doc, "t_id", ""),  # Template ID for PostgreSQL resolution
             }
         except Exception as e:
             logger.warning(f"Error parsing document: {e}")
@@ -148,8 +205,11 @@ def stage1_vector_retrieval(user_query: str, top_k: int = DEFAULT_TOP_K) -> List
                 "query": getattr(doc, "query", ""),
                 "api": getattr(doc, "api", ""),
                 "endpoint": getattr(doc, "endpoint", ""),
-                "request": {},
-                "response": {},
+                "method": getattr(doc, "method", "POST"),
+                "scenario_type": getattr(doc, "scenario_type", "valid"),
+                "test_category": getattr(doc, "test_category", "valid_flow"),
+                "notes": getattr(doc, "notes", ""),
+                "t_id": getattr(doc, "t_id", ""),
             }
         candidates.append(candidate)
     
@@ -157,9 +217,8 @@ def stage1_vector_retrieval(user_query: str, top_k: int = DEFAULT_TOP_K) -> List
     return candidates
 
 
-# ===============================================================
-# STAGE 2: FLASHRANK RERANKING
-# ===============================================================
+
+# --- Stage 2: FlashRank Reranking ---
 def stage2_flashrank_rerank(
     user_query: str, 
     candidates: List[Dict[str, Any]]
@@ -201,14 +260,27 @@ def stage2_flashrank_rerank(
         reranker = _get_reranker()
         
         # Prepare passages for reranking
+        # ENHANCED: Include API metadata in reranking text for better accuracy
         # FlashRank expects a list of dicts with 'id' and 'text' keys
         passages = []
         for i, candidate in enumerate(candidates):
-            text = candidate.get("text", "").strip()
-            if text:  # Only include non-empty texts
+            query_text = candidate.get("text", "").strip()
+            if query_text:  # Only include non-empty texts
+                # Build enhanced text with API metadata for better reranking
+                api_name = candidate.get("api", "")
+                endpoint = candidate.get("endpoint", "")
+                method = candidate.get("method", "POST")
+                
+                # Enhanced text format: "{query} | API: {api_name} | {method} {endpoint}"
+                # This helps FlashRank distinguish between similar queries across different APIs
+                enhanced_text = query_text
+                if api_name:
+                    enhanced_text = f"{query_text} | API: {api_name} | {method} {endpoint}"
+                
                 passages.append({
                     "id": i,
-                    "text": text,
+                    "text": enhanced_text,  # Enhanced text for reranking
+                    "original_text": query_text,  # Preserve original for display
                     "meta": candidate  # Store original candidate data
                 })
         
@@ -229,17 +301,22 @@ def stage2_flashrank_rerank(
         final_results = []
         for new_rank, result in enumerate(reranked_results, start=1):
             original_candidate = result.get("meta", candidates[result.get("id", 0)])
+            # Use original_text for display (not the enhanced text used for reranking)
+            display_text = result.get("original_text", original_candidate.get("text", "")).strip()
             
             final_result = {
                 "rank": new_rank,
                 "score": _safe_float(result.get("score", 0.0)),  # FlashRank score (sanitized)
-                "text": result.get("text", "").strip(),
+                "text": display_text,  # Original text for display
                 "query": original_candidate.get("query", ""),
                 "api": original_candidate.get("api", ""),
                 "endpoint": original_candidate.get("endpoint", ""),
-                "request": original_candidate.get("request", {}),
-                "response": original_candidate.get("response", {}),
+                "method": original_candidate.get("method", "POST"),
+                "scenario_type": original_candidate.get("scenario_type", "valid"),
+                "test_category": original_candidate.get("test_category", "valid_flow"),
+                "notes": original_candidate.get("notes", ""),
                 "vector_score": _safe_float(original_candidate.get("vector_score", 0.0)),
+                "t_id": original_candidate.get("t_id", ""),  # Template ID for PostgreSQL resolution
             }
             final_results.append(final_result)
         
@@ -256,59 +333,73 @@ def stage2_flashrank_rerank(
             "query": c.get("query", ""),
             "api": c.get("api", ""),
             "endpoint": c.get("endpoint", ""),
-            "request": c.get("request", {}),
-            "response": c.get("response", {}),
+            "method": c.get("method", "POST"),
+            "scenario_type": c.get("scenario_type", "valid"),
+            "test_category": c.get("test_category", "valid_flow"),
+            "notes": c.get("notes", ""),
             "vector_score": c.get("vector_score", 0.0),
+            "t_id": c.get("t_id", ""),
         } for i, c in enumerate(candidates)]
     except Exception as e:
         logger.error(f"[Stage 2] Reranking failed: {e}")
         raise
 
 
-# ===============================================================
-# MAIN RANKING FUNCTION
-# ===============================================================
+# --- Main Ranking Function ---
 def rank_query(
     user_query: str, 
     top_k: int = DEFAULT_TOP_K,
-    include_stage1_results: bool = False
+    include_stage1_results: bool = False,
+    user_id: str = None
 ) -> Dict[str, Any]:
     """
-    Two-Stage AI Ranking Engine
+    Two-Stage AI Ranking Engine (Multi-Tenant Secure)
     
     Stage 1: Vector Retrieval (Top-K=5) from Redis Vector DB
     Stage 2: FlashRank Reranking with ms-marco-MiniLM-L-12-v2
     
+    Security: Requires user_id for tenant isolation.
+    
     This function ensures:
-    ✅ Correct 2-stage retrieval pipeline (semantic → rerank)
-    ✅ Uses Redis Vector DB Top-K candidates
-    ✅ FlashRank with ms-marco-MiniLM-L-12-v2 for high-accuracy reranking
-    ✅ Zero hallucination, fully deterministic behavior
+    - Correct 2-stage retrieval pipeline (semantic -> rerank)
+    - Uses Redis Vector DB Top-K candidates
+    - FlashRank with ms-marco-MiniLM-L-12-v2 for high-accuracy reranking
+    - Zero hallucination, fully deterministic behavior
+    - Multi-tenant isolation via user_id filtering
     
     Args:
         user_query: The search query from the user
         top_k: Number of candidates to retrieve in Stage 1 (default: 5)
         include_stage1_results: Whether to include Stage 1 results in output
+        user_id: User ID for multi-tenant isolation (REQUIRED for security)
     
     Returns:
         JSON-ready dictionary with query and ranked_results
     """
-    logger.info(f"[Ranking Engine] Starting two-stage retrieval for: '{user_query}'")
+    logger.info(f"[Ranking Engine] Starting two-stage retrieval for: '{user_query}' (user_id={user_id})")
     
-    # Stage 1: Vector Retrieval
-    stage1_candidates = stage1_vector_retrieval(user_query, top_k=top_k)
+    # Stage 1: Vector Retrieval (with user_id filter for security)
+    stage1_candidates = stage1_vector_retrieval(user_query, top_k=top_k, user_id=user_id)
     
     # Stage 2: FlashRank Reranking
     reranked_results = stage2_flashrank_rerank(user_query, stage1_candidates)
     
-    # Build final output
+    # Build final output with complete JSON for best result
     output = {
         "query": user_query,
+        "best_result": reranked_results[0] if reranked_results else None,  # Complete JSON of best match
         "ranked_results": [
             {
                 "rank": result["rank"],
                 "score": result["score"],
-                "text": result["text"]
+                "text": result["text"],
+                "api": result.get("api", ""),
+                "endpoint": result.get("endpoint", ""),
+                "method": result.get("method", ""),
+                "scenario_type": result.get("scenario_type", ""),
+                "test_category": result.get("test_category", ""),
+                "notes": result.get("notes", ""),
+                "vector_score": result.get("vector_score", 0.0)
             }
             for result in reranked_results
         ]
@@ -325,24 +416,28 @@ def rank_query(
 
 def rank_query_detailed(
     user_query: str, 
-    top_k: int = DEFAULT_TOP_K
+    top_k: int = DEFAULT_TOP_K,
+    user_id: str = None
 ) -> Dict[str, Any]:
     """
-    Detailed two-stage ranking with full metadata.
+    Detailed two-stage ranking with full metadata (Multi-Tenant Secure)
     
     Returns both Stage 1 and Stage 2 results with all metadata.
+    
+    Security: Requires user_id for tenant isolation.
     
     Args:
         user_query: The search query from the user
         top_k: Number of candidates to retrieve in Stage 1 (default: 5)
+        user_id: User ID for multi-tenant isolation (REQUIRED for security)
     
     Returns:
         Dictionary with query, stage1_results, and ranked_results
     """
-    logger.info(f"[Ranking Engine Detailed] Starting for: '{user_query}'")
+    logger.info(f"[Ranking Engine Detailed] Starting for: '{user_query}' (user_id={user_id})")
     
-    # Stage 1: Vector Retrieval
-    stage1_candidates = stage1_vector_retrieval(user_query, top_k=top_k)
+    # Stage 1: Vector Retrieval (with user_id filter for security)
+    stage1_candidates = stage1_vector_retrieval(user_query, top_k=top_k, user_id=user_id)
     
     # Stage 2: FlashRank Reranking
     reranked_results = stage2_flashrank_rerank(user_query, stage1_candidates)
@@ -355,7 +450,8 @@ def rank_query_detailed(
                 "vector_score": _safe_float(c["vector_score"]),
                 "text": c["text"],
                 "api": c["api"],
-                "endpoint": c["endpoint"]
+                "endpoint": c["endpoint"],
+                "method": c.get("method", "POST")
             }
             for c in stage1_candidates
         ],
@@ -365,9 +461,7 @@ def rank_query_detailed(
     }
 
 
-# ===============================================================
-# UTILITY FUNCTIONS
-# ===============================================================
+# --- Utility Functions ---
 def _safe_float(value: Any, default: float = 0.0) -> float:
     """
     Safely convert a value to a JSON-compliant float.

@@ -1,7 +1,10 @@
+# Backend\app\services\embedding_service.py
+
+
 """
 Enhanced Embedding Service - Automatic embeddings after dataset generation using Ollama
 
-🎯 Features:
+Features:
 - Automatic embedding after CSV generation
 - Multi-tenant separation: embedding:{user_id}:{template_id}:{csv_row_id}
 - Ollama-based embedding models (384/768/1024 dimensions)
@@ -10,7 +13,7 @@ Enhanced Embedding Service - Automatic embeddings after dataset generation using
 - User settings integration
 - CPU-only, no GPU required
 
-🔒 KEY DESIGN: ONE EMBEDDING MODEL PER DATASET
+Key Design: One Embedding Model Per Dataset
 - Once embedded, a dataset is locked to that model
 - Search with different model returns MODEL_MISMATCH error
 - Re-embedding requires explicit user action via /reembed endpoint
@@ -27,18 +30,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import numpy as np
 
-from celery import shared_task
 from app.core.logger import logger
 from app.core.postgres import get_db
 from app.models.database_models import Template, Metadata, UserSettings, User, Dataset, CSVData
 from app.services.redis_vector_service import RedisVectorService
 from app.services.ollama_embedding_service import get_ollama_service
 from app.core.models_config import get_embedding_model_info, DEFAULT_EMBEDDING_MODEL
-from app.schemas.embedding_schemas import (
+from app.models.schemas.embedding_schemas import (
     ModelMismatchError,
     EmbeddingStatus,
     ErrorCode,
 )
+
+
+def escape_redis_tag(value: str) -> str:
+    """Escape special characters in Redis TAG field values (like hyphens in UUIDs)"""
+    if value is None:
+        return value
+    return str(value).replace('-', '\\-')
 
 
 class EnhancedEmbeddingService:
@@ -55,10 +64,12 @@ class EnhancedEmbeddingService:
     def __init__(self):
         self.redis_service = RedisVectorService()
         self.ollama_service = get_ollama_service()
+        # LEGACY: Dimension-based indexes - bypasses model governance
+        # For new development, use multi_model_embedding_service.py
         self.index_mapping = {
-            384: "embeddings_384",
-            768: "embeddings_768",
-            1024: "embeddings_1024"
+            384: "embeddings_384",   # DEPRECATED: Use idx_vectors_{model_id}
+            768: "embeddings_768",   # DEPRECATED: Use idx_vectors_{model_id}
+            1024: "embeddings_1024"  # DEPRECATED: Use idx_vectors_{model_id}
         }
     
     def _get_user_embedding_model(self, db: Session, user_id: uuid.UUID) -> tuple[str, int]:
@@ -80,7 +91,7 @@ class EnhancedEmbeddingService:
             model_info = get_embedding_model_info(model_id)
             dimension = model_info.dimension
         
-        logger.info(f"🎯 Using Ollama model: {model_id} (dimension={dimension})")
+        logger.info(f"Using Ollama model: {model_id} (dimension={dimension})")
         return model_id, dimension
     
     async def _get_user_embedding_model_async(self, db: AsyncSession, user_id: uuid.UUID) -> tuple[str, int]:
@@ -103,7 +114,7 @@ class EnhancedEmbeddingService:
             model_info = get_embedding_model_info(model_id)
             dimension = model_info.dimension
         
-        logger.info(f"🎯 Using Ollama model: {model_id} (dimension={dimension})")
+        logger.info(f"Using Ollama model: {model_id} (dimension={dimension})")
         return model_id, dimension
     
     def _generate_redis_key(
@@ -123,34 +134,35 @@ class EnhancedEmbeddingService:
         """
         Ensure HNSW index exists for the given dimension
         
-        Creates Redis Search index if not exists:
-        - 384-dim → embeddings_384
-        - 768-dim → embeddings_768
-        - 1536-dim → embeddings_1536
+        Creates dimension-based Redis Search index (embeddings_384, embeddings_768, etc.).
+        Each embedding model dimension gets its own index.
         """
-        index_name = self.index_mapping.get(dimension)
-        if not index_name:
-            raise ValueError(f"Unsupported dimension: {dimension}. Supported: 384, 768, 1024, 1536")
+        index_name = self.index_mapping.get(dimension, f"embeddings_{dimension}")
         
         try:
             # Check if index exists
             self.redis_service.redis_client.ft(index_name).info()
-            logger.info(f"✅ HNSW index already exists: {index_name}")
+            logger.info(f"HNSW index already exists: {index_name}")
         except Exception:
             # Create HNSW index
-            logger.info(f"🔨 Creating HNSW index: {index_name} (dimension={dimension})")
+            logger.info(f"Creating HNSW index: {index_name} (dimension={dimension})")
             
-            from redis.commands.search.field import VectorField, TextField, NumericField
+            from redis.commands.search.field import VectorField, TextField, NumericField, TagField
             from redis.commands.search.indexDefinition import IndexDefinition, IndexType
             
             schema = (
-                TextField("$.user_id", as_name="user_id"),
-                TextField("$.template_id", as_name="template_id"),
+                TagField("$.user_id", as_name="user_id"),
+                TagField("$.t_id", as_name="t_id"),
                 NumericField("$.csv_row_id", as_name="csv_row_id"),
                 TextField("$.query", as_name="query"),
                 TextField("$.api", as_name="api"),
+                TextField("$.endpoint", as_name="endpoint"),
+                TextField("$.method", as_name="method"),
+                TextField("$.intent_type", as_name="intent_type"),
                 TextField("$.scenario_type", as_name="scenario_type"),
                 TextField("$.test_category", as_name="test_category"),
+                NumericField("$.confidence_score", as_name="confidence_score"),
+                TextField("$.notes", as_name="notes"),
                 VectorField(
                     "$.vector",
                     "HNSW",
@@ -172,7 +184,7 @@ class EnhancedEmbeddingService:
                 schema,
                 definition=definition
             )
-            logger.info(f"✅ Created HNSW index: {index_name}")
+            logger.info(f"Created HNSW index: {index_name}")
     
     async def auto_embed_generated_dataset(
         self,
@@ -200,27 +212,38 @@ class EnhancedEmbeddingService:
         task_id = str(uuid.uuid4())
         
         try:
-            logger.info(f"🚀 Starting automatic embedding with Ollama for: {csv_path}", extra={"user_id": user_id})
+            logger.info(f"Starting automatic embedding with Ollama for: {csv_path}", extra={"user_id": user_id})
             
             # Check if Ollama is available
             if not await self.ollama_service.check_ollama_available():
-                raise RuntimeError("❌ Ollama service not available at http://localhost:11434. Please start Ollama first.")
+                raise RuntimeError("Ollama service not available at http://localhost:11434. Please start Ollama first.")
             
             # Get user's preferred embedding model
             model_id, dimension = self._get_user_embedding_model(db, user_id)
-            logger.info(f"🎯 Using embedding model: {model_id}", extra={"user_id": user_id})
+            logger.info(f"Using embedding model: {model_id}", extra={"user_id": user_id})
             
             # Ensure HNSW index exists for this dimension
             self._ensure_hnsw_index(dimension)
             
+            # Fetch template details from PostgreSQL
+            template = db.query(Template).filter(
+                Template.t_id == template_id,
+                Template.u_id == user_id  # Multi-tenant security
+            ).first()
+            
+            template_api_name = template.api_name if template else ""
+            template_endpoint = template.endpoint if template else ""
+            template_method = template.method if template else "POST"
+            logger.info(f"Template: {template_api_name} ({template_method} {template_endpoint})", extra={"user_id": user_id})
+            
             # Read CSV
-            logger.info(f"📖 Reading CSV dataset...", extra={"user_id": user_id})
+            logger.info(f"Reading CSV dataset...", extra={"user_id": user_id})
             df = pd.read_csv(csv_path)
             total_rows = len(df)
-            logger.info(f"📊 Found {total_rows} rows to embed", extra={"user_id": user_id})
+            logger.info(f"Found {total_rows} rows to embed", extra={"user_id": user_id})
             
             if total_rows == 0:
-                logger.warning("⚠️ CSV is empty, skipping embedding", extra={"user_id": user_id})
+                logger.warning("CSV is empty, skipping embedding", extra={"user_id": user_id})
                 return task_id
             
             # Generate Redis namespace for metadata tracking
@@ -246,7 +269,7 @@ class EnhancedEmbeddingService:
                     texts.append(text)
                 
                 # Generate embeddings using Ollama
-                logger.info(f"🧠 Embedding batch {i//batch_size + 1}/{(total_rows + batch_size - 1)//batch_size}...", extra={"user_id": user_id})
+                logger.info(f"Embedding batch {i//batch_size + 1}/{(total_rows + batch_size - 1)//batch_size}...", extra={"user_id": user_id})
                 embeddings = await self.ollama_service.generate_embeddings_batch(
                     model_name=model_id,
                     texts=texts,
@@ -256,7 +279,7 @@ class EnhancedEmbeddingService:
                 # Store in Redis with JSON format
                 for j, (idx, row) in enumerate(batch.iterrows()):
                     if embeddings[j] is None:
-                        logger.warning(f"⚠️ Failed to embed row {idx}, skipping", extra={"user_id": user_id})
+                        logger.warning(f"Failed to embed row {idx}, skipping", extra={"user_id": user_id})
                         continue
                     
                     csv_row_id = int(idx)
@@ -264,16 +287,19 @@ class EnhancedEmbeddingService:
                     vector = embeddings[j]  # Already a list from Ollama
                     
                     # Store as JSON document for RedisSearch
+                    # Use template values from PostgreSQL, CSV values where available
                     document = {
                         "user_id": str(user_id),
-                        "template_id": str(template_id),
+                        "t_id": str(template_id),
                         "csv_row_id": csv_row_id,
                         "query": row.get('query', ''),
-                        "api": row.get('api', ''),
-                        "endpoint": row.get('endpoint', ''),
-                        "method": row.get('method', ''),
-                        "scenario_type": row.get('scenario_type', 'valid'),
+                        "api": template_api_name,  # From PostgreSQL template
+                        "endpoint": template_endpoint,  # From PostgreSQL template
+                        "method": template_method,  # From PostgreSQL template
+                        "intent_type": row.get('intent_type', ''),  # From CSV
+                        "scenario_type": row.get('scenario_type', row.get('intent_type', 'valid')),  # Fallback
                         "test_category": row.get('test_category', 'valid_flow'),
+                        "confidence_score": row.get('confidence_score', 0.5),  # From CSV
                         "notes": row.get('notes', ''),
                         "vector": vector,
                         "dimension": dimension,
@@ -285,7 +311,7 @@ class EnhancedEmbeddingService:
                     self.redis_service.redis_client.json().set(redis_key, '$', document)
                     embedded_count += 1
                 
-                logger.info(f"✅ Embedded {i + len(batch)}/{total_rows} rows", extra={"user_id": user_id})
+                logger.info(f"Embedded {i + len(batch)}/{total_rows} rows", extra={"user_id": user_id})
             
             # Update template metadata with embedding info
             metadata = db.query(Metadata).filter(
@@ -313,17 +339,17 @@ class EnhancedEmbeddingService:
                     metadata.remarks['embedding_info'] = embedding_metadata
                 
                 db.commit()
-                logger.info(f"💾 Updated template metadata with embedding info", extra={"user_id": user_id})
+                logger.info(f"Updated template metadata with embedding info", extra={"user_id": user_id})
             
-            logger.info(f"✅ Automatic embedding completed: {embedded_count} vectors stored", extra={"user_id": user_id})
-            logger.info(f"🔑 Redis namespace: {redis_namespace}", extra={"user_id": user_id})
-            logger.info(f"📐 Dimension: {dimension}, Index: {self.index_mapping[dimension]}", extra={"user_id": user_id})
-            logger.info(f"🤖 Ollama model: {model_id}", extra={"user_id": user_id})
+            logger.info(f"Automatic embedding completed: {embedded_count} vectors stored", extra={"user_id": user_id})
+            logger.info(f"Redis namespace: {redis_namespace}", extra={"user_id": user_id})
+            logger.info(f"Dimension: {dimension}, Index: {self.index_mapping[dimension]}", extra={"user_id": user_id})
+            logger.info(f"Ollama model: {model_id}", extra={"user_id": user_id})
             
             return task_id
         
         except Exception as e:
-            logger.error(f"❌ Error during automatic embedding: {e}", exc_info=True)
+            logger.error(f"Error during automatic embedding: {e}", exc_info=True)
             raise
     
     async def search_similar_test_cases(
@@ -339,7 +365,7 @@ class EnhancedEmbeddingService:
         """
         Search for similar test cases using vector similarity with Ollama
         
-        🔒 ENFORCES ONE MODEL PER DATASET RULE:
+        ENFORCES ONE MODEL PER DATASET RULE:
         - Validates that search model matches dataset's embedded model
         - Returns MODEL_MISMATCH structured error if mismatch detected
         
@@ -405,7 +431,7 @@ class EnhancedEmbeddingService:
             # 5. ENFORCE MODEL MATCH - Return structured MODEL_MISMATCH error
             if embedded_model_id != current_model_id:
                 logger.warning(
-                    f"❌ MODEL_MISMATCH: Dataset {dataset_id} embedded with '{embedded_model_id}', "
+                    f"MODEL_MISMATCH: Dataset {dataset_id} embedded with '{embedded_model_id}', "
                     f"but user wants to search with '{current_model_id}'"
                 )
                 
@@ -428,11 +454,11 @@ class EnhancedEmbeddingService:
                 return mismatch_error.model_dump()
             
             # 6. Proceed with search using the MATCHING model
-            logger.info(f"🔍 Generating query embedding with Ollama ({current_model_id})")
+            logger.info(f"Generating query embedding with Ollama ({current_model_id})")
             query_vector = await self.ollama_service.generate_embedding(current_model_id, query)
             
             if not query_vector:
-                logger.error("❌ Failed to generate query embedding")
+                logger.error("Failed to generate query embedding")
                 return {"error": "EMBEDDING_FAILED", "message": "Failed to generate query embedding", "results": []}
             
             # Get HNSW index name
@@ -446,7 +472,9 @@ class EnhancedEmbeddingService:
             
             # Filter by user_id and template_id (from dataset)
             template_id = dataset.t_id
-            base_query = f"@user_id:{{{user_id}}} @template_id:{{{template_id}}}"
+            escaped_user_id = escape_redis_tag(str(user_id))
+            escaped_template_id = escape_redis_tag(str(template_id))
+            base_query = f"@user_id:{{{escaped_user_id}}} @template_id:{{{escaped_template_id}}}"
             
             # Add optional filters
             if filter_scenario_type:
@@ -489,7 +517,7 @@ class EnhancedEmbeddingService:
                     "similarity_score": 1 - float(getattr(doc, 'score', 1))  # Convert distance to similarity
                 })
             
-            logger.info(f"🔍 Found {len(similar_cases)} similar test cases in {search_time_ms}ms")
+            logger.info(f"Found {len(similar_cases)} similar test cases in {search_time_ms}ms")
             
             return {
                 "success": True,
@@ -504,7 +532,7 @@ class EnhancedEmbeddingService:
             }
         
         except Exception as e:
-            logger.error(f"❌ Error searching similar test cases: {e}", exc_info=True)
+            logger.error(f"Error searching similar test cases: {e}", exc_info=True)
             return {"error": "SEARCH_ERROR", "message": str(e), "results": []}
     
     def get_embedding_stats(
@@ -543,7 +571,7 @@ class EnhancedEmbeddingService:
             }
         
         except Exception as e:
-            logger.error(f"❌ Error getting embedding stats: {e}")
+            logger.error(f"Error getting embedding stats: {e}")
             return {"error": str(e)}
     
     async def reembed_dataset(
@@ -558,11 +586,11 @@ class EnhancedEmbeddingService:
         """
         Re-embed a dataset with a new model
         
-        🔒 This will:
+        This will:
         1. Validate the dataset exists and user has access
         2. Delete ALL existing embeddings for the dataset
         3. Update dataset's embedding_model field
-        4. Dispatch chunked Celery tasks for embedding
+        4. Run embedding in background thread
         
         Args:
             user_id: User ID
@@ -570,7 +598,7 @@ class EnhancedEmbeddingService:
             db: Database session (AsyncSession)
             new_model: New embedding model (uses user's default if None)
             force: Force re-embed even if same model
-            chunk_size: Rows per Celery task chunk
+            chunk_size: Rows per embedding batch
         
         Returns:
             Dict with task info or error
@@ -598,7 +626,7 @@ class EnhancedEmbeddingService:
                     "error": ErrorCode.EMBEDDING_IN_PROGRESS,
                     "message": f"Embedding is already in progress ({dataset.embedding_progress}%)",
                     "success": False,
-                    "celery_task_id": dataset.celery_task_id
+                    "task_id": dataset.task_id
                 }
             
             # 3. Get new model info
@@ -627,13 +655,13 @@ class EnhancedEmbeddingService:
                 }
             
             # 5. Delete existing Redis embeddings
-            logger.info(f"🗑️ Deleting existing embeddings for dataset {dataset_id}")
+            logger.info(f"Deleting existing embeddings for dataset {dataset_id}")
             pattern = f"embedding:{user_id}:{dataset.t_id}:*"
             deleted_count = 0
             for key in self.redis_service.redis_client.scan_iter(match=pattern, count=100):
                 self.redis_service.redis_client.delete(key)
                 deleted_count += 1
-            logger.info(f"🗑️ Deleted {deleted_count} existing embeddings")
+            logger.info(f"Deleted {deleted_count} existing embeddings")
             
             # 6. Update dataset status
             dataset.embedding_model = model_id
@@ -646,26 +674,34 @@ class EnhancedEmbeddingService:
             dataset.embedding_error = None
             await db.commit()
             
-            # 7. Dispatch Celery task
-            from app.services.embedding_service import reembed_dataset_async
+            # 7. Generate a task ID for tracking
+            import secrets
+            task_id = f"embed_{secrets.token_hex(8)}"
             
-            celery_task = reembed_dataset_async.delay(
-                dataset_id=str(dataset_id),
-                user_id=str(user_id),
-                model_id=model_id,
-                dimension=dimension,
-                chunk_size=chunk_size,
-                csv_path=dataset.csv_path
-            )
-            
-            # 8. Store Celery task ID
-            dataset.celery_task_id = celery_task.id
+            # 8. Store task ID and start background embedding
+            dataset.task_id = task_id
             await db.commit()
             
-            # 9. Estimate time
+            # 9. Start background embedding in a separate thread
+            import threading
+            embed_thread = threading.Thread(
+                target=reembed_dataset_sync,
+                args=(
+                    str(dataset_id),
+                    str(user_id),
+                    model_id,
+                    dimension,
+                    chunk_size,
+                    dataset.csv_path
+                ),
+                daemon=True
+            )
+            embed_thread.start()
+            
+            # 10. Estimate time
             estimated_seconds = (dataset.total_rows / chunk_size) * 5  # ~5 seconds per chunk
             
-            logger.info(f"🚀 Started re-embedding: task_id={celery_task.id}, model={model_id}")
+            logger.info(f"Started re-embedding: task_id={task_id}, model={model_id}")
             
             return {
                 "success": True,
@@ -673,7 +709,7 @@ class EnhancedEmbeddingService:
                 "dataset_id": str(dataset_id),
                 "new_model": model_id,
                 "new_dimension": dimension,
-                "celery_task_id": celery_task.id,
+                "task_id": task_id,
                 "total_rows": dataset.total_rows,
                 "estimated_time_seconds": int(estimated_seconds),
                 "warnings": [
@@ -682,7 +718,7 @@ class EnhancedEmbeddingService:
             }
         
         except Exception as e:
-            logger.error(f"❌ Error starting re-embed: {e}", exc_info=True)
+            logger.error(f"Error starting re-embed: {e}", exc_info=True)
             return {"error": "REEMBED_ERROR", "message": str(e), "success": False}
     
     async def get_dataset_embedding_status(
@@ -733,11 +769,11 @@ class EnhancedEmbeddingService:
                 "completed_at": dataset.embedding_completed_at.isoformat() if dataset.embedding_completed_at else None,
                 "estimated_completion": estimated_completion,
                 "error_message": dataset.embedding_error,
-                "celery_task_id": dataset.celery_task_id
+                "task_id": dataset.task_id
             }
         
         except Exception as e:
-            logger.error(f"❌ Error getting embedding status: {e}")
+            logger.error(f"Error getting embedding status: {e}")
             return {"error": str(e)}
 
 
@@ -753,64 +789,156 @@ def get_enhanced_embedding_service() -> EnhancedEmbeddingService:
     return _enhanced_embedding_service
 
 
-# Celery task wrapper - defined separately to avoid import issues in worker
-# Note: This task is defined but not imported in worker.py due to async DB dependencies
-# Use the EnhancedEmbeddingService directly for synchronous operations
+# Background embedding task - runs synchronously in FastAPI BackgroundTask
 def create_embedding_task(csv_path: str, user_id: str, template_id: str, model_name: str = None):
     """
-    Celery task wrapper for embedding creation
+    Background task for embedding creation
     
-    Executes the async embedding service within a synchronous Celery worker
-    by creating a temporary sync DB session and using asyncio.run().
+    Creates embeddings for a CSV dataset using Ollama embedding models.
+    Runs synchronously within a FastAPI BackgroundTask context.
     """
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from app.core.config import settings
+    from app.services.ollama_embedding_service import get_ollama_service
+    from app.services.redis_vector_service import RedisVectorService
     
     try:
-        logger.info(f"🚀 Starting background embedding task: {template_id}")
+        logger.info(f"Starting background embedding task: {template_id}")
         
         # 1. Create Synchronous DB Connection
-        # Convert async URL to sync URL (remove +asyncpg)
         sync_db_url = settings.database_url.replace("+asyncpg", "")
         engine = create_engine(sync_db_url)
         SyncSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
         
-        # 2. Run Async Service in Sync Context
-        async def run_async_embedding():
-            # Create session
-            db = SyncSessionLocal()
+        # 2. Parse and validate IDs
+        try:
+            parsed_user_id = uuid.UUID(user_id)
+        except (ValueError, TypeError):
+            logger.error(f"Invalid user_id (not a UUID): {user_id}")
+            return {
+                "status": "failed",
+                "message": f"Invalid user_id: {user_id}. Must be a valid UUID.",
+                "csv_path": csv_path,
+                "user_id": user_id,
+                "template_id": template_id
+            }
+        
+        try:
+            parsed_template_id = uuid.UUID(template_id)
+        except (ValueError, TypeError):
+            parsed_template_id = uuid.uuid5(uuid.NAMESPACE_DNS, str(template_id))
+            logger.info(f"Non-UUID template_id '{template_id}' converted to UUID: {parsed_template_id}")
+        
+        # 3. Run embedding synchronously using ollama service
+        # Read CSV
+        df = pd.read_csv(csv_path)
+        if len(df) == 0:
+            logger.warning("⚠️ CSV is empty, nothing to embed")
+            return {"status": "completed", "task_id": f"embed_empty_{template_id}", "embedded_rows": 0}
+        
+        # Get embedding model
+        model_id = model_name or "nomic-embed-text"
+        dimension = 768  # nomic-embed-text dimension
+        
+        # Initialize services
+        redis_service = RedisVectorService()
+        ollama_service = get_ollama_service()
+        
+        # Generate task ID
+        import secrets
+        task_id = f"embed_{secrets.token_hex(8)}"
+        
+        # Prepare texts from CSV rows
+        texts = []
+        for _, row in df.iterrows():
+            query = row.get('query', '')
+            api = row.get('api', '')
+            notes = row.get('notes', '')
+            text = f"{query} {api} {notes}".strip() or f"API test case"
+            texts.append(text)
+        
+        # Generate embeddings using PARALLEL async HTTP calls for speed
+        import httpx
+        import asyncio
+        
+        embedded_count = 0
+        batch_size = 50  # Larger batches for faster embedding
+        
+        logger.info(f"Embedding {len(texts)} rows in batches of {batch_size} (PARALLEL)...")
+        
+        async def embed_single(client: httpx.AsyncClient, text: str, model: str):
+            """Embed a single text asynchronously"""
             try:
-                service = get_enhanced_embedding_service()
-                
-                # Call the service method
-                # Note: The service method uses db.query (sync) but also await (async)
-                # This hybrid approach works because we are in a single-threaded async loop
-                task_id = await service.auto_embed_generated_dataset(
-                    user_id=uuid.UUID(user_id),
-                    template_id=uuid.UUID(template_id),
-                    csv_path=csv_path,
-                    db=db
+                response = await client.post(
+                    "http://localhost:11434/api/embeddings",
+                    json={"model": model, "prompt": text},
+                    timeout=60.0
                 )
-                return task_id
-            finally:
-                db.close()
+                if response.status_code == 200:
+                    return response.json().get("embedding", [])
+            except Exception as e:
+                logger.debug(f"Embedding failed: {e}")
+            return None
         
-        # Execute async function
-        result_task_id = asyncio.run(run_async_embedding())
+        async def embed_batch_parallel(batch_texts: list, model: str):
+            """Embed all texts in batch in parallel"""
+            async with httpx.AsyncClient() as client:
+                tasks = [embed_single(client, text, model) for text in batch_texts]
+                return await asyncio.gather(*tasks)
         
-        logger.info(f"✅ Background embedding task completed: {result_task_id}")
+        for i in range(0, len(texts), batch_size):
+            batch_texts = texts[i:i + batch_size]
+            
+            # Run parallel embedding
+            batch_embeddings = asyncio.run(embed_batch_parallel(batch_texts, model_id))
+            
+            # Store in Redis
+            for j, embedding in enumerate(batch_embeddings):
+                if embedding is None:
+                    continue
+                    
+                row_idx = i + j
+                row = df.iloc[row_idx]
+                csv_row_id = row_idx
+                
+                redis_key = f"embedding:{user_id}:{template_id}:{csv_row_id}"
+                
+                document = {
+                    "user_id": str(user_id),
+                    "t_id": str(template_id),  # Changed from template_id to t_id to match search
+                    "csv_row_id": csv_row_id,
+                    "query": row.get('query', ''),
+                    "api": row.get('api', ''),
+                    "endpoint": row.get('endpoint', ''),
+                    "method": row.get('method', ''),
+                    "scenario_type": row.get('scenario_type', 'valid'),
+                    "test_category": row.get('test_category', 'valid_flow'),
+                    "notes": row.get('notes', ''),
+                    "vector": embedding,
+                    "dimension": len(embedding),
+                    "model": model_id,
+                    "embedded_at": datetime.utcnow().isoformat()
+                }
+                
+                redis_service.redis_client.json().set(redis_key, '$', document)
+                embedded_count += 1
+            
+            logger.info(f"Embedded {embedded_count}/{len(texts)} rows")
+        
+        logger.info(f"Background embedding task completed: {embedded_count} rows embedded")
         
         return {
             "status": "completed",
-            "task_id": result_task_id,
+            "task_id": task_id,
             "csv_path": csv_path,
             "user_id": user_id,
-            "template_id": template_id
+            "template_id": template_id,
+            "embedded_rows": embedded_count
         }
         
     except Exception as e:
-        logger.error(f"❌ Embedding creation failed: {e}", exc_info=True)
+        logger.error(f"Embedding creation failed: {e}", exc_info=True)
         return {
             "status": "failed",
             "message": str(e),
@@ -820,16 +948,9 @@ def create_embedding_task(csv_path: str, user_id: str, template_id: str, model_n
         }
 
 
-# Register with Celery if being used standalone
-try:
-    create_embedding_async = shared_task(name="app.services.embedding_service.create_embedding_async")(create_embedding_task)
-except Exception as e:
-    logger.warning(f"Could not register Celery task: {e}")
+# ============= BACKGROUND RE-EMBEDDING TASK =============
 
-
-# ============= ENHANCED RE-EMBEDDING CELERY TASK =============
-
-def reembed_dataset_task(
+def reembed_dataset_sync(
     dataset_id: str,
     user_id: str,
     model_id: str,
@@ -838,9 +959,9 @@ def reembed_dataset_task(
     csv_path: str
 ):
     """
-    Celery task for re-embedding a dataset with chunking and progress tracking
+    Background task for re-embedding a dataset with chunking and progress tracking
     
-    🎯 Features:
+    Features:
     - Processes in chunks (50-200 rows per chunk)
     - Updates progress (0-100%) after each chunk
     - Error recovery: failed rows are tracked, job continues
@@ -862,7 +983,7 @@ def reembed_dataset_task(
     from app.services.ollama_embedding_service import get_ollama_service
     
     try:
-        logger.info(f"🚀 Starting re-embedding task: dataset={dataset_id}, model={model_id}")
+        logger.info(f"Starting re-embedding task: dataset={dataset_id}, model={model_id}")
         
         # 1. Create Synchronous DB Connection
         sync_db_url = settings.database_url.replace("+asyncpg", "")
@@ -878,7 +999,7 @@ def reembed_dataset_task(
         total_rows = len(df)
         
         if total_rows == 0:
-            logger.warning(f"⚠️ CSV is empty, nothing to embed")
+            logger.warning(f"CSV is empty, nothing to embed")
             # Update status to completed with 0 rows
             db = SyncSessionLocal()
             try:
@@ -919,7 +1040,7 @@ def reembed_dataset_task(
             )
             definition = IndexDefinition(prefix=["embedding:"], index_type=IndexType.JSON)
             redis_service.redis_client.ft(index_name).create_index(schema, definition=definition)
-            logger.info(f"✅ Created HNSW index: {index_name}")
+            logger.info(f"Created HNSW index: {index_name}")
         
         # 5. Get template_id from dataset
         db = SyncSessionLocal()
@@ -951,7 +1072,7 @@ def reembed_dataset_task(
             end_idx = min(start_idx + chunk_size, total_rows)
             batch = df.iloc[start_idx:end_idx]
             
-            logger.info(f"📦 Processing chunk {chunk_idx + 1}/{num_chunks} (rows {start_idx}-{end_idx})")
+            logger.info(f"Processing chunk {chunk_idx + 1}/{num_chunks} (rows {start_idx}-{end_idx})")
             
             # Prepare texts
             texts = []
@@ -966,7 +1087,7 @@ def reembed_dataset_task(
             try:
                 embeddings = asyncio.run(embed_batch(texts))
             except Exception as e:
-                logger.error(f"❌ Embedding batch failed: {e}")
+                logger.error(f"Embedding batch failed: {e}")
                 # Track all rows in this batch as failed
                 for idx in range(start_idx, end_idx):
                     failed_count += 1
@@ -985,7 +1106,7 @@ def reembed_dataset_task(
                 
                 document = {
                     "user_id": user_id,
-                    "template_id": template_id,
+                    "t_id": template_id,  # Changed from template_id to t_id to match search
                     "csv_row_id": csv_row_id,
                     "query": row.get('query', ''),
                     "api": row.get('api', ''),
@@ -1013,7 +1134,7 @@ def reembed_dataset_task(
                     dataset.embedding_progress = progress
                     dataset.embedded_rows = embedded_count
                     db.commit()
-                    logger.info(f"📊 Progress: {progress}% ({embedded_count}/{total_rows} rows)")
+                    logger.info(f"Progress: {progress}% ({embedded_count}/{total_rows} rows)")
             finally:
                 db.close()
         
@@ -1034,7 +1155,7 @@ def reembed_dataset_task(
         finally:
             db.close()
         
-        logger.info(f"✅ Re-embedding completed: {embedded_count} embedded, {failed_count} failed")
+        logger.info(f"Re-embedding completed: {embedded_count} embedded, {failed_count} failed")
         
         return {
             "status": "completed",
@@ -1047,7 +1168,7 @@ def reembed_dataset_task(
         }
     
     except Exception as e:
-        logger.error(f"❌ Re-embedding task failed: {e}", exc_info=True)
+        logger.error(f"Re-embedding task failed: {e}", exc_info=True)
         
         # Update dataset status to failed
         try:
@@ -1065,22 +1186,10 @@ def reembed_dataset_task(
             finally:
                 db.close()
         except Exception as db_error:
-            logger.error(f"❌ Failed to update dataset status: {db_error}")
+            logger.error(f"Failed to update dataset status: {db_error}")
         
         return {
             "status": "failed",
             "dataset_id": dataset_id,
             "error": str(e)
         }
-
-
-# Register re-embedding Celery task
-try:
-    reembed_dataset_async = shared_task(
-        name="app.services.embedding_service.reembed_dataset_async",
-        bind=True,
-        max_retries=3,
-        default_retry_delay=60
-    )(lambda self, **kwargs: reembed_dataset_task(**kwargs))
-except Exception as e:
-    logger.warning(f"Could not register reembed Celery task: {e}")
