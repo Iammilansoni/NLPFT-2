@@ -39,11 +39,11 @@ class OllamaEmbeddingModel:
                     model_dims = {
                         "nomic-embed-text": 768,
                         "all-minilm": 384,
-                        "bge-large": 1024,
                         "mxbai-embed-large": 1024
                     }
                     self._dimension = model_dims.get(self.model_name, 768)
-            except:
+            except Exception as e:
+                logger.debug(f"Could not get dimension from test embedding: {e}")
                 self._dimension = 768  # Default fallback
         return self._dimension
     
