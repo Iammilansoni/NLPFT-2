@@ -4,7 +4,10 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env from Backend directory (where this config file resides)
+_backend_dir = Path(__file__).resolve().parent.parent.parent  # app/core/config.py -> Backend/
+_env_file = _backend_dir / ".env"
+load_dotenv(_env_file)
 
 class Settings:
     app_name = "NLPForge API"
@@ -99,6 +102,9 @@ BATCH_SIZE = int(os.getenv("BATCH_SIZE", "32"))
 # Ollama Configuration (LOCAL LLM for dataset generation)
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b-instruct-q4_K_M")  # Llama 3.1 8B Instruct (high quality, non-Chinese)
+
+# Google Gemini Configuration
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 # Intent detection method: "vector_search" or "pattern_matching"
 INTENT_DETECTION_METHOD = os.getenv("INTENT_DETECTION_METHOD", "vector_search")

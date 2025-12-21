@@ -20,32 +20,28 @@ from typing import Dict, List, Optional, Any, Tuple
 from uuid import UUID
 import pandas as pd
 
-from app.core.config import settings, DATASETS_DIR, OLLAMA_HOST, OLLAMA_MODEL
+from app.core.config import settings, DATASETS_DIR, GEMINI_API_KEY
 from app.core.logger import logger
 
-# --- Ollama Configuration ---
-# Uses quantized models for fast CPU inference
-_ollama_available = False
-_ollama_host = OLLAMA_HOST
-_ollama_model = OLLAMA_MODEL
+# --- Google Gemini Configuration ---
+# Uses Gemini 2.5 Flash for fast, high-quality generation
+_gemini_available = False
+_gemini_model = "gemini-2.5-flash"
 
 try:
-    import httpx
-    response = httpx.get(f"{_ollama_host}/api/tags", timeout=5.0)
-    if response.status_code == 200:
-        _ollama_available = True
-        available_models = [m.get("name", "") for m in response.json().get("models", [])]
-        logger.info(f"Ollama running at {_ollama_host}")
-        logger.info(f"Available models: {', '.join(available_models[:5])}{'...' if len(available_models) > 5 else ''}")
-        
-        if any(_ollama_model.split(':')[0] in m for m in available_models):
-            logger.info(f"Model available: {_ollama_model}")
-        else:
-            logger.warning(f"Model {_ollama_model} not found. Run: ollama pull {_ollama_model}")
+    import google.generativeai as genai
+    if GEMINI_API_KEY:
+        genai.configure(api_key=GEMINI_API_KEY)
+        _gemini_available = True
+        logger.info(f"Google Gemini API configured successfully")
+        logger.info(f"Using model: {_gemini_model}")
+    else:
+        logger.warning("GEMINI_API_KEY not set. Please add it to your .env file.")
+except ImportError as e:
+    logger.warning(f"google-generativeai package not installed: {e}")
+    logger.warning("Install with: pip install google-generativeai")
 except Exception as e:
-    logger.warning(f"Ollama not available at {_ollama_host}: {e}")
-    logger.warning("Install Ollama: https://ollama.ai/download")
-    logger.warning(f"Then run: ollama pull {_ollama_model}")
+    logger.warning(f"Gemini API configuration failed: {e}")
 
 
 class EnterpriseDatasetGenerator:
@@ -69,20 +65,19 @@ class EnterpriseDatasetGenerator:
         self.datasets_dir = datasets_dir
         os.makedirs(datasets_dir, exist_ok=True)
         
-        self.ollama_available = _ollama_available
-        self.ollama_host = _ollama_host
-        self.ollama_model = _ollama_model
+        self.gemini_available = _gemini_available
+        self.gemini_model = _gemini_model
         
-        if self.ollama_available:
-            self.client = "ollama"
-            self.model_name = self.ollama_model
-            self.provider = "ollama"
-            logger.info(f"Using Ollama {self.model_name} for dataset generation (LOCAL CPU)")
+        if self.gemini_available:
+            import google.generativeai as genai
+            self.client = genai.GenerativeModel(self.gemini_model)
+            self.model_name = self.gemini_model
+            self.provider = "gemini"
+            logger.info(f"Using Gemini {self.model_name} for dataset generation")
         else:
             self.client = None
             self.provider = None
-            logger.error("Ollama not available. Install from: https://ollama.ai/download")
-            logger.error(f"Then run: ollama pull {_ollama_model}")
+            logger.error("Gemini API not available. Set GOOGLE_API_KEY in your .env file.")
     
     def _build_system_prompt(
         self,
@@ -512,9 +507,9 @@ Return ONLY the JSON array, nothing else."""
         
         return csv_rows
     
-    async def _call_ollama_api(self, system_prompt: str, user_prompt: str, num_examples: int) -> str:
+    async def _call_gemini_api(self, system_prompt: str, user_prompt: str, num_examples: int) -> str:
         """
-        Call Ollama API with Llama 3.2 Instruct (local CPU inference)
+        Call Gemini API with Gemini 2.5 Flash
         
         Args:
             system_prompt: System instructions
@@ -522,80 +517,61 @@ Return ONLY the JSON array, nothing else."""
             num_examples: Number of test cases
             
         Returns:
-            Response text from Ollama
+            Response text from Gemini
         """
-        import httpx
         import asyncio
         
-        current_model = self.ollama_model
-        max_retries = 2
+        max_retries = 3
         
         for attempt in range(max_retries):
             try:
-                logger.info(f"Calling Ollama {current_model} (attempt {attempt + 1})...")
+                logger.info(f"Calling Gemini {self.gemini_model} (attempt {attempt + 1})...")
                 
-                url = f"{self.ollama_host}/api/chat"
+                # Combine system prompt and user prompt for Gemini
+                full_prompt = f"{system_prompt}\n\n{user_prompt}"
                 
-                payload = {
-                    "model": current_model,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.7,
-                        "top_p": 0.9,
-                        "num_predict": 8192,  
-                    }
+                # Configure generation settings
+                generation_config = {
+                    "temperature": 0.7,
+                    "top_p": 0.9,
+                    "max_output_tokens": 65536,  # Gemini 2.5 Flash max limit
                 }
                 
-                timeout = httpx.Timeout(900.0, connect=10.0) 
+                # Run the synchronous generate_content in a thread pool
+                response = await asyncio.to_thread(
+                    self.client.generate_content,
+                    full_prompt,
+                    generation_config=generation_config
+                )
                 
-                async with httpx.AsyncClient(timeout=timeout) as client:
-                    response = await client.post(url, json=payload)
-                    
-                    if response.status_code != 200:
-                        error_text = response.text
-                        logger.error(f"Ollama returned {response.status_code}: {error_text}")
-                        raise ValueError(f"Ollama API error: {response.status_code}")
-                    
-                    result = response.json()
-                    response_text = result.get("message", {}).get("content", "")
-                    
-                    if not response_text:
-                        raise ValueError("Empty response from Ollama")
-                    
-                    eval_count = result.get("eval_count", 0)
-                    eval_duration = result.get("eval_duration", 0)
-                    if eval_duration > 0:
-                        tokens_per_sec = eval_count / (eval_duration / 1e9)
-                        logger.info(f"Ollama: {eval_count} tokens @ {tokens_per_sec:.1f} tok/s")
-                    
-                    logger.info(f"Ollama response received: {len(response_text)} chars")
-                    return response_text
-                    
-            except httpx.TimeoutException:
-                logger.warning(f"Ollama timeout on {current_model}")
-                if current_model != self.ollama_fallback and attempt == 0:
-                    logger.warning(f"Switching to faster model: {self.ollama_fallback}")
-                    current_model = self.ollama_fallback
-                    continue
+                if not response or not response.text:
+                    raise ValueError("Empty response from Gemini")
+                
+                response_text = response.text
+                logger.info(f"Gemini response received: {len(response_text)} chars")
+                return response_text
                     
             except Exception as e:
                 error_str = str(e).lower()
-                if "model" in error_str and "not found" in error_str:
-                    logger.warning(f"Model {current_model} not found. Try: ollama pull {current_model}")
-                    
-                    if current_model != self.ollama_fallback:
-                        logger.warning(f"Trying fallback model: {self.ollama_fallback}")
-                        current_model = self.ollama_fallback
-                        continue
                 
-                logger.error(f"Ollama API error: {e}")
-                raise ValueError(f"Ollama API failed: {e}")
+                if "quota" in error_str or "rate" in error_str:
+                    logger.warning(f"Gemini rate limit hit, waiting before retry...")
+                    await asyncio.sleep(5 * (attempt + 1))
+                    continue
+                    
+                if "api_key" in error_str or "authentication" in error_str:
+                    logger.error("Gemini API key is invalid. Check your GOOGLE_API_KEY in .env")
+                    raise ValueError("Gemini API authentication failed. Check your GOOGLE_API_KEY.")
+                
+                if attempt < max_retries - 1:
+                    logger.warning(f"Gemini API error (attempt {attempt + 1}): {e}")
+                    await asyncio.sleep(2)
+                    continue
+                
+                logger.error(f"Gemini API error: {e}")
+                raise ValueError(f"Gemini API failed: {e}")
         
-        raise ValueError("Ollama failed after all retries. Ensure Ollama is running and models are pulled.")
+        raise ValueError("Gemini failed after all retries. Check your API key and quota.")
 
     async def generate_dataset_from_template(
         self,
@@ -634,8 +610,8 @@ Return ONLY the JSON array, nothing else."""
         
         update_progress(5, "Initializing dataset generation...", "init")
         
-        if not self.ollama_available:
-            raise ValueError("Ollama not available. Install from https://ollama.ai/download")
+        if not self.gemini_available:
+            raise ValueError("Gemini API not available. Set GOOGLE_API_KEY in your .env file.")
         
         template_name = "Unknown"
         template_id_str = "unknown"
@@ -663,7 +639,7 @@ Return ONLY the JSON array, nothing else."""
             import time
             start_time = time.time()
 
-            BATCH_SIZE = 15
+            BATCH_SIZE = 50  # Generate 50 test cases per API call for faster generation
             all_test_cases = []
             total_batches = (target_count + BATCH_SIZE - 1) // BATCH_SIZE 
             
@@ -685,7 +661,7 @@ Return ONLY the JSON array, nothing else."""
                 
                 response_text = None
                 try:
-                    response_text = await self._call_ollama_api(system_prompt, user_prompt_msg, batch_count)
+                    response_text = await self._call_gemini_api(system_prompt, user_prompt_msg, batch_count)
                 except Exception as api_error:
                     logger.error(f"API call failed for batch {batch_num + 1}: {type(api_error).__name__}: {api_error}")
                     

@@ -23,12 +23,12 @@ python-jose[cryptography]==3.3.0  # JWT tokens
 passlib[bcrypt]==1.7.4  # Password hashing
 python-multipart==0.0.6  # Form uploads
 
-# NLP and ML dependencies (Ollama-based, no HuggingFace)
-# sentence_transformers removed - using Ollama HTTP API instead
-# spacy==3.7.2  # NLP library for NER - removed, not actively used
+# NLP and ML dependencies (Ollama + Gemini)
+
 numpy>=1.26.0  # Numerical computing (1.26+ for Python 3.12 support)
 pandas>=2.1.0  # Data manipulation (2.1+ for Python 3.12 support)
 httpx>=0.25.2  # HTTP client for Ollama API
+google-generativeai>=0.8.3  # Gemini API support
 
 # System monitoring
 psutil==5.9.6  # System resource monitoring

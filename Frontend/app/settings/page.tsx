@@ -9,6 +9,15 @@ import {
   Loader2,
   Check,
   AlertTriangle,
+  Shield,
+  Settings,
+  ChevronRight,
+  Lock,
+  Trash2,
+  Mail,
+  UserCircle,
+  Fingerprint,
+  Zap,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,14 +36,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+
+// ============================================================================
+// NAVIGATION ITEMS
+// ============================================================================
+
+const NAV_ITEMS = [
+  { id: 'profile', label: 'Profile', icon: UserCircle, description: 'Personal information' },
+  { id: 'security', label: 'Security', icon: Shield, description: 'Password & sessions' },
+  { id: 'models', label: 'Models', icon: Cpu, description: 'Embedding configuration' },
+  { id: 'api-keys', label: 'API Keys', icon: Key, description: 'Programmatic access' },
+] as const
+
+type TabValue = typeof NAV_ITEMS[number]['id']
 
 // ============================================================================
 // ENTERPRISE MODEL CARD
@@ -52,56 +66,56 @@ const ModelCard = ({ model, isSelected, isCurrentlyActive, onSelect }: ModelCard
     <button
       onClick={onSelect}
       className={cn(
-        "w-full text-left rounded-md border p-4",
-        "bg-white dark:bg-slate-900",
-        "transition-all duration-200 ease-in-out",
-        "hover:border-slate-300 dark:hover:border-slate-600",
+        "w-full text-left rounded-xl border p-5",
+        "bg-card/50 backdrop-blur-sm",
+        "transition-all duration-300 ease-out",
+        "hover:shadow-md hover:border-border",
         "active:scale-[0.99]",
         isSelected
-          ? "border-slate-700 dark:border-slate-400 ring-1 ring-slate-700/20 dark:ring-slate-400/20"
-          : "border-slate-200/80 dark:border-slate-800"
+          ? "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
+          : "border-border/60"
       )}
     >
       {/* Header Row */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h3 className="font-medium text-slate-900 dark:text-slate-100">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="font-semibold text-foreground">
               {model.label}
             </h3>
-            <span className="text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+            <span className="text-xs font-mono text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">
               {model.dimension}D
             </span>
             {model.recommended && (
-              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                Recommended
+              <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                ★ Recommended
               </span>
             )}
             {isCurrentlyActive && !isSelected && (
-              <span className="text-xs text-slate-500">
-                Current
+              <span className="text-xs text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                Active
               </span>
             )}
           </div>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
             {model.tagline.replace(/^[^\s]+\s/, '')}
           </p>
         </div>
 
         {/* Selection Indicator */}
         <div className={cn(
-          "flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center",
+          "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center",
           "transition-all duration-200",
           isSelected
-            ? "border-slate-700 dark:border-slate-300 bg-slate-700 dark:bg-slate-300"
-            : "border-slate-300 dark:border-slate-600"
+            ? "border-primary bg-primary"
+            : "border-muted-foreground/30"
         )}>
-          {isSelected && <Check className="h-3 w-3 text-white dark:text-slate-900" strokeWidth={3} />}
+          {isSelected && <Check className="h-3.5 w-3.5 text-primary-foreground" strokeWidth={3} />}
         </div>
       </div>
 
       {/* Specs Row */}
-      <div className="flex gap-6 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+      <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-border/40">
         {[
           { label: 'Speed', value: model.speed === 'fast' ? 'Fast' : model.speed === 'moderate' ? 'Moderate' : 'Thorough' },
           { label: 'Accuracy', value: model.accuracy === 'superior' ? 'Superior' : model.accuracy === 'excellent' ? 'Excellent' : 'Good' },
@@ -109,8 +123,8 @@ const ModelCard = ({ model, isSelected, isCurrentlyActive, onSelect }: ModelCard
           { label: 'Params', value: model.parameters.replace('~', '').replace(' Million', 'M') },
         ].map((spec) => (
           <div key={spec.label} className="text-xs">
-            <span className="text-slate-400 dark:text-slate-500">{spec.label}:</span>{' '}
-            <span className="text-slate-600 dark:text-slate-300 font-medium">{spec.value}</span>
+            <span className="text-muted-foreground">{spec.label}: </span>
+            <span className="text-foreground font-medium">{spec.value}</span>
           </div>
         ))}
       </div>
@@ -119,10 +133,49 @@ const ModelCard = ({ model, isSelected, isCurrentlyActive, onSelect }: ModelCard
 }
 
 // ============================================================================
-// MAIN SETTINGS PAGE
+// NAVIGATION ITEM COMPONENT
 // ============================================================================
 
-type TabValue = 'profile' | 'models' | 'api-keys'
+interface NavItemProps {
+  item: typeof NAV_ITEMS[number]
+  isActive: boolean
+  onClick: () => void
+}
+
+const NavItem = ({ item, isActive, onClick }: NavItemProps) => {
+  const Icon = item.icon
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left",
+        "transition-all duration-200",
+        isActive
+          ? "bg-primary/10 text-primary border border-primary/20"
+          : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+      )}
+    >
+      <div className={cn(
+        "p-2 rounded-lg transition-colors",
+        isActive ? "bg-primary/10" : "bg-muted/50"
+      )}>
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-sm">{item.label}</p>
+        <p className="text-xs text-muted-foreground truncate">{item.description}</p>
+      </div>
+      <ChevronRight className={cn(
+        "h-4 w-4 transition-transform",
+        isActive ? "text-primary" : "text-muted-foreground/50"
+      )} />
+    </button>
+  )
+}
+
+// ============================================================================
+// MAIN SETTINGS PAGE
+// ============================================================================
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabValue>('profile')
@@ -282,433 +335,504 @@ export default function SettingsPage() {
 
   const hasModelChanged = settings?.default_embedding_model !== selectedModel
 
-  return (
-    <div className="max-w-3xl mx-auto px-6 py-10">
-      {/* Page Header */}
-      <div className="mb-10">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Settings</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Manage your account and embedding configuration
+  // ============================================================================
+  // RENDER SECTIONS
+  // ============================================================================
+
+  const renderProfileSection = () => (
+    <div className="space-y-6">
+      {/* User Avatar Card */}
+      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card/50 backdrop-blur-sm">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent" />
+        <div className="relative p-6">
+          {authLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : user ? (
+            <div className="flex items-center gap-6">
+              <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-3xl font-bold text-primary-foreground shadow-lg">
+                {user.username ? user.username.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-2xl font-bold text-foreground">{user.username || 'User'}</h2>
+                  {user.is_expert && (
+                    <span className="text-xs font-semibold text-amber-600 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+                      Expert
+                    </span>
+                  )}
+                </div>
+                <p className="text-muted-foreground mt-1 flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  {user.email}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <User className="h-12 w-12 mx-auto mb-3 opacity-40" />
+              <p className="text-sm">Please log in to view your profile</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Profile Form */}
+      {user && (
+        <div className="rounded-2xl border border-border/60 bg-card/50 backdrop-blur-sm p-6 space-y-5">
+          <h3 className="font-semibold text-foreground flex items-center gap-2">
+            <UserCircle className="h-5 w-5 text-primary" />
+            Account Information
+          </h3>
+
+          <div className="grid gap-5">
+            <div className="space-y-2">
+              <Label htmlFor="username" className="text-sm font-medium text-foreground">
+                Username
+              </Label>
+              <Input
+                id="username"
+                value={profileForm.username}
+                onChange={(e) => setProfileForm(prev => ({ ...prev, username: e.target.value }))}
+                placeholder="Your username"
+                className="h-11 bg-background/50 border-border/60 focus:border-primary/50 transition-colors"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-sm font-medium text-foreground">
+                Email Address
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={profileForm.email}
+                disabled
+                className="h-11 bg-muted/50 cursor-not-allowed"
+              />
+              <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-foreground">User ID</Label>
+              <Input
+                value={user.user_id}
+                disabled
+                className="h-11 bg-muted/50 cursor-not-allowed font-mono text-xs"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-4 border-t border-border/40">
+            <p className="text-sm text-muted-foreground">
+              {profileForm.username !== user.username ? '● Unsaved changes' : '✓ Up to date'}
+            </p>
+            <Button
+              disabled={profileForm.username === user.username || isProfileSaving}
+              onClick={() => {
+                toast({
+                  title: "Coming Soon",
+                  description: "Profile update functionality will be available soon.",
+                })
+              }}
+              className="transition-all duration-200 active:scale-95"
+            >
+              {isProfileSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Changes'
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+
+  const renderSecuritySection = () => (
+    <div className="space-y-6">
+      {/* Security Overview */}
+      <div className="rounded-2xl border border-border/60 bg-card/50 backdrop-blur-sm overflow-hidden">
+        <div className="p-6 border-b border-border/40">
+          <h3 className="font-semibold text-foreground flex items-center gap-2">
+            <Shield className="h-5 w-5 text-primary" />
+            Security Settings
+          </h3>
+          <p className="text-sm text-muted-foreground mt-1">Manage your account security preferences</p>
+        </div>
+
+        <div className="divide-y divide-border/40">
+          {/* Password */}
+          <div className="flex items-center justify-between p-5 hover:bg-muted/30 transition-colors">
+            <div className="flex items-center gap-4">
+              <div className="p-2.5 rounded-xl bg-muted/50">
+                <Lock className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-medium text-foreground">Password</p>
+                <p className="text-sm text-muted-foreground">Last changed: Never</p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsPasswordDialogOpen(true)}
+              className="transition-all duration-200 active:scale-95"
+            >
+              Change
+            </Button>
+          </div>
+
+          {/* Two-Factor */}
+          <div className="flex items-center justify-between p-5 hover:bg-muted/30 transition-colors">
+            <div className="flex items-center gap-4">
+              <div className="p-2.5 rounded-xl bg-muted/50">
+                <Fingerprint className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-medium text-foreground">Two-Factor Authentication</p>
+                <p className="text-sm text-muted-foreground">Add an extra layer of security</p>
+              </div>
+            </div>
+            <span className="text-xs font-medium text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
+              Coming Soon
+            </span>
+          </div>
+
+          {/* Delete Account */}
+          <div className="flex items-center justify-between p-5 hover:bg-muted/30 transition-colors">
+            <div className="flex items-center gap-4">
+              <div className="p-2.5 rounded-xl bg-destructive/10">
+                <Trash2 className="h-5 w-5 text-destructive" />
+              </div>
+              <div>
+                <p className="font-medium text-foreground">Delete Account</p>
+                <p className="text-sm text-muted-foreground">Permanently remove your account and data</p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                toast({
+                  title: "Contact Support",
+                  description: "Please contact support to delete your account.",
+                })
+              }}
+              className="text-destructive hover:text-destructive border-destructive/30 hover:border-destructive/50 hover:bg-destructive/5 transition-all duration-200 active:scale-95"
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
+  const renderModelsSection = () => (
+    <div className="space-y-6">
+      {/* Current Model Banner */}
+      {settings?.default_embedding_model && (
+        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-primary/10">
+              <Zap className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm text-muted-foreground">Current Active Model</p>
+              <p className="text-lg font-bold text-foreground">
+                {EMBEDDING_MODELS.find(m => m.value === settings.default_embedding_model)?.label || settings.default_embedding_model}
+              </p>
+            </div>
+            <span className="text-sm font-mono text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
+              {settings.embedding_dimension}D vectors
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Ollama Info */}
+      <div className="rounded-xl border border-border/60 bg-muted/30 p-4">
+        <p className="text-sm text-muted-foreground">
+          Embeddings run locally via Ollama at{' '}
+          <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">localhost:11434</code>.
+          Ensure Ollama is running before generating embeddings.
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)} className="space-y-8">
-        <TabsList className="grid w-full grid-cols-3 bg-slate-100 dark:bg-slate-800/50 p-1 rounded-md">
-          <TabsTrigger
-            value="profile"
-            className="flex items-center gap-2 text-sm data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-sm transition-all duration-200"
-          >
-            <User className="h-4 w-4" />
-            <span className="hidden sm:inline">Profile</span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="models"
-            className="flex items-center gap-2 text-sm data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-sm transition-all duration-200"
-          >
-            <Cpu className="h-4 w-4" />
-            <span className="hidden sm:inline">Models</span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="api-keys"
-            className="flex items-center gap-2 text-sm data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-sm transition-all duration-200"
-          >
-            <Key className="h-4 w-4" />
-            <span className="hidden sm:inline">API Keys</span>
-          </TabsTrigger>
-        </TabsList>
+      {/* Model Selection */}
+      <div className="space-y-4">
+        <h3 className="font-semibold text-foreground">Select Embedding Model</h3>
 
-        {/* ============================================================ */}
-        {/* PROFILE TAB */}
-        {/* ============================================================ */}
-        <TabsContent value="profile" className="space-y-8">
-          {/* Account Section */}
-          <section>
-            <div className="mb-4">
-              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Account</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Your personal account information</p>
-            </div>
+        {settingsLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {EMBEDDING_MODELS.map((model) => (
+              <ModelCard
+                key={model.value}
+                model={model}
+                isSelected={selectedModel === model.value}
+                isCurrentlyActive={settings?.default_embedding_model === model.value}
+                onSelect={() => setSelectedModel(model.value)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
-            <Card className="border-slate-200/80 dark:border-slate-800 shadow-none">
-              <CardContent className="p-6">
-                {authLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
-                  </div>
-                ) : user ? (
-                  <div className="space-y-6">
-                    {/* User Summary */}
-                    <div className="flex items-center gap-4 pb-6 border-b border-slate-100 dark:border-slate-800">
-                      <div className="h-12 w-12 rounded-md bg-slate-700 flex items-center justify-center text-white font-medium">
-                        {user.username ? user.username.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-900 dark:text-slate-100">{user.username || 'User'}</p>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">{user.email}</p>
-                      </div>
-                      {user.is_expert && (
-                        <span className="ml-auto text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
-                          Expert
-                        </span>
-                      )}
-                    </div>
+      {/* Change Notice */}
+      {hasModelChanged && settings?.default_embedding_model && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+              Model change detected
+            </p>
+            <p className="text-sm text-amber-600/80 dark:text-amber-400/80 mt-1">
+              Changing from <strong>{settings.default_embedding_model}</strong> to <strong>{selectedModel}</strong>.
+              Existing datasets will need re-embedding.
+            </p>
+          </div>
+        </div>
+      )}
 
-                    {/* Form Fields */}
-                    <div className="grid gap-5">
-                      <div className="space-y-2">
-                        <Label htmlFor="username" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                          Username
-                        </Label>
-                        <Input
-                          id="username"
-                          value={profileForm.username}
-                          onChange={(e) => setProfileForm(prev => ({ ...prev, username: e.target.value }))}
-                          placeholder="Your username"
-                          className="h-10 border-slate-200 dark:border-slate-700 focus:ring-slate-700/20 transition-colors duration-200"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                          Email Address
-                        </Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={profileForm.email}
-                          disabled
-                          className="h-10 bg-slate-50 dark:bg-slate-800 cursor-not-allowed"
-                        />
-                        <p className="text-xs text-slate-400">Email cannot be changed</p>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">User ID</Label>
-                        <Input
-                          value={user.user_id}
-                          disabled
-                          className="h-10 bg-slate-50 dark:bg-slate-800 cursor-not-allowed font-mono text-xs"
-                        />
-                      </div>
-                    </div>
+      {/* Save Actions */}
+      <div className="flex items-center justify-between pt-4 border-t border-border/40">
+        <p className="text-sm text-muted-foreground">
+          {hasModelChanged ? '● Unsaved changes' : settings?.default_embedding_model ? '✓ Saved' : ''}
+        </p>
+        <Button
+          onClick={handleSaveModel}
+          disabled={updateSettingsMutation.isPending || !hasModelChanged}
+          className="transition-all duration-200 active:scale-95"
+        >
+          {updateSettingsMutation.isPending ? 'Saving...' : 'Save Model'}
+        </Button>
+      </div>
+    </div>
+  )
 
-                    {/* Save Button */}
-                    <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
-                      <p className="text-sm text-slate-500">
-                        {profileForm.username !== user.username ? 'Unsaved changes' : 'Up to date'}
-                      </p>
-                      <Button
-                        disabled={profileForm.username === user.username || isProfileSaving}
-                        onClick={() => {
-                          toast({
-                            title: "Coming Soon",
-                            description: "Profile update functionality will be available soon.",
-                          })
-                        }}
-                        className="bg-slate-700 hover:bg-slate-800 text-white transition-all duration-200 active:scale-95"
-                      >
-                        {isProfileSaving ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          'Save Changes'
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-10 text-slate-500">
-                    <User className="h-10 w-10 mx-auto mb-3 opacity-40" />
-                    <p className="text-sm">Please log in to view your profile</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </section>
+  const renderApiKeysSection = () => (
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-border/60 bg-card/50 backdrop-blur-sm p-12 text-center">
+        <div className="mx-auto w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
+          <Key className="h-8 w-8 text-muted-foreground" />
+        </div>
+        <h3 className="font-semibold text-foreground mb-2">API Keys Not Available</h3>
+        <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+          Programmatic API access is not currently enabled for your account.
+          Contact your administrator for API access.
+        </p>
+        <Button
+          variant="outline"
+          className="mt-6"
+          onClick={() => {
+            toast({
+              title: "Contact Support",
+              description: "Please contact support for API key access.",
+            })
+          }}
+        >
+          Request Access
+        </Button>
+      </div>
+    </div>
+  )
 
-          {/* Security Section */}
-          <section>
-            <div className="mb-4">
-              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Security</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Manage your account security settings</p>
-            </div>
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'profile':
+        return renderProfileSection()
+      case 'security':
+        return renderSecuritySection()
+      case 'models':
+        return renderModelsSection()
+      case 'api-keys':
+        return renderApiKeysSection()
+      default:
+        return null
+    }
+  }
 
-            <Card className="border-slate-200/80 dark:border-slate-800 shadow-none">
-              <CardContent className="p-0">
-                <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800">
-                  <div>
-                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Password</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Update your account password</p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsPasswordDialogOpen(true)}
-                    className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-200 active:scale-95"
-                  >
-                    Change
-                  </Button>
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="max-w-6xl mx-auto p-6 md:p-8">
+        {/* Page Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 mb-8 border-b border-border/40">
+          <div className="space-y-1">
+            <div className="flex items-center gap-4">
+              <h1 className="text-4xl font-bold tracking-tight text-foreground">
+                Settings
+              </h1>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-background/50 border border-border/40 backdrop-blur-sm">
+                <div className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                 </div>
-
-                <div className="flex items-center justify-between p-4">
-                  <div>
-                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Delete Account</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Permanently remove your account and data</p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      toast({
-                        title: "Contact Support",
-                        description: "Please contact support to delete your account.",
-                      })
-                    }}
-                    className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 transition-all duration-200 active:scale-95"
-                  >
-                    Delete
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </section>
-
-          {/* Password Dialog */}
-          <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Change Password</DialogTitle>
-                <DialogDescription>
-                  Enter your current password and choose a new one.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4 py-4">
-                {passwordError && (
-                  <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                    {passwordError}
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="current-password">Current Password</Label>
-                  <Input
-                    id="current-password"
-                    type="password"
-                    placeholder="Enter current password"
-                    value={passwordForm.current_password}
-                    onChange={(e) => setPasswordForm(prev => ({ ...prev, current_password: e.target.value }))}
-                    className="transition-colors duration-200"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="new-password">New Password</Label>
-                  <Input
-                    id="new-password"
-                    type="password"
-                    placeholder="Enter new password"
-                    value={passwordForm.new_password}
-                    onChange={(e) => setPasswordForm(prev => ({ ...prev, new_password: e.target.value }))}
-                    className="transition-colors duration-200"
-                  />
-                  <p className="text-xs text-slate-500">
-                    Min 8 characters with uppercase, lowercase, and number
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-password">Confirm New Password</Label>
-                  <Input
-                    id="confirm-password"
-                    type="password"
-                    placeholder="Confirm new password"
-                    value={passwordForm.confirm_password}
-                    onChange={(e) => setPasswordForm(prev => ({ ...prev, confirm_password: e.target.value }))}
-                    className="transition-colors duration-200"
-                  />
-                </div>
+                <span className="text-sm font-medium text-muted-foreground">
+                  Account Active
+                </span>
               </div>
-
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setIsPasswordDialogOpen(false)
-                    setPasswordForm({ current_password: '', new_password: '', confirm_password: '' })
-                    setPasswordError('')
-                  }}
-                  className="transition-all duration-200 active:scale-95"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handlePasswordChange}
-                  disabled={isPasswordChanging}
-                  className="bg-slate-700 hover:bg-slate-800 text-white transition-all duration-200 active:scale-95"
-                >
-                  {isPasswordChanging ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Changing...
-                    </>
-                  ) : (
-                    'Change Password'
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          {/* Model Change Confirmation Dialog */}
-          <Dialog open={isModelConfirmDialogOpen} onOpenChange={setIsModelConfirmDialogOpen}>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Change Embedding Model</DialogTitle>
-                <DialogDescription>
-                  Existing datasets will require re-embedding with the new model.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="py-4 space-y-4 text-sm">
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-slate-500 mb-1">Current</p>
-                    <p className="font-medium text-slate-900 dark:text-slate-100">{settings?.default_embedding_model || 'None'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500 mb-1">New</p>
-                    <p className="font-medium text-slate-900 dark:text-slate-100">{selectedModel}</p>
-                  </div>
-                </div>
-                <p className="text-xs text-slate-500 pt-3 border-t border-slate-100 dark:border-slate-800">
-                  Vectors from different models are incompatible. You will need to re-embed datasets to use the new model for search.
-                </p>
-              </div>
-
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsModelConfirmDialogOpen(false)}
-                  className="transition-all duration-200 active:scale-95"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleConfirmModelChange}
-                  disabled={updateSettingsMutation.isPending}
-                  className="bg-slate-700 hover:bg-slate-800 text-white transition-all duration-200 active:scale-95"
-                >
-                  {updateSettingsMutation.isPending ? 'Saving...' : 'Confirm Change'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </TabsContent>
-
-        {/* ============================================================ */}
-        {/* MODELS TAB */}
-        {/* ============================================================ */}
-        <TabsContent value="models" className="space-y-8">
-          <section>
-            <div className="mb-4">
-              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Embedding Model</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Select the default model used for vector embeddings
-              </p>
             </div>
+            <p className="text-base text-muted-foreground/90 font-medium">
+              Manage your profile, security, and embedding preferences
+            </p>
+          </div>
+        </div>
 
-            {settingsLoading ? (
-              <div className="flex items-center justify-center py-16">
-                <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {/* Status Banner */}
-                <div className="p-4 rounded-md border border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30">
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Embeddings run locally via Ollama at{' '}
-                    <code className="text-xs bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded font-mono">localhost:11434</code>.
-                    Ensure Ollama is running before generating embeddings.
-                  </p>
-                </div>
+        {/* Two Column Layout */}
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Sidebar Navigation */}
+          <aside className="lg:w-72 flex-shrink-0">
+            <nav className="space-y-2 sticky top-8">
+              {NAV_ITEMS.map(item => (
+                <NavItem
+                  key={item.id}
+                  item={item}
+                  isActive={activeTab === item.id}
+                  onClick={() => setActiveTab(item.id)}
+                />
+              ))}
+            </nav>
+          </aside>
 
-                {/* Current Model Display */}
-                {settings?.default_embedding_model && (
-                  <div className="p-4 rounded-md border border-slate-200/80 dark:border-slate-800">
-                    <p className="text-sm text-slate-700 dark:text-slate-300">
-                      <span className="text-slate-500">Current model:</span>{' '}
-                      <span className="font-medium">{EMBEDDING_MODELS.find(m => m.value === settings.default_embedding_model)?.label || settings.default_embedding_model}</span>
-                      <span className="text-slate-400 ml-2">· {settings.embedding_dimension}D vectors</span>
-                    </p>
-                  </div>
-                )}
+          {/* Main Content */}
+          <main className="flex-1 min-w-0">
+            {renderContent()}
+          </main>
+        </div>
+      </div>
 
-                {/* Model Selection */}
-                <div className="space-y-3">
-                  {EMBEDDING_MODELS.map((model) => (
-                    <ModelCard
-                      key={model.value}
-                      model={model}
-                      isSelected={selectedModel === model.value}
-                      isCurrentlyActive={settings?.default_embedding_model === model.value}
-                      onSelect={() => setSelectedModel(model.value)}
-                    />
-                  ))}
-                </div>
+      {/* Password Dialog */}
+      <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Password</DialogTitle>
+            <DialogDescription>
+              Enter your current password and choose a new one.
+            </DialogDescription>
+          </DialogHeader>
 
-                {/* Change Notice */}
-                {hasModelChanged && settings?.default_embedding_model && (
-                  <div className="p-3 rounded-md border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20">
-                    <p className="text-xs text-amber-700 dark:text-amber-400">
-                      Changing from <strong>{settings.default_embedding_model}</strong> to <strong>{selectedModel}</strong>.
-                      Existing datasets will need re-embedding.
-                    </p>
-                  </div>
-                )}
-
-                {/* Save Actions */}
-                <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
-                  <p className="text-sm text-slate-500">
-                    {hasModelChanged ? 'Unsaved changes' : settings?.default_embedding_model ? 'Saved' : ''}
-                  </p>
-                  <Button
-                    onClick={handleSaveModel}
-                    disabled={updateSettingsMutation.isPending || !hasModelChanged}
-                    className="bg-slate-700 hover:bg-slate-800 text-white transition-all duration-200 active:scale-95 disabled:opacity-50"
-                  >
-                    {updateSettingsMutation.isPending ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                </div>
+          <div className="space-y-4 py-4">
+            {passwordError && (
+              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                {passwordError}
               </div>
             )}
-          </section>
-        </TabsContent>
 
-        {/* ============================================================ */}
-        {/* API KEYS TAB */}
-        {/* ============================================================ */}
-        <TabsContent value="api-keys" className="space-y-8">
-          <section>
-            <div className="mb-4">
-              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">API Keys</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Manage programmatic access to the API
+            <div className="space-y-2">
+              <Label htmlFor="current-password">Current Password</Label>
+              <Input
+                id="current-password"
+                type="password"
+                placeholder="Enter current password"
+                value={passwordForm.current_password}
+                onChange={(e) => setPasswordForm(prev => ({ ...prev, current_password: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                placeholder="Enter new password"
+                value={passwordForm.new_password}
+                onChange={(e) => setPasswordForm(prev => ({ ...prev, new_password: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Min 8 characters with uppercase, lowercase, and number
               </p>
             </div>
 
-            <Card className="border-slate-200/80 dark:border-slate-800 shadow-none">
-              <CardContent className="p-0">
-                <div className="text-center py-12 text-slate-500">
-                  <Key className="h-8 w-8 mx-auto mb-3 opacity-40" />
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">API keys not available</p>
-                  <p className="text-xs mt-1">Contact your administrator for API access.</p>
-                </div>
-              </CardContent>
-            </Card>
-          </section>
-        </TabsContent>
-      </Tabs>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirm New Password</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                placeholder="Confirm new password"
+                value={passwordForm.confirm_password}
+                onChange={(e) => setPasswordForm(prev => ({ ...prev, confirm_password: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsPasswordDialogOpen(false)
+                setPasswordForm({ current_password: '', new_password: '', confirm_password: '' })
+                setPasswordError('')
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handlePasswordChange}
+              disabled={isPasswordChanging}
+            >
+              {isPasswordChanging ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Changing...
+                </>
+              ) : (
+                'Change Password'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Model Change Confirmation Dialog */}
+      <Dialog open={isModelConfirmDialogOpen} onOpenChange={setIsModelConfirmDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Embedding Model</DialogTitle>
+            <DialogDescription>
+              Existing datasets will require re-embedding with the new model.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4 text-sm">
+            <div className="grid grid-cols-2 gap-6">
+              <div className="p-4 rounded-xl bg-muted/30 border border-border/60">
+                <p className="text-muted-foreground mb-1 text-xs uppercase tracking-wider">Current</p>
+                <p className="font-semibold text-foreground">{settings?.default_embedding_model || 'None'}</p>
+              </div>
+              <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
+                <p className="text-muted-foreground mb-1 text-xs uppercase tracking-wider">New</p>
+                <p className="font-semibold text-primary">{selectedModel}</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground pt-3 border-t border-border/40">
+              Vectors from different models are incompatible. You will need to re-embed datasets to use the new model for search.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsModelConfirmDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmModelChange}
+              disabled={updateSettingsMutation.isPending}
+            >
+              {updateSettingsMutation.isPending ? 'Saving...' : 'Confirm Change'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

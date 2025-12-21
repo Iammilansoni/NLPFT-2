@@ -43,6 +43,23 @@
         "dataset-generation",
         "local-inference"
       ]
+    },
+    {
+      "model_id": "gemini-2.5-flash",
+      "type": "llm",
+      "name": "Gemini 2.5 Flash",
+      "dimension": null,
+      "context_tokens": 1000000,
+      "cpu_friendly": false,
+      "provider": "google",
+      "api_required": true,
+      "notes": "High-performance multimodal model for large-scale dataset generation. Requires GOOGLE_API_KEY.",
+      "status": "active",
+      "use_cases": [
+        "dataset-generation",
+        "high-accuracy",
+        "cloud-inference"
+      ]
     }
   ],
   "default_models": {
