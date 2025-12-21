@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 import os
 
-from app.core.config import settings  
+from app.core.config import settings, REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
 from app.core.logger import logger, log_startup, log_shutdown, log_error
 from app.core.postgres import db_manager
 from app.models.schemas import ErrorResponse
@@ -40,13 +40,10 @@ async def lifespan(app: FastAPI):
     redis_error = None
     try:
         import redis
-        redis_host = os.getenv('REDIS_HOST', 'localhost')
-        redis_port = int(os.getenv('REDIS_PORT', '6379'))
-        redis_password = os.getenv('REDIS_PASSWORD', 'nlpforge_redis_secure_password_2024')
         redis_client = redis.Redis(
-            host=redis_host, 
-            port=redis_port, 
-            password=redis_password,
+            host=REDIS_HOST, 
+            port=REDIS_PORT, 
+            password=REDIS_PASSWORD,
             decode_responses=True
         )
         redis_client.ping()
@@ -103,9 +100,10 @@ def create_app() -> FastAPI:
     )
     
     # Initialize rate limiter with Redis storage (or fallback to memory)
-    redis_password = os.getenv('REDIS_PASSWORD', '')
-    redis_host = os.getenv('REDIS_HOST', 'localhost')
-    redis_port = os.getenv('REDIS_PORT', '6379')
+    # Redis config from centralized config.py (loaded from env)
+    redis_password = REDIS_PASSWORD
+    redis_host = REDIS_HOST
+    redis_port = str(REDIS_PORT)
     
     # Build Redis URI with optional password
     if redis_password:

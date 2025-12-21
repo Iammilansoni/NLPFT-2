@@ -1,25 +1,20 @@
+"""
+Redis Configuration - Centralized Redis client factory
+All configuration loaded from environment via config.py
+"""
 
-import os
 import redis
-from dotenv import load_dotenv
+from app.core.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
 
-
-load_dotenv()
-
-
-redis_host = os.getenv("REDIS_HOST", "localhost")
-redis_port = int(os.getenv("REDIS_PORT", "6379"))
-redis_password = os.getenv("REDIS_PASSWORD", "nlpforge_redis_secure_password_2024")
-
-print(f"Using Redis at {redis_host}:{redis_port}")
+print(f"Using Redis at {REDIS_HOST}:{REDIS_PORT}")
 
 def get_redis_client() -> redis.Redis:
     """
-    Get Redis client configured for local Docker Redis
+    Get Redis client configured from environment variables
     """
     return redis.Redis(
-        host=redis_host,
-        port=redis_port,
-        password=redis_password,
+        host=REDIS_HOST,
+        port=REDIS_PORT,
+        password=REDIS_PASSWORD,
         decode_responses=False
     )

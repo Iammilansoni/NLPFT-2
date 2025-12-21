@@ -34,6 +34,8 @@ services:
     image: postgres:15-alpine
     container_name: nlpforge-dev-postgres
     hostname: postgres
+    env_file:
+      - ./Backend/.env
     ports:
       - "5432:5432"
     environment:
@@ -60,6 +62,8 @@ services:
     image: redis/redis-stack:latest
     container_name: nlpforge-dev-redis
     hostname: redis
+    env_file:
+      - ./Backend/.env
     ports:
       - "6379:6379"     # Redis port
       - "8001:8001"     # RedisInsight UI
@@ -89,6 +93,8 @@ services:
     image: rediscommander/redis-commander:latest
     container_name: nlpforge-dev-redis-commander
     hostname: redis-commander
+    env_file:
+      - ./Backend/.env
     ports:
       - "8081:8081"
     environment:
@@ -109,6 +115,8 @@ services:
     image: dpage/pgadmin4:latest
     container_name: nlpforge-dev-pgadmin
     hostname: pgadmin
+    env_file:
+      - ./Backend/.env
     ports:
       - "5050:80"
     environment:

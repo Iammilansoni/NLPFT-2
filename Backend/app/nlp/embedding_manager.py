@@ -14,7 +14,7 @@ from redis.commands.search.field import VectorField, TextField, NumericField
 from redis.commands.search.indexDefinition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 
-from app.core.config import settings, REDIS_HOST, REDIS_PORT, INDEX_NAME, MODEL_NAME
+from app.core.config import settings, REDIS_HOST, REDIS_PORT, MODEL_NAME
 from app.core.logger import logger
 from app.nlp.embedding_model import OllamaEmbeddingModel
 
@@ -29,7 +29,7 @@ class EmbeddingManager:
         model_name: str = "nomic-embed-text",
         redis_host: str = REDIS_HOST,
         redis_port: int = REDIS_PORT,
-        index_name: str = INDEX_NAME
+        index_name: str = None  # Will be auto-generated based on model
     ):
         """
         Initialize the embedding manager with Ollama
@@ -38,10 +38,11 @@ class EmbeddingManager:
             model_name: Name of the Ollama embedding model
             redis_host: Redis host
             redis_port: Redis port
-            index_name: Name of the Redis vector index
+            index_name: Name of the Redis vector index (auto-generated if None)
         """
         self.model_name = model_name
-        self.index_name = index_name
+        # Auto-generate index name based on model if not provided
+        self.index_name = index_name or f"idx:{model_name}"
         
         # Load Ollama embedding model (no HuggingFace download)
         logger.info(f"Initializing Ollama embedding model: {model_name}")
@@ -49,12 +50,12 @@ class EmbeddingManager:
         self.embedding_dim = self.model.get_sentence_embedding_dimension()
         logger.info(f"Ollama model ready. Embedding dimension: {self.embedding_dim}")
         
-        # Connect to Redis
-        redis_password = os.getenv("REDIS_PASSWORD", "nlpforge_redis_secure_password_2024")
+        # Connect to Redis - use password from config (loaded from env)
+        from app.core.config import REDIS_PASSWORD
         self.redis_client = redis.Redis(
             host=redis_host,
             port=redis_port,
-            password=redis_password,
+            password=REDIS_PASSWORD,
             decode_responses=False
         )
         

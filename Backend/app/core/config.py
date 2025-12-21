@@ -9,6 +9,19 @@ _backend_dir = Path(__file__).resolve().parent.parent.parent  # app/core/config.
 _env_file = _backend_dir / ".env"
 load_dotenv(_env_file)
 
+
+def _require_env(key: str, description: str = None) -> str:
+    """Get required environment variable or raise error."""
+    value = os.getenv(key)
+    if not value:
+        desc = f" ({description})" if description else ""
+        raise ValueError(
+            f"❌ REQUIRED: {key} must be set in environment variables{desc}.\n"
+            f"Add to Backend/.env: {key}=<your_value>"
+        )
+    return value
+
+
 class Settings:
     app_name = "NLPForge API"
     app_version = "0.1.0"
@@ -16,41 +29,37 @@ class Settings:
     host = "127.0.0.1"
     port = 8000
     workers = 1
-    debug = True
-    log_level = "info"
+    debug = os.getenv("DEBUG", "true").lower() == "true"
+    log_level = os.getenv("LOG_LEVEL", "info")
     environment = os.getenv("ENVIRONMENT", "development")
     
     # Security settings - MUST be set in environment variables
     secret_key: str = os.getenv("SECRET_KEY", "")
     
-    # Email settings
+    # Email/SMTP settings - read from env
     smtp_host: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
     smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
     smtp_user: str = os.getenv("SMTP_USER", "")
     smtp_password: str = os.getenv("SMTP_PASSWORD", "")
-    smtp_from_email: str = os.getenv("SMTP_FROM_EMAIL", "noreply@nlpforge.com")
+    smtp_from_email: str = os.getenv("SMTP_FROM_EMAIL", "")
     smtp_from_name: str = os.getenv("SMTP_FROM_NAME", "NLPForge")
     frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     
-    # PostgreSQL Configuration (Main Brain - Permanent Storage)
-    postgres_host = os.getenv("POSTGRES_HOST", "localhost")
+    # PostgreSQL Configuration - read from env
+    postgres_host = os.getenv("POSTGRES_HOST", "")
     postgres_port = int(os.getenv("POSTGRES_PORT", "5432"))
-    postgres_user = os.getenv("POSTGRES_USER", "nlpforge")
-    postgres_password = os.getenv("POSTGRES_PASSWORD", "nlpforge_password")
-    postgres_db = os.getenv("POSTGRES_DB", "nlpforge")
-    database_url = os.getenv(
-        "DATABASE_URL",
-        f"postgresql+asyncpg://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_db}"
-    )
+    postgres_user = os.getenv("POSTGRES_USER", "")
+    postgres_password = os.getenv("POSTGRES_PASSWORD", "")
+    postgres_db = os.getenv("POSTGRES_DB", "")
+    database_url = os.getenv("DATABASE_URL", "")
     
     # Datasets directory
     @property
     def project_root(self) -> Path:
         """Get the Backend directory as project root."""
-        # Navigate from app/core/config.py to Backend/
-        current_file = Path(__file__).resolve()  # app/core/config.py
-        app_dir = current_file.parent.parent      # app/
-        backend_dir = app_dir.parent              # Backend/
+        current_file = Path(__file__).resolve()
+        app_dir = current_file.parent.parent
+        backend_dir = app_dir.parent
         return backend_dir
     
     @property
@@ -63,7 +72,6 @@ settings = Settings()
 # Validate SECRET_KEY on startup
 if not settings.secret_key or len(settings.secret_key) < 32:
     if settings.environment == "development":
-        # Allow weak key in development but warn loudly
         import warnings
         warnings.warn(
             "\n" + "="*80 + "\n"
@@ -76,49 +84,84 @@ if not settings.secret_key or len(settings.secret_key) < 32:
             UserWarning,
             stacklevel=2
         )
-        # Use a weak development key (DO NOT use in production)
         settings.secret_key = "dev-insecure-key-DO-NOT-USE-IN-PRODUCTION-" + "x" * 10
     else:
-        # In production/staging, this is a critical error
         raise ValueError(
             "❌ CRITICAL: SECRET_KEY must be set in environment variables and be at least 32 characters long.\n"
             "Generate a secure key with: python -c 'import secrets; print(secrets.token_urlsafe(32))'\n"
             "Then add to .env file: SECRET_KEY=<generated_key>"
         )
 
+# Validate DATABASE_URL
+if not settings.database_url and not (settings.postgres_host and settings.postgres_user and settings.postgres_password):
+    if settings.environment != "development":
+        raise ValueError(
+            "❌ CRITICAL: Database configuration required.\n"
+            "Set DATABASE_URL or (POSTGRES_HOST, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB) in .env"
+        )
+
+# Build database URL from components if not directly provided
+if not settings.database_url and settings.postgres_host:
+    settings.database_url = (
+        f"postgresql+asyncpg://{settings.postgres_user}:{settings.postgres_password}"
+        f"@{settings.postgres_host}:{settings.postgres_port}/{settings.postgres_db}"
+    )
+
+# =============================================================================
+# SMTP VALIDATION - REQUIRED for email functionality
+# =============================================================================
+if not settings.smtp_user or not settings.smtp_password:
+    raise ValueError(
+        "❌ CRITICAL: SMTP configuration is required.\n"
+        "Email functionality (registration, password reset) requires:\n"
+        "  SMTP_USER=your_email@gmail.com\n"
+        "  SMTP_PASSWORD=your_app_password\n\n"
+        "For Gmail, create an App Password at:\n"
+        "  Google Account → Security → 2-Step Verification → App Passwords\n\n"
+        "Add these to Backend/.env"
+    )
+
 # Ensure datasets directory exists
 DATASETS_DIR = settings.datasets_path
 DATASETS_DIR.mkdir(exist_ok=True, parents=True)
 
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+# =============================================================================
+# REDIS CONFIGURATION - All values from environment
+# =============================================================================
+REDIS_HOST = os.getenv("REDIS_HOST", "")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "nlpforge_redis_secure_password_2024")
-MODEL_NAME = os.getenv("MODEL_NAME", "nomic-embed-text")  # Non-Chinese embedding model for Ollama
-INDEX_NAME = os.getenv("INDEX_NAME", "idx:api")
-TOP_K = int(os.getenv("TOP_K", "5"))
-BATCH_SIZE = int(os.getenv("BATCH_SIZE", "32"))
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "")
 
+# Validate Redis in non-development
+if not REDIS_HOST and settings.environment != "development":
+    raise ValueError("❌ CRITICAL: REDIS_HOST must be set in environment variables.")
+elif not REDIS_HOST:
+    REDIS_HOST = "localhost"  # Development fallback only
 
-# Ollama Configuration (LOCAL LLM for dataset generation)
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b-instruct-q4_K_M")  # Llama 3.1 8B Instruct (high quality, non-Chinese)
+# =============================================================================
+# OLLAMA CONFIGURATION - All values from environment
+# =============================================================================
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "")
+MODEL_NAME = os.getenv("OLLAMA_EMBEDDING_MODEL", os.getenv("MODEL_NAME", ""))
 
-# Google Gemini Configuration
+# Validate Ollama in non-development
+if not OLLAMA_HOST and settings.environment != "development":
+    raise ValueError("❌ CRITICAL: OLLAMA_HOST must be set in environment variables.")
+elif not OLLAMA_HOST:
+    OLLAMA_HOST = "http://localhost:11434"  # Development fallback only
+
+if not MODEL_NAME:
+    MODEL_NAME = "nomic-embed-text"  # Safe default for embedding model
+
+# =============================================================================
+# GEMINI API - Required for dataset generation
+# =============================================================================
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+# Note: Validation happens in dataset_generator.py when actually used
 
-# Intent detection method: "vector_search" or "pattern_matching"
-INTENT_DETECTION_METHOD = os.getenv("INTENT_DETECTION_METHOD", "vector_search")
-
-# Security settings - Use settings.secret_key (validated on startup)
+# =============================================================================
+# JWT/SECURITY SETTINGS
+# =============================================================================
 SECRET_KEY = settings.secret_key
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
-
-# Email settings (for password reset and verification)
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", "noreply@nlpforge.com")
-SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "NLPForge")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", str(60 * 24)))  # 24 hours default

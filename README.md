@@ -9,11 +9,11 @@
 </p>
 
 <p align="center">
-  <a href="#features">Features</a> •
-  <a href="#architecture">Architecture</a> •
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#api-documentation">API Docs</a> •
-  <a href="#configuration">Configuration</a>
+  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-environment-setup">Environment Setup</a> •
+  <a href="#-docker-deployment">Docker</a> •
+  <a href="#-development">Development</a> •
+  <a href="#-troubleshooting">Troubleshooting</a>
 </p>
 
 ---
@@ -40,40 +40,11 @@ Query: "Authenticate with email milansoni@nlpforge.com and password secure123"
   "endpoint": "/auth/login",
   "method": "POST",
   "extracted_request_body": {
-    "email": "milansoni@enlpforge.com",
+    "email": "milansoni@nlpforge.com",
     "password": "secure123"
   }
 }
 ```
-
----
-
-## ✨ Features
-
-### 🔍 Semantic Search Pipeline
-- **Two-Stage Retrieval**: Vector similarity search + FlashRank re-ranking
-- **Multi-Model Support**: Choose from 3 embedding models based on your needs
-- **Multi-Tenant Security**: Complete user data isolation
-
-### 🤖 LLM-Powered Slot Extraction
-- Extracts values from natural language queries
-- Populates API request schemas automatically
-- Supports complex nested JSON structures
-
-### 📋 Enterprise Template Builder
-- Create and manage API templates with JSON schemas
-- Approval workflow (Draft → Review → Approved)
-- Version control and audit logging
-
-### 📊 Synthetic Dataset Generation
-- Generate diverse test data using Ollama LLMs
-- Embed datasets for semantic search
-- CSV export for integration
-
-### 🔐 Security & Compliance
-- JWT authentication with refresh tokens
-- Complete audit trail for all actions
-- Multi-tenant data isolation
 
 ---
 
@@ -102,14 +73,14 @@ Query: "Authenticate with email milansoni@nlpforge.com and password secure123"
      └────────────┘   └───────────┘   └─────────────┘
 ```
 
-### Technology Stack
+### Tech Stack
 
 | Layer | Technology |
 |-------|------------|
 | **Frontend** | Next.js 14, TypeScript, Tailwind CSS, shadcn/ui |
 | **Backend** | FastAPI, Python 3.11+, SQLAlchemy, Pydantic |
 | **Database** | PostgreSQL 15 (metadata), Redis Stack (vectors) |
-| **AI/ML** | Ollama (embeddings + LLM, Slot extraction), FlashRank (re-ranking), Gemini(Dataset Generation) |
+| **AI/ML** | Ollama (embeddings + LLM), FlashRank (re-ranking), Gemini (dataset generation) |
 | **DevOps** | Docker, Docker Compose |
 
 ---
@@ -118,72 +89,158 @@ Query: "Authenticate with email milansoni@nlpforge.com and password secure123"
 
 ### Prerequisites
 
-- Docker & Docker Compose
-- 16GB RAM recommended (for LLM inference)
-- 20GB disk space (for models)
+- **Docker & Docker Compose** (v2.0+)
+- **16GB RAM** recommended (for LLM inference)
+- **20GB disk space** (for models)
+- **Git**
 
-### One-Command Setup
+### Step 1: Clone the Repository
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/NLPForge-Tester.git
+git clone https://github.com/Iammilansoni/NLPForge-Tester.git
 cd NLPForge-Tester
-
-# Start all services (first run downloads models automatically)
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
 ```
 
-### Access Points
+### Step 2: Set Up Environment Variables
 
-| Service | URL | Credentials |
-|---------|-----|-------------|
+```bash
+# Copy example environment files
+cp Backend/.env.example Backend/.env
+cp Frontend/.env.example Frontend/.env.local
+```
+
+**Edit `Backend/.env`** with your actual credentials:
+
+```bash
+# REQUIRED: Generate a secure secret key
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+# Copy the output and set SECRET_KEY in Backend/.env
+
+# REQUIRED for dataset generation: Get Gemini API key
+# Visit: https://aistudio.google.com/apikey
+
+# REQUIRED: Configure SMTP for email (registration, password reset)
+# For Gmail, use App Passwords (not your regular password)
+# Create at: Google Account → Security → 2-Step Verification → App Passwords
+```
+
+### Step 3: Start All Services
+
+```bash
+# Start everything (first run downloads models automatically - may take 10-15 minutes)
+docker compose up -d --build
+
+# View logs to monitor startup progress
+docker compose logs -f
+```
+
+### Step 4: Access the Application
+
+| Service | URL | Default Credentials |
+|---------|-----|---------------------|
 | **Frontend** | http://localhost:3000 | Register new account |
 | **API Docs** | http://localhost:8000/docs | - |
 | **RedisInsight** | http://localhost:8001 | - |
-| **pgAdmin** | http://localhost:5050 | admin@nlpforge.local / admin123 |
+| **Redis Commander** | http://localhost:8081 | admin / admin123 |
+| **pgAdmin** | http://localhost:5050 | admin@example.com / admin123 |
 
-### First Steps
+### Step 5: First Steps
 
 1. **Register** an account at http://localhost:3000/auth/register
 2. **Create a Template** in the Templates page
-3. **Generate Dataset** to create training data
+3. **Generate Dataset** to create training data  
 4. **Search** using natural language on the Dashboard
 
 ---
 
-## 🔧 Development Setup
+## ⚙️ Environment Setup
 
-For local development with hot reload:
+### Backend Environment (`Backend/.env`)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SECRET_KEY` | ✅ Yes | JWT signing key (min 32 chars). Generate with: `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
+| `GEMINI_API_KEY` | ✅ Yes | Google Gemini API key for dataset generation. Get from [AI Studio](https://aistudio.google.com/apikey) |
+| `POSTGRES_PASSWORD` | ✅ Yes | PostgreSQL database password |
+| `REDIS_PASSWORD` | ✅ Yes | Redis database password |
+| `SMTP_USER` | ✅ Yes | Email address for sending emails (registration, password reset) |
+| `SMTP_PASSWORD` | ✅ Yes | Email password (for Gmail, use [App Password](https://myaccount.google.com/apppasswords)) |
+| `PGADMIN_PASSWORD` | Optional | pgAdmin admin password (default: admin123) |
+| `REDIS_COMMANDER_PASSWORD` | Optional | Redis Commander password (default: admin123) |
+
+### Frontend Environment (`Frontend/.env.local`)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NEXT_PUBLIC_API_URL` | ✅ Yes | Backend API URL (default: http://localhost:8000) |
+
+> **⚠️ Security Note**: Never commit `.env` files with real credentials. Only `.env.example` files should be in version control.
+
+---
+
+## 🐳 Docker Deployment
+
+### Production Mode (Full Docker)
+
+All services run in Docker containers:
 
 ```bash
-# Start infrastructure services only
-docker-compose -f docker-compose.dev.yml up -d
+# Start all services
+docker compose up -d --build
 
-# Run Ollama locally (separate terminal)
+# View logs
+docker compose logs -f
+
+# Stop all services
+docker compose down
+
+# Full reset (removes all data)
+docker compose down -v
+docker compose up -d --build
+```
+
+### Development Mode (Hybrid)
+
+Infrastructure in Docker, frontend/backend run locally for hot reload:
+
+```bash
+# Start infrastructure only
+docker compose -f docker-compose.dev.yml up -d
+
+# Run Ollama locally (faster model loading)
 ollama serve
 
 # Pull required models
 ollama pull nomic-embed-text
-ollama pull all-minilm
+ollama pull all-minilm  
 ollama pull mxbai-embed-large
 ollama pull llama3.1:8b-instruct-q4_K_M
 
-# Start Backend (separate terminal)
+# Terminal 1: Start Backend
 cd Backend
 python -m venv venv
-source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 
-# Start Frontend (separate terminal)
+# Terminal 2: Start Frontend
 cd Frontend
 npm install
 npm run dev
 ```
+
+### Docker Services
+
+| Service | Port(s) | Purpose |
+|---------|---------|---------|
+| `postgres` | 5432 | Primary database (users, templates, audit logs) |
+| `redis` | 6379, 8001 | Vector database + RedisInsight UI |
+| `redis-commander` | 8081 | Redis web management UI |
+| `pgadmin` | 5050 | PostgreSQL admin UI |
+| `ollama` | 11434 | Local LLM & embedding server |
+| `backend` | 8000 | FastAPI application |
+| `frontend` | 3000 | Next.js web application |
 
 ---
 
@@ -201,132 +258,93 @@ Change your embedding model in **Settings** → **Embedding Model**.
 
 ---
 
-## 📖 API Documentation
+## 🔧 Troubleshooting
 
-### Core Endpoints
+### Docker Issues
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/v1/auth/register` | Register new user |
-| `POST` | `/api/v1/auth/login` | Login and get tokens |
-| `GET` | `/api/v1/templates` | List user's templates |
-| `POST` | `/api/v1/templates` | Create new template |
-| `POST` | `/api/v1/ranking/semantic-retrieve` | Semantic search |
-| `GET` | `/api/v1/stats` | Dashboard statistics |
+**Problem: Services fail to start**
+```bash
+# Check logs for specific service
+docker compose logs backend
+docker compose logs postgres
 
-Full API documentation available at: **http://localhost:8000/docs**
+# Restart everything
+docker compose down
+docker compose up -d --build
+```
 
-### Semantic Search Request
+**Problem: "Port already in use"**
+```bash
+# Find what's using the port (Windows)
+netstat -ano | findstr :8000
+
+# Find what's using the port (Linux/Mac)
+lsof -i :8000
+
+# Change ports in docker-compose.yml if needed
+```
+
+**Problem: Database connection fails**
+```bash
+# Ensure PostgreSQL is healthy
+docker compose ps
+docker compose logs postgres
+
+# Reset database
+docker compose down -v
+docker compose up -d --build
+```
+
+### Backend Issues
+
+**Problem: "SECRET_KEY must be at least 32 characters"**
+```bash
+# Generate a secure key
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+# Add the output to Backend/.env as SECRET_KEY=<generated_key>
+```
+
+**Problem: "GEMINI_API_KEY not set"**
+1. Visit https://aistudio.google.com/apikey
+2. Create a new API key
+3. Add to `Backend/.env`: `GEMINI_API_KEY=your_key_here`
+
+**Problem: Ollama connection refused**
+```bash
+# Check if Ollama is running
+docker compose logs ollama
+
+# Or if running locally
+curl http://localhost:11434/api/tags
+```
+
+### Frontend Issues
+
+**Problem: "Failed to fetch" or API errors**
+1. Ensure backend is running: http://localhost:8000/docs
+2. Check `Frontend/.env.local` has correct `NEXT_PUBLIC_API_URL`
+3. Check browser console for CORS errors
+
+**Problem: Build fails in Docker**
+```bash
+# Clear Docker cache and rebuild
+docker compose build --no-cache frontend
+```
+
+### Cleanup Commands
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/ranking/semantic-retrieve" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "Login with email test@example.com and password secret123",
-    "top_k": 5,
-    "include_slot_extraction": true
-  }'
-```
+# Stop all containers
+docker compose down
 
----
+# Remove all containers and volumes (DELETES ALL DATA)
+docker compose down -v
 
-## ⚙️ Configuration
+# Remove all NLPForge images
+docker rmi $(docker images | grep nlpforge | awk '{print $3}')
 
-### Environment Variables
-
-Create a `.env` file in the project root:
-
-```env
-# =============================================================================
-# NLPForge Backend - Environment Configuration Template
-# =============================================================================
-# Copy this file to .env and fill in your actual values
-# =============================================================================
-
-# -----------------------------------------------------------------------------
-# PostgreSQL Configuration
-# -----------------------------------------------------------------------------
-DATABASE_URL=postgresql+asyncpg://nlpforge:your_secure_password@localhost:5432/nlpforge
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-POSTGRES_USER=nlpforge
-POSTGRES_PASSWORD=your_secure_password
-POSTGRES_DB=nlpforge
-
-# -----------------------------------------------------------------------------
-# Redis Configuration
-# -----------------------------------------------------------------------------
-REDIS_URL=redis://:your_redis_password@localhost:6379/0
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=your_redis_password
-INDEX_NAME=idx:api
-
-# -----------------------------------------------------------------------------
-# Application Settings
-# -----------------------------------------------------------------------------
-ENVIRONMENT=development
-LOG_LEVEL=INFO
-# Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
-SECRET_KEY=your_secret_key_here_min_32_chars
-DEBUG=true
-
-# -----------------------------------------------------------------------------
-# AI/ML Configuration
-# -----------------------------------------------------------------------------
-# Gemini API (REQUIRED for dataset generation)
-# Get from: https://aistudio.google.com/apikey
-GEMINI_API_KEY=your_gemini_api_key_here
-
-# Ollama Configuration (for embeddings - runs locally)
-# Install: https://ollama.ai
-# Start: ollama serve
-# Pull model: ollama pull nomic-embed-text
-OLLAMA_HOST=http://localhost:11434
-OLLAMA_EMBEDDING_MODEL=nomic-embed-text
-
-# Search Settings
-TOP_K=5
-BATCH_SIZE=32
-
-# -----------------------------------------------------------------------------
-# CORS Configuration
-# -----------------------------------------------------------------------------
-CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
-
-
-```
-
-### Docker Compose Services
-
-| Service | Port | Purpose |
-|---------|------|---------|
-| `postgres` | 5432 | Primary database |
-| `redis` | 6379, 8001 | Vector DB + RedisInsight |
-| `redis-commander` | 8081 | Redis web UI |
-| `pgadmin` | 5050 | PostgreSQL admin |
-| `ollama` | 11434 | LLM & embeddings |
-| `backend` | 8000 | FastAPI server |
-| `frontend` | 3000 | Next.js app |
-
----
-
-## 🔒 Security
-
-### Multi-Tenant Isolation
-
-- All database queries filter by `user_id`
-- Redis vectors are namespaced per user
-- API endpoints require authentication
-- Complete audit logging
-
-### Authentication Flow
-
-```
-Register → Email Verification → Login → JWT Access Token → API Access
-                                          ↓
-                                   Refresh Token (7 days)
+# Clear Docker system (careful - affects all Docker projects)
+docker system prune -a
 ```
 
 ---
@@ -343,11 +361,13 @@ NLPForge-Tester/
 │   │   ├── services/        # Business logic
 │   │   └── nlp/             # Embedding & ranking
 │   ├── alembic/             # Database migrations
+│   ├── .env.example         # Environment template
 │   └── requirements.txt
 ├── Frontend/
 │   ├── app/                 # Next.js pages
 │   ├── components/          # React components
 │   ├── lib/                 # Utilities & API client
+│   ├── .env.example         # Environment template
 │   └── package.json
 ├── docker-compose.yml       # Production setup
 ├── docker-compose.dev.yml   # Development setup
@@ -356,39 +376,26 @@ NLPForge-Tester/
 
 ---
 
-## 🧪 Testing
+## 🔒 Security Notes
 
-```bash
-# Backend tests
-cd Backend
-pytest tests/ -v
-
-# Frontend tests
-cd Frontend
-npm run test
-```
-
----
-
-## 📈 Performance Telemetry
-
-NLPForge tracks real-time performance metrics:
-
-- **Search Latency**: Redis vector search time
-- **Embedding Latency**: Ollama embedding generation
-- **Reranker Latency**: FlashRank re-ranking time
-
-View metrics on the Dashboard performance chart.
+- **Never commit** `.env` files with real credentials
+- **Generate unique** `SECRET_KEY` for production
+- **Use App Passwords** for Gmail SMTP (not your regular password)
+- **Change default passwords** for pgAdmin and Redis Commander in production
+- All data is isolated per user (multi-tenant)
 
 ---
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create environment files from examples
+3. Start with `docker compose -f docker-compose.dev.yml up -d`
+4. Create a feature branch (`git checkout -b feature/amazing-feature`)
+5. Test your changes thoroughly
+6. Commit changes (`git commit -m 'Add amazing feature'`)
+7. Push to branch (`git push origin feature/amazing-feature`)
+8. Open a Pull Request
 
 ---
 
@@ -398,19 +405,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 🙏 Acknowledgments
-
-- [Ollama](https://ollama.ai/) - Local LLM inference
-- [Redis Stack](https://redis.io/docs/stack/) - Vector database
-- [FastAPI](https://fastapi.tiangolo.com/) - Backend framework
-- [Next.js](https://nextjs.org/) - Frontend framework
-- [FlashRank](https://github.com/PrithivirajDamodaran/FlashRank) - Re-ranking
-
----
-
 <p align="center">
   Made with ❤️ by 
   <a href="https://github.com/Iammilansoni">Milan Soni</a>, 
   <a href="https://github.com/Avadhi-Singhal">Avadhi Singhal</a>, 
-  <a href="https://github.com/AbhilashJoshi09">Abhilash Joshi</a>, 
+  <a href="https://github.com/AbhilashJoshi09">Abhilash Joshi</a>
 </p>

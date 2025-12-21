@@ -24,13 +24,14 @@ class EmailService:
     """
     
     def __init__(self):
-        # Load email config from environment variables
-        self.smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-        self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
-        self.smtp_user = os.getenv("SMTP_USER")  # Your email
-        self.smtp_password = os.getenv("SMTP_PASSWORD")  # App password
-        self.from_email = os.getenv("FROM_EMAIL", self.smtp_user)
-        self.from_name = os.getenv("FROM_NAME", "NLPForge")
+        # Load email config from centralized config (loaded from env)
+        from app.core.config import settings
+        self.smtp_host = settings.smtp_host
+        self.smtp_port = settings.smtp_port
+        self.smtp_user = settings.smtp_user
+        self.smtp_password = settings.smtp_password
+        self.from_email = settings.smtp_from_email or self.smtp_user
+        self.from_name = settings.smtp_from_name
     
     def generate_otp(self) -> str:
         """Generate a 6-digit OTP"""
