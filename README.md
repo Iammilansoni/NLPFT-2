@@ -106,7 +106,7 @@ cd NLPForge-Tester
 ```bash
 # Copy example environment files
 cp Backend/.env.example Backend/.env
-cp Frontend/.env.example Frontend/.env.local
+cp Frontend/.env.example Frontend/.env
 ```
 
 **Edit `Backend/.env`** with your actual credentials:
