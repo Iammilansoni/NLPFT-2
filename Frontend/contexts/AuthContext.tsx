@@ -107,8 +107,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Sync token to cookies for middleware (with secure flag in production)
       if (typeof document !== 'undefined') {
-        const isProduction = process.env.NODE_ENV === 'production';
-        const cookieString = `nlpforge_access_token=${response.access_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax${isProduction ? '; Secure' : ''}`;
+        const isSecureContext = typeof window !== 'undefined' && window.location.protocol === 'https:';
+        const cookieString = `nlpforge_access_token=${response.access_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax${isSecureContext ? '; Secure' : ''}`;
         document.cookie = cookieString;
 
         // Force cookie to be written immediately by reading it back

@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
+import { getApiBase } from '@/lib/runtime-config'
 
 interface TelemetryData {
   time: string
@@ -105,7 +106,8 @@ export function TrendChart() {
   const [data, setData] = useState<TelemetryData[]>([])
   const [loading, setLoading] = useState(true)
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+  const RAW_API_BASE = getApiBase()
+  const API_BASE = RAW_API_BASE ? RAW_API_BASE.replace(/\/$/, '') : ''
 
   const fetchTelemetry = async () => {
     try {

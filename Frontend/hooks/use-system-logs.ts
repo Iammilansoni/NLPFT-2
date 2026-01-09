@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { getApiBase, getWsUrl } from '../lib/runtime-config';
 
 export type LogCategory = 'info' | 'warning' | 'error' | 'success';
 export type LogSeverity = 'normal' | 'high' | 'critical';
@@ -18,7 +19,8 @@ export interface LogEntry {
     isExpanded?: boolean;
 }
 
-const WS_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/^http/, 'ws');
+const RAW_API_BASE = getApiBase();
+const WS_BASE_URL = getWsUrl();
 
 export function useSystemLogs() {
     const [logs, setLogs] = useState<LogEntry[]>([]);

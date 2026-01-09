@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
+import { getApiBase } from '@/lib/runtime-config'
 import {
   Download,
   RefreshCw,
@@ -148,7 +149,8 @@ export default function DatasetGeneratorPage() {
   const [embeddingDatasetId, setEmbeddingDatasetId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+  const RAW_API_BASE = getApiBase()
+  const API_BASE = RAW_API_BASE ? RAW_API_BASE.replace(/\/$/, '') : ''
 
   // Format date in unambiguous format with local timezone: "Dec 10, 2025, 7:28 PM"
   const formatDateTime = (dateString: string | undefined): string => {

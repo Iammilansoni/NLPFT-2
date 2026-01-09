@@ -22,11 +22,18 @@ const nextConfig = {
     root: '..',
   },
   // API rewrites for backend integration
+  // Only add a server-side proxy when BACKEND_INTERNAL_URL is provided.
+  // This prevents the dev/build from hardcoding `http://backend:8000` into
+  // client-side requests when running the frontend on the host machine.
   async rewrites() {
+    const backendBase = process.env.BACKEND_INTERNAL_URL;
+    if (!backendBase) {
+      return [];
+    }
     return [
       {
         source: '/api/:path*',
-        destination: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/:path*',
+        destination: `${backendBase}/api/:path*`,
       },
     ];
   },

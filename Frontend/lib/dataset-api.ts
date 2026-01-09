@@ -4,8 +4,11 @@
  */
 
 import axios, { AxiosInstance } from 'axios';
+import { getApiBase } from './runtime-config';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const RAW_API_BASE = getApiBase();
+const API_BASE_URL = RAW_API_BASE ? RAW_API_BASE.replace(/\/$/, '') : '';
+
 
 // ==================== Types ====================
 

@@ -1,6 +1,7 @@
-'use client'
+ 'use client'
 
 import { useEffect, useState } from 'react'
+import { getApiBase } from '@/lib/runtime-config'
 import {
   Activity,
   Database,
@@ -35,7 +36,8 @@ export function HealthIndicator() {
   const checkHealth = async () => {
     setIsRefreshing(true)
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const RAW_API_BASE = getApiBase();
+      const apiUrl = RAW_API_BASE ? RAW_API_BASE.replace(/\/$/, '') : '';
       const response = await fetch(`${apiUrl}/api/v1/health`, {
         method: 'GET',
         signal: AbortSignal.timeout(5000),

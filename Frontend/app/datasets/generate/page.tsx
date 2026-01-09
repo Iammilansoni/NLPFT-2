@@ -239,21 +239,12 @@ export default function DatasetGenerationPage() {
                   <label className="block text-sm font-medium mb-2">Number of Rows</label>
                   <div className="flex items-center gap-4">
                     <input
-                      type="range"
-                      min="10"
-                      max="10000"
-                      step="10"
-                      value={rows}
-                      onChange={e => setRows(Number(e.target.value))}
-                      disabled={isGenerating}
-                      className="flex-1"
-                    />
-                    <input
                       type="number"
                       value={rows}
                       onChange={e => setRows(Number(e.target.value))}
                       disabled={isGenerating}
-                      className="w-24 px-3 py-2 bg-background border border-border rounded-lg"
+                      className="w-full px-3 py-2 bg-background border border-border rounded-lg"
+                      placeholder="Enter number of rows"
                     />
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">

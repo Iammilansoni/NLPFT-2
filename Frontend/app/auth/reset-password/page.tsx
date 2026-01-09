@@ -7,6 +7,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
+import { getApiBase } from '@/lib/runtime-config';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -47,7 +48,9 @@ function ResetPasswordForm() {
       }
 
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/auth/verify-reset-token?token=${token}`);
+      const RAW_API_BASE = getApiBase();
+      const apiBase = RAW_API_BASE ? RAW_API_BASE.replace(/\/$/, '') : '';
+      const response = await fetch(`${apiBase}/api/v1/auth/verify-reset-token?token=${token}`);
         const data = await response.json();
 
         if (data.valid) {

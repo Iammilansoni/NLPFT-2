@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { getApiBase } from '@/lib/runtime-config';
 import { useIsClient } from '@/lib/use-client-only';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -35,7 +36,8 @@ export default function HealthPage() {
   const fetchHealth = async () => {
     try {
       setIsRefetching(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const RAW_API_BASE = getApiBase();
+      const apiUrl = RAW_API_BASE ? RAW_API_BASE.replace(/\/$/, '') : '';
       const response = await fetch(`${apiUrl}/api/v1/health`);
       if (!response.ok) {
         throw new Error('Failed to fetch health');

@@ -12,6 +12,7 @@ Features:
 
 import httpx
 import asyncio
+import os
 from typing import List, Optional
 from app.core.logger import logger
 
@@ -24,7 +25,10 @@ class OllamaEmbeddingService:
     POST http://localhost:11434/api/embeddings
     """
     
-    def __init__(self, base_url: str = "http://localhost:11434"):
+    def __init__(self, base_url: str = None):
+        # Default to environment `OLLAMA_HOST`, then to internal service name `http://ollama:11434`.
+        if base_url is None:
+            base_url = os.getenv("OLLAMA_HOST", "http://ollama:11434")
         self.base_url = base_url
         self.embeddings_endpoint = f"{base_url}/api/embeddings"
         self.pull_endpoint = f"{base_url}/api/pull"
@@ -193,5 +197,15 @@ def get_ollama_service() -> OllamaEmbeddingService:
     """Get or create singleton instance"""
     global _ollama_service
     if _ollama_service is None:
-        _ollama_service = OllamaEmbeddingService()
+        # Read OLLAMA_HOST from environment at runtime (docker-compose env or .env)
+        base_url = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+        _ollama_service = OllamaEmbeddingService(base_url=base_url)
+    else:
+        # If environment changed since the singleton was created, recreate it
+        base_url = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+        try:
+            if getattr(_ollama_service, "base_url", None) != base_url:
+                _ollama_service = OllamaEmbeddingService(base_url=base_url)
+        except Exception:
+            _ollama_service = OllamaEmbeddingService(base_url=base_url)
     return _ollama_service

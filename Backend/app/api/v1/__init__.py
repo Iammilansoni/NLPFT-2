@@ -94,15 +94,24 @@ async def get_user_dashboard_stats(
     - unique_apis: Unique API names in user's data
     """
     try:
-        # Get actual embedding count from Redis
-        from app.services.redis_vector_service import get_redis_vector_service
-        import redis
-        from app.core.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
-        
-        redis_service = get_redis_vector_service()
-        
-        # Count embeddings for this user
-        embedding_count = redis_service.count_embeddings(current_user.u_id)
+        # Get actual embedding count from Redis using multi-model Redis service
+        from app.services.multi_model_redis_service import get_multi_model_redis_service
+        from app.core.embedding_model_registry import get_embedding_registry
+
+        redis_service = get_multi_model_redis_service()
+        registry = get_embedding_registry()
+
+        # Sum vectors across all registered models for this user
+        embedding_count = 0
+        try:
+            for model_id in registry.list_model_ids():
+                try:
+                    embedding_count += redis_service.count_vectors(model_id, current_user.u_id)
+                except Exception:
+                    # If counting for a model fails, continue with others
+                    continue
+        except Exception:
+            embedding_count = 0
         
         # Get unique intents and APIs by scanning user's embeddings
         intents = {}
@@ -113,24 +122,33 @@ async def get_user_dashboard_stats(
             user_id = str(current_user.u_id)
             pattern = f"embedding:{user_id}:*"
             
-            for key in r.scan_iter(match=pattern.encode(), count=100):
-                try:
-                    data = r.json().get(key)
-                    if data:
-                        # Count intents
-                        intent = data.get('intent_type') or data.get('scenario_type') or 'unknown'
-                        if isinstance(intent, bytes):
-                            intent = intent.decode()
-                        intents[intent] = intents.get(intent, 0) + 1
-                        
-                        # Count unique APIs
-                        api = data.get('api', '')
-                        if isinstance(api, bytes):
-                            api = api.decode()
-                        if api:
-                            unique_apis.add(api)
-                except Exception:
-                    continue
+            # Legacy intents/APIs aggregation - attempt to read legacy keys if present
+            r = None
+            try:
+                import redis as _redis
+                from app.core.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
+                r = _redis.Redis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD, decode_responses=False)
+            except Exception:
+                r = None
+
+            if r:
+                pattern = f"embedding:{str(current_user.u_id)}:*"
+                for key in r.scan_iter(match=pattern.encode(), count=100):
+                    try:
+                        data = r.json().get(key)
+                        if data:
+                            intent = data.get('intent_type') or data.get('scenario_type') or 'unknown'
+                            if isinstance(intent, bytes):
+                                intent = intent.decode()
+                            intents[intent] = intents.get(intent, 0) + 1
+
+                            api = data.get('api', '')
+                            if isinstance(api, bytes):
+                                api = api.decode()
+                            if api:
+                                unique_apis.add(api)
+                    except Exception:
+                        continue
         except Exception as e:
             logger.warning(f"Could not aggregate intents/APIs: {e}")
         

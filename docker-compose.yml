@@ -1,30 +1,13 @@
 # =============================================================================
-# NLPForge-Tester - Production Docker Compose
+# NLPForge-Tester - Production Docker Compose (Host Ollama)
 # =============================================================================
-# Complete production setup with all services containerized
-# 
-# Cross-platform compatible: Windows, Linux, macOS
-#
-# Usage:
-#   Start:      docker-compose up -d
-#   Stop:       docker-compose down
-#   Logs:       docker-compose logs -f
-#   Rebuild:    docker-compose up -d --build
-#   Full reset: docker-compose down -v && docker-compose up -d --build
-#
-# Access Points:
-#   - Frontend:       http://localhost:3000
-#   - Backend API:    http://localhost:8000
-#   - API Docs:       http://localhost:8000/docs
-#   - RedisInsight:   http://localhost:8001
-#   - Redis Commander: http://localhost:8081
-#   - pgAdmin:        http://localhost:5050
-#
+# Ollama runs on HOST (http://localhost:11434)
+# Docker stack connects via host.docker.internal (Linux-safe)
 # =============================================================================
 
 services:
   # ---------------------------------------------------------------------------
-  # PostgreSQL Database - Primary data storage
+  # PostgreSQL Database
   # ---------------------------------------------------------------------------
   postgres:
     image: postgres:15-alpine
@@ -33,7 +16,7 @@ services:
     env_file:
       - ./Backend/.env
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-nlpforge}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nlpforge_secure_password}
@@ -50,14 +33,9 @@ services:
     restart: unless-stopped
     networks:
       - nlpforge-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   # ---------------------------------------------------------------------------
-  # Redis Stack - Vector database with RediSearch
+  # Redis Stack (Vector DB + RedisInsight)
   # ---------------------------------------------------------------------------
   redis:
     image: redis/redis-stack:latest
@@ -66,8 +44,8 @@ services:
     env_file:
       - ./Backend/.env
     ports:
-      - "6379:6379"     # Redis port
-      - "8001:8001"     # RedisInsight UI
+      - "6379:6379"
+      - "8001:8001"
     environment:
       REDIS_ARGS: >-
         --requirepass ${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024}
@@ -78,29 +56,20 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
     restart: unless-stopped
     networks:
       - nlpforge-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   # ---------------------------------------------------------------------------
-  # Redis Commander - Web-based Redis management UI
+  # Redis Commander
   # ---------------------------------------------------------------------------
   redis-commander:
     image: rediscommander/redis-commander:latest
     container_name: nlpforge-redis-commander
-    hostname: redis-commander
-    env_file:
-      - ./Backend/.env
     ports:
       - "8081:8081"
     environment:
@@ -113,25 +82,17 @@ services:
     restart: unless-stopped
     networks:
       - nlpforge-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "5m"
-        max-file: "2"
 
   # ---------------------------------------------------------------------------
-  # pgAdmin - PostgreSQL Web Administration Tool
+  # pgAdmin
   # ---------------------------------------------------------------------------
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: nlpforge-pgadmin
-    hostname: pgadmin
-    env_file:
-      - ./Backend/.env
     ports:
       - "5050:80"
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@nlpforge.local}
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
       PGADMIN_CONFIG_SERVER_MODE: "False"
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
@@ -143,84 +104,9 @@ services:
     restart: unless-stopped
     networks:
       - nlpforge-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "5m"
-        max-file: "2"
 
   # ---------------------------------------------------------------------------
-  # Ollama - Local LLM and Embedding Model Server
-  # ---------------------------------------------------------------------------
-  # Supported Embedding Models (3 models):
-  # - nomic-embed-text (768D) - Default, balanced
-  # - all-minilm (384D) - Fast, lightweight
-  # - mxbai-embed-large (1024D) - High accuracy
-  # ---------------------------------------------------------------------------
-  ollama:
-    image: ollama/ollama:latest
-    container_name: nlpforge-ollama
-    hostname: ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    environment:
-      OLLAMA_HOST: 0.0.0.0
-      OLLAMA_ORIGINS: "*"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    restart: unless-stopped
-    networks:
-      - nlpforge-network
-    # Uncomment for GPU support on Linux with NVIDIA
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "20m"
-        max-file: "3"
-
-  # ---------------------------------------------------------------------------
-  # Ollama Init - Automatically pull required models on startup
-  # ---------------------------------------------------------------------------
-  ollama-init:
-    image: curlimages/curl:latest
-    container_name: nlpforge-ollama-init
-    depends_on:
-      ollama:
-        condition: service_healthy
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        echo "🚀 Pulling required Ollama models..."
-        echo "📦 [1/4] Pulling nomic-embed-text (768D embedding - default)..."
-        curl -X POST http://ollama:11434/api/pull -d '{"name": "nomic-embed-text", "stream": false}' -H 'Content-Type: application/json' --max-time 600 || echo "⚠️ nomic-embed-text pull failed"
-        echo "📦 [2/4] Pulling all-minilm (384D embedding - fast)..."
-        curl -X POST http://ollama:11434/api/pull -d '{"name": "all-minilm", "stream": false}' -H 'Content-Type: application/json' --max-time 600 || echo "⚠️ all-minilm pull failed"
-        echo "📦 [3/4] Pulling mxbai-embed-large (1024D embedding - high accuracy)..."
-        curl -X POST http://ollama:11434/api/pull -d '{"name": "mxbai-embed-large", "stream": false}' -H 'Content-Type: application/json' --max-time 600 || echo "⚠️ mxbai-embed-large pull failed"
-        echo "📦 [4/4] Pulling llama3.1:8b-instruct-q4_K_M (dataset generation LLM)..."
-        curl -X POST http://ollama:11434/api/pull -d '{"name": "llama3.1:8b-instruct-q4_K_M", "stream": false}' -H 'Content-Type: application/json' --max-time 900 || echo "⚠️ llama3.1 pull failed"
-        echo "✅ Model initialization complete!"
-        echo "📋 Available models:"
-        curl -s http://ollama:11434/api/tags | grep -o '"name":"[^"]*"' || echo "Could not list models"
-    networks:
-      - nlpforge-network
-    restart: "no"
-
-  # ---------------------------------------------------------------------------
-  # Backend - FastAPI Application Server
+  # Backend (FastAPI)
   # ---------------------------------------------------------------------------
   backend:
     build:
@@ -228,47 +114,23 @@ services:
       dockerfile: Dockerfile
     image: nlpforge-backend:latest
     container_name: nlpforge-backend
-    hostname: backend
     env_file:
       - ./Backend/.env
     ports:
       - "8000:8000"
     environment:
-      # PostgreSQL Configuration
-      DATABASE_URL: postgresql://${POSTGRES_USER:-nlpforge}:${POSTGRES_PASSWORD:-nlpforge_secure_password}@postgres:5432/${POSTGRES_DB:-nlpforge}
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: "5432"
-      POSTGRES_USER: ${POSTGRES_USER:-nlpforge}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nlpforge_secure_password}
-      POSTGRES_DB: ${POSTGRES_DB:-nlpforge}
-
-      # Redis Configuration
       REDIS_URL: redis://:${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024}@redis:6379/0
       REDIS_HOST: redis
-      REDIS_PORT: "6379"
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024}
-
-      # Ollama Configuration
-      OLLAMA_HOST: http://ollama:11434
       OLLAMA_BASE_URL: http://ollama:11434
-
-      # Application Configuration
+      OLLAMA_HOST: http://ollama:11434
       ENVIRONMENT: ${ENVIRONMENT:-production}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      SECRET_KEY: ${SECRET_KEY:-your-super-secret-key-change-in-production}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://10.0.0.1:3000}
 
-      # Email / SMTP Configuration
-      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@nlpforge.com}
-      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-NLPForge}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
-      # AI/ML Configuration
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     volumes:
       - backend_storage:/app/storage
       - backend_datasets:/app/datasets
@@ -277,100 +139,81 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      ollama:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 90s
     restart: unless-stopped
     networks:
       - nlpforge-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "20m"
-        max-file: "5"
 
   # ---------------------------------------------------------------------------
-  # Frontend - Next.js Web Application
+  # Frontend (Next.js)
   # ---------------------------------------------------------------------------
   frontend:
     build:
       context: ./Frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
-        NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:8000}
+        NEXT_PUBLIC_API_URL: ""
     image: nlpforge-frontend:latest
     container_name: nlpforge-frontend
-    hostname: frontend
-    env_file:
-      - ./Frontend/.env
+    
+    
+    
     ports:
       - "3000:3000"
     environment:
-      # Public environment variables (browser-accessible)
-      NEXT_PUBLIC_API_URL: http://localhost:8000
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
-      NEXT_PUBLIC_WS_URL: ws://localhost:8000
-
-      # Server-side environment variables
-      API_URL: http://backend:8000
+      # Leave NEXT_PUBLIC_API_URL empty so the client uses relative paths (same-origin)
+      NEXT_PUBLIC_API_URL: "http://10.0.0.1:8000"
+      BACKEND_INTERNAL_URL: http://backend:8000
+      # Do not expose an absolute API URL to the client; keep API_URL empty for builds
+      API_URL: ""
       NODE_ENV: production
-      PORT: "3000"
-      HOSTNAME: "0.0.0.0"
     depends_on:
       backend:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
     restart: unless-stopped
     networks:
       - nlpforge-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Ollama (Local Embeddings Server)
+  # Note: Replace `ollama/ollama:latest` with the correct Ollama image if needed.
+  # If you prefer to run Ollama on the host, omit this service and keep OLLAMA_HOST pointing
+  # to the host (e.g. http://host.docker.internal:11434).
+  # ---------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: nlpforge-ollama
+    # Do not bind host port 11434 if Ollama is already running on the host.
+    # Containers can reach this service at http://ollama:11434 via the Docker network.
+    # If you need host access to this container, map to a different host port (e.g. "11435:11434").
+    restart: unless-stopped
+    expose:
+      - "11434"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nlpforge-network
 
 # =============================================================================
-# Volumes - Persistent data storage
+# Volumes
 # =============================================================================
 volumes:
   postgres_data:
-    driver: local
-    name: nlpforge-postgres-data
   redis_data:
-    driver: local
-    name: nlpforge-redis-data
   pgadmin_data:
-    driver: local
-    name: nlpforge-pgadmin-data
-  ollama_data:
-    driver: local
-    name: nlpforge-ollama-data
   backend_storage:
-    driver: local
-    name: nlpforge-backend-storage
   backend_datasets:
-    driver: local
-    name: nlpforge-backend-datasets
 
 # =============================================================================
-# Networks - Internal container communication
+# Network
 # =============================================================================
 networks:
   nlpforge-network:
     driver: bridge
-    name: nlpforge-network
-    ipam:
-      config:
-        - subnet: 172.28.0.0/16

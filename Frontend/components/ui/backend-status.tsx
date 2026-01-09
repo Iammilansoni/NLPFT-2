@@ -1,6 +1,7 @@
 "use client";
 
 import { useTheme } from "next-themes";
+import { getApiBase } from '@/lib/runtime-config';
 import { Wifi, WifiOff, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -24,7 +25,8 @@ export function BackendStatus({ className = "", showText = true, variant = 'defa
       const startTime = performance.now();
       try {
         setIsLoading(true);
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const RAW_API_BASE = getApiBase();
+        const apiUrl = RAW_API_BASE ? RAW_API_BASE.replace(/\/$/, '') : '';
         const response = await fetch(`${apiUrl}/api/v1/health`, {
           method: 'GET',
           signal: AbortSignal.timeout(5000),
