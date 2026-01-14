@@ -12,6 +12,7 @@ Features:
 
 import os
 import json
+import math
 import csv
 import random
 import string
@@ -258,6 +259,21 @@ You understand. Await user prompt.
             edge_count = 3
             extreme_count = 2
 
+        # Extract parameter info for dynamic examples
+        num_concepts = 3 # valid, edge, error
+        per_concept_variants = min(15, max(1, math.floor(num_examples / num_concepts)))
+        phrasing_instruction = f"Provide {per_concept_variants} different phrasings" if num_examples < 50 else "aim for diverse phrasings; for larger datasets target 10–15 per concept."
+        
+        params = template_data.get("parameters", []) if template_data else []
+        p_names = [p.get("name") for p in params if p.get("name")]
+        
+        # Fallback for empty parameters
+        p_names_clean = p_names[:2] if p_names else ["data", "parameter"]
+        p1 = p_names_clean[0]
+        p2 = p_names_clean[1] if len(p_names_clean) > 1 else "config"
+        
+        api_name = template_data.get("name", "API") if template_data else "API"
+
         user_prompt_text = f"""Generate exactly {num_examples} test cases for the API above. Output ONLY a JSON array.
 
 Requirements:
@@ -267,11 +283,23 @@ Requirements:
 
 Each test case needs: query, api, endpoint, method, request, expected_response, scenario_type, test_category, notes
 
+CRITICAL FOR HIGH CONFIDENCE SCORES (80%+):
+1. **Use domain-specific technical terminology** from the schema
+2. **Include multiple parameter mentions** in each query (e.g., "perform action on {p1} and {p2}")
+3. **{phrasing_instruction}**:
+   - Formal: "Submit a POST request to {api_name} for {p1} processing..."
+   - Technical shorthand: "{api_name} {p1} spec-compliant execution"
+   - Natural question: "How do I perform {api_name} on the given {p1}?"
+   - With parameters: "{p1}=value {p2}=default"
+4. **Add typo variants (10% of total)** with slightly lower expected quality
+5. **Include action verbs**: calculate, generate, process, execute, apply, transform, compute
+
 Generate varied natural language queries:
-- "Create order for customer X"
-- "Place a new booking with COD payment"  
-- "I want to buy product ABC"
-- Include some with typos like "creaet ordr"
+- "Submit request to perform {api_name} on {p1} with specific configuration"
+- "Generate {api_name} analysis {p1} technical parameters"
+- "How do I transform raw input into valid {p1} using {api_name}?"
+- "Process {p1} using {api_name} specification"
+- Include some with typos like "crete requ est witout fiel ds"
 
 Output format: [{{"query":"...", "api":"...", ...}}, ...]
 Return ONLY the JSON array, nothing else."""

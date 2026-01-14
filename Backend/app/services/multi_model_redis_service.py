@@ -368,7 +368,7 @@ class MultiModelRedisVectorService:
         document = {
             "user_id": str(user_id),
             "dataset_id": str(dataset_id),
-            "template_id": str(template_id),
+            "template_id": str(template_id) if template_id else None,
             "row_id": row_id,
             "embedding_model": model_id,
             "dimension": expected_dim,
@@ -445,7 +445,7 @@ class MultiModelRedisVectorService:
                 document = {
                     "user_id": str(user_id),
                     "dataset_id": str(dataset_id),
-                    "template_id": str(template_id),
+                    "template_id": str(template_id) if template_id else None,
                     "row_id": row_id,
                     "embedding_model": model_id,
                     "dimension": expected_dim,

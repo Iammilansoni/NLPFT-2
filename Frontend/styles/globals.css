@@ -173,6 +173,10 @@
     @apply border-border;
   }
 
+  input, select, textarea {
+    @apply bg-background text-foreground;
+  }
+
   html {
     font-size: 14px;
     -webkit-font-smoothing: antialiased;

@@ -126,7 +126,7 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-production}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://10.0.0.1:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://10.0.0.1:3000,http://10.0.0.1:8000}
 
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -149,7 +149,7 @@ services:
       - nlpforge-network
 
   # ---------------------------------------------------------------------------
-  # Frontend (Next.js)
+  # Frontend (Next.js) - Hardened with Security Controls
   # ---------------------------------------------------------------------------
   frontend:
     build:
@@ -160,17 +160,16 @@ services:
     image: nlpforge-frontend:latest
     container_name: nlpforge-frontend
     
-    
-    
     ports:
       - "3000:3000"
     environment:
-      # Leave NEXT_PUBLIC_API_URL empty so the client uses relative paths (same-origin)
-      NEXT_PUBLIC_API_URL: "http://10.0.0.1:8000"
+      # Leave empty to enable dynamic host detection (localhost vs 10.0.0.1)
+      NEXT_PUBLIC_API_URL: ""
       BACKEND_INTERNAL_URL: http://backend:8000
       # Do not expose an absolute API URL to the client; keep API_URL empty for builds
       API_URL: ""
       NODE_ENV: production
+      NPM_CONFIG_IGNORE_SCRIPTS: "true"
     depends_on:
       backend:
         condition: service_healthy
@@ -194,9 +193,9 @@ services:
     expose:
       - "11434"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      test: ["CMD", "ollama", "list"]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 5
     networks:
       - nlpforge-network

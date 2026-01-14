@@ -118,15 +118,14 @@ async def get_user_dashboard_stats(
         unique_apis = set()
         
         try:
-            r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD, decode_responses=False)
+            import redis as _redis
+            from app.core.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
+            
             user_id = str(current_user.u_id)
             pattern = f"embedding:{user_id}:*"
             
             # Legacy intents/APIs aggregation - attempt to read legacy keys if present
-            r = None
             try:
-                import redis as _redis
-                from app.core.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
                 r = _redis.Redis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD, decode_responses=False)
             except Exception:
                 r = None

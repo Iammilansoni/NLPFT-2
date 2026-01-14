@@ -533,10 +533,19 @@ class MultiModelSemanticRetrievalService:
         for result in results:
             # Handle both 'template_id' and 't_id' for compatibility
             t_id = result.get("template_id") or result.get("t_id")
-            if t_id:
+            
+            # Skip invalid or missing template IDs
+            if not t_id or str(t_id).lower() == "none":
+                continue
+                
+            # Verify it's a valid UUID string (Step 7 requires this)
+            try:
+                if isinstance(t_id, str):
+                    uuid.UUID(t_id)
                 grouped[t_id].append(result)
-            else:
-                logger.debug(f"Result missing t_id: {result.get('query', '')[:30]}")
+            except (ValueError, TypeError):
+                logger.debug(f"Skipping result with invalid UUID t_id: {t_id}")
+                continue
         
         return dict(grouped)
     
