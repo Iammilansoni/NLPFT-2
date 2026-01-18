@@ -119,11 +119,11 @@ async def register(
     # Send verification OTP automatically (MANDATORY)
     from app.services.email_service import get_email_service
     from app.models.email_verification_models import EmailVerification
-    from datetime import datetime, timedelta
+    from datetime import datetime, timezone, timedelta
     
     email_service = get_email_service()
     otp = email_service.generate_otp()
-    expires_at = datetime.utcnow() + timedelta(minutes=10)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
     
     # Store OTP
     verification = EmailVerification(
@@ -388,7 +388,7 @@ async def forgot_password(
     For security, we always return success even if the email doesn't exist.
     """
     import secrets
-    from datetime import datetime, timedelta
+    from datetime import datetime, timezone, timedelta
     from app.services.email_service import get_email_service
     from app.models.password_reset_models import PasswordReset
     from sqlalchemy import select, and_
@@ -398,7 +398,7 @@ async def forgot_password(
     
     if user:
         # Rate limiting: Check if user has requested too many resets in the past hour
-        one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+        one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
         result = await db.execute(
             select(PasswordReset).where(
                 and_(
@@ -418,7 +418,7 @@ async def forgot_password(
         
         # Generate secure token
         reset_token = secrets.token_urlsafe(32)
-        expires_at = datetime.utcnow() + timedelta(hours=1)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
         
         # Get client IP
         client_ip = request.client.host if request.client else None
@@ -486,7 +486,7 @@ async def reset_password(
     - **new_password**: New password (min 8 characters, must contain uppercase, lowercase, and digit)
     - **confirm_password**: Must match new password
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
     from app.models.password_reset_models import PasswordReset
     from sqlalchemy import select, update, and_
     
@@ -508,7 +508,7 @@ async def reset_password(
         )
     
     # Check if token is expired
-    if reset_record.expires_at < datetime.utcnow():
+    if reset_record.expires_at < datetime.now(timezone.utc):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Reset token has expired. Please request a new one."
@@ -571,7 +571,7 @@ async def verify_reset_token(
     
     Returns token validity status
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
     from app.models.password_reset_models import PasswordReset
     from sqlalchemy import select, and_
     
@@ -588,7 +588,7 @@ async def verify_reset_token(
     if not reset_record:
         return {"valid": False, "message": "Invalid reset token"}
     
-    if reset_record.expires_at < datetime.utcnow():
+    if reset_record.expires_at < datetime.now(timezone.utc):
         return {"valid": False, "message": "Reset token has expired"}
     
     return {"valid": True, "email": reset_record.email}

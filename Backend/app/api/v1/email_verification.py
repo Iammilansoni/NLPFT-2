@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from pydantic import BaseModel, EmailStr
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 from app.core.postgres import get_db
 from app.models.database_models import User
@@ -97,7 +97,7 @@ async def send_verification_otp(
         
         # Generate new OTP
         otp = email_service.generate_otp()
-        expires_at = datetime.utcnow() + timedelta(minutes=10)
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
         
         # Store OTP in database
         verification = EmailVerification(
@@ -189,7 +189,7 @@ async def verify_otp(
             )
         
         # Check if OTP expired
-        if datetime.utcnow() > verification.expires_at:
+        if datetime.now(timezone.utc) > verification.expires_at:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="OTP expired. Please request a new OTP."
@@ -272,7 +272,7 @@ async def resend_otp(
             )
         
         # Check rate limiting - max 3 OTPs per hour
-        one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+        one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
         recent_otps = select(EmailVerification).where(
             and_(
                 EmailVerification.email == email,
@@ -301,7 +301,7 @@ async def resend_otp(
         
         # Generate new OTP
         otp = email_service.generate_otp()
-        expires_at = datetime.utcnow() + timedelta(minutes=10)
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
         
         verification = EmailVerification(
             email=email,
