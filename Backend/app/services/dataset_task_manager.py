@@ -3,7 +3,7 @@ Dataset Task Manager - Manages async dataset generation tasks with progress trac
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Optional, List, Callable
 from uuid import UUID
 from app.core.logger import logger
@@ -33,7 +33,7 @@ class DatasetTaskManager:
             "progress": 0,
             "current_step": "initializing",
             "steps": [],
-            "created_at": datetime.utcnow().isoformat() + "Z",  # Add Z suffix to indicate UTC
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "completed_at": None,
             "statistics": None,
             "files": None,
@@ -79,7 +79,7 @@ class DatasetTaskManager:
         _task_store[task_id]["steps"].append({
             "name": step_name,
             "status": step_status,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
         _task_store[task_id]["current_step"] = step_name
     

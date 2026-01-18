@@ -171,7 +171,9 @@ Each data point must contain:
 4. classification labels:
    - scenario_type → valid | edge | extreme
    - test_category → valid_flow | boundary | typo | error_case | paraphrase
-5. short `notes` (explain intention, edge, typo, boundary)
+   - intent_type → create | read | update | delete | query (MUST match the HTTP method: POST=create, GET=read, PUT/PATCH=update, DELETE=delete)
+5. confidence_score → 0.6 to 1.0 (how confident you are this is a good test case)
+6. short `notes` (explain intention, edge, typo, boundary)
 
 ===============================================================================
 CASE DISTRIBUTION RULE
@@ -219,6 +221,8 @@ Each item must be:
   "expected_response": {{ ... }},
   "scenario_type": "valid"|"edge"|"extreme",
   "test_category": "valid_flow"|"typo"|"boundary"|"error_case"|"paraphrase",
+  "intent_type": "create"|"read"|"update"|"delete"|"query",
+  "confidence_score": 0.85,
   "notes": "..."
 }}
 
@@ -482,6 +486,29 @@ Return ONLY the JSON array, nothing else."""
         if "notes" not in test_case:
             test_case["notes"] = ""
         
+        # Add intent_type based on HTTP method if missing
+        if "intent_type" not in test_case or not test_case.get("intent_type"):
+            from app.services.intent_classification_service import get_intent_from_method
+            method = test_case.get("method", template_data.get("method", "POST"))
+            test_case["intent_type"] = get_intent_from_method(method)
+        
+        # Validate intent_type
+        valid_intents = ["create", "read", "update", "delete", "query", "unknown"]
+        if test_case.get("intent_type", "").lower() not in valid_intents:
+            from app.services.intent_classification_service import get_intent_from_method
+            method = test_case.get("method", "POST")
+            test_case["intent_type"] = get_intent_from_method(method)
+        
+        # Add confidence_score if missing (default 0.85 for valid, 0.7 for edge, 0.6 for extreme)
+        if "confidence_score" not in test_case:
+            scenario = test_case.get("scenario_type", "valid").lower()
+            if scenario == "valid":
+                test_case["confidence_score"] = 0.85
+            elif scenario == "edge":
+                test_case["confidence_score"] = 0.70
+            else:
+                test_case["confidence_score"] = 0.60
+        
         scenario = test_case.get("scenario_type", "valid").lower()
         if scenario not in ["valid", "edge", "extreme"]:
             test_case["scenario_type"] = "valid"
@@ -530,6 +557,8 @@ Return ONLY the JSON array, nothing else."""
                 "expected_response": response_json,
                 "scenario_type": tc.get("scenario_type", "valid"),
                 "test_category": tc.get("test_category", "valid_flow"),
+                "intent_type": tc.get("intent_type", "unknown"),
+                "confidence_score": tc.get("confidence_score", 0.85),
                 "notes": tc.get("notes", "")
             })
         

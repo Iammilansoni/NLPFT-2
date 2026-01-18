@@ -6,7 +6,7 @@ Uses Ollama for CPU-based embeddings (no HuggingFace dependency)
 import os
 import hashlib
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 import numpy as np
 import redis
@@ -210,7 +210,7 @@ class EmbeddingManager:
             "hash_id": hash_id,
             "api_name": api_name or intent,
             "template_version": template_version,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "confidence": confidence
         }
         
@@ -301,7 +301,7 @@ class EmbeddingManager:
                     "hash_id": hash_id,
                     "api_name": batch_api_names[j],
                     "template_version": 1,
-                    "created_at": datetime.utcnow().isoformat(),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
                     "confidence": 1.0
                 }
                 

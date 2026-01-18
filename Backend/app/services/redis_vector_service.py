@@ -16,7 +16,7 @@ import redis
 import numpy as np
 from typing import List, Dict, Optional, Tuple, Union
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from redis.commands.search.field import VectorField, TextField, NumericField
 from redis.commands.search.indexDefinition import IndexDefinition, IndexType
@@ -183,7 +183,7 @@ class RedisVectorService:
             "vector": vector.tolist(),
             "dimension": dimension,
             "model": model_name or "unknown",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             # Semantic retrieval metadata (defaults for backward compatibility)
             "intent_type": intent_type or "unknown",
             "confidence_score": confidence_score if confidence_score is not None else 0.5
