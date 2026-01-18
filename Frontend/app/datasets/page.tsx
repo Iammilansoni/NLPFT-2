@@ -51,6 +51,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { toast } from '@/hooks/use-toast'
+import { OnboardingTour } from '@/components/onboarding/OnboardingTour'
+import { ActiveTasksPanel } from '@/components/datasets/ActiveTasksPanel'
 
 interface DatasetRecord {
   api: string
@@ -131,7 +133,7 @@ export default function DatasetGeneratorPage() {
 
   const [templateId, setTemplateId] = useState('')
   const [templates, setTemplates] = useState<any[]>([])
-  const [numExamples, setNumExamples] = useState(100)
+  const [numExamples, setNumExamples] = useState('100')
   const [userPrompt, setUserPrompt] = useState('')
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
@@ -342,7 +344,7 @@ export default function DatasetGeneratorPage() {
         },
         body: JSON.stringify({
           template_id: templateId,
-          num_examples: numExamples,
+          num_examples: parseInt(numExamples) || 100,
           user_prompt: userPrompt,
         }),
       })
@@ -615,6 +617,7 @@ export default function DatasetGeneratorPage() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950/50">
+      <OnboardingTour tourId="datasets" />
       <div className="p-6 lg:p-8 space-y-8 max-w-[1600px] mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -639,8 +642,14 @@ export default function DatasetGeneratorPage() {
           </div>
         </div>
 
-        <Tabs defaultValue="generate" className="w-full space-y-6">
-          <TabsList className="grid w-full sm:w-[400px] grid-cols-2 p-1 bg-muted/50 rounded-lg">
+        {/* Active Tasks Panel - Shows running/recent generation tasks */}
+        <ActiveTasksPanel 
+          onTaskComplete={fetchAllTasks}
+          className="animate-in fade-in slide-in-from-top-2 duration-300"
+        />
+
+        <Tabs defaultValue="generate" className="w-full space-y-6" data-tour="dataset-tabs">
+          <TabsList className="grid w-full sm:w-[400px] grid-cols-2 p-1 bg-muted/50 rounded-lg" data-tour="generate-dataset">
             <TabsTrigger
               value="generate"
               className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md transition-all duration-200"
@@ -660,30 +669,92 @@ export default function DatasetGeneratorPage() {
           <TabsContent value="generate" className="outline-none animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
             {/* Active Generation Progress Card */}
             {currentTask && (currentTask.status === 'running' || currentTask.status === 'pending') && (
-              <Card className="mb-6 border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-900/10 shadow-sm animate-in fade-in slide-in-from-top-2">
-                <CardContent className="p-4 flex items-center gap-4">
-                  <div className="relative">
-                    <Loader2 className="w-8 h-8 animate-spin text-blue-600 dark:text-blue-400" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-900/50" />
+              <Card className="mb-6 border-blue-200 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 dark:border-blue-900 dark:from-blue-900/20 dark:to-indigo-900/20 shadow-sm animate-in fade-in slide-in-from-top-2">
+                <CardContent className="p-5 space-y-4">
+                  {/* Header Row */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <Loader2 className="w-8 h-8 animate-spin text-blue-600 dark:text-blue-400" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-3 h-3 rounded-full bg-blue-500/30" />
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                          Generating Dataset
+                        </p>
+                        <p className="text-xs text-blue-600 dark:text-blue-400 font-mono">
+                          ID: {currentTask.task_id.slice(0, 8)}...
+                        </p>
+                      </div>
+                    </div>
+                    <Badge 
+                      variant="outline" 
+                      className={cn(
+                        "text-xs font-medium px-2.5 py-1",
+                        currentTask.status === 'running' 
+                          ? "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-700"
+                          : "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-300 dark:border-amber-700"
+                      )}
+                    >
+                      {currentTask.status === 'running' ? '⚡ Processing' : '⏳ Queued'}
+                    </Badge>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-blue-700 dark:text-blue-300 font-medium">
+                        {currentTask.current_step || currentTask.message || 'Initializing...'}
+                      </span>
+                      <span className="text-blue-900 dark:text-blue-100 font-bold tabular-nums">
+                        {currentTask.progress !== undefined ? `${Math.round(currentTask.progress)}%` : '—'}
+                      </span>
+                    </div>
+                    <div className="h-2.5 bg-blue-200/50 dark:bg-blue-900/50 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-500 ease-out"
+                        style={{ width: `${currentTask.progress || 0}%` }}
+                      />
                     </div>
                   </div>
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 flex items-center gap-2">
-                      Generating Dataset...
-                      <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200 text-[10px] h-5 px-1.5">
-                        {currentTask.task_id}
-                      </Badge>
+
+                  {/* Step Details */}
+                  {currentTask.steps && currentTask.steps.length > 0 && (
+                    <div className="pt-2 border-t border-blue-200/50 dark:border-blue-800/50">
+                      <div className="flex flex-wrap gap-2">
+                        {currentTask.steps.map((step, idx) => (
+                          <div 
+                            key={idx}
+                            className={cn(
+                              "flex items-center gap-1.5 text-xs px-2 py-1 rounded-full",
+                              step.status === 'completed' && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+                              step.status === 'running' && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 animate-pulse",
+                              step.status === 'pending' && "bg-gray-100 text-gray-500 dark:bg-gray-800/30 dark:text-gray-500"
+                            )}
+                          >
+                            {step.status === 'completed' && <CheckCircle className="w-3 h-3" />}
+                            {step.status === 'running' && <Loader2 className="w-3 h-3 animate-spin" />}
+                            {step.status === 'pending' && <Clock className="w-3 h-3" />}
+                            <span>{step.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Time Estimate */}
+                  {currentTask.created_at && (
+                    <p className="text-[10px] text-blue-600/70 dark:text-blue-400/70 text-center">
+                      Started {new Date(currentTask.created_at).toLocaleTimeString()} • Generation typically takes 30-60 seconds
                     </p>
-                    <p className="text-xs text-blue-700 dark:text-blue-300">
-                      {currentTask.message || 'Creating test cases with AI...'}
-                    </p>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             )}
 
-            <Card className="border-border shadow-sm bg-card overflow-hidden">
+            <Card className="border-border shadow-sm bg-card overflow-hidden" data-tour="generate-dataset">
               <CardHeader className="bg-muted/30 border-b pb-4">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center ring-1 ring-primary/20">
@@ -736,7 +807,16 @@ export default function DatasetGeneratorPage() {
                       min={1}
                       max={1000}
                       value={numExamples}
-                      onChange={(e) => setNumExamples(parseInt(e.target.value) || 100)}
+                      onChange={(e) => setNumExamples(e.target.value)}
+                      onBlur={(e) => {
+                        // On blur, validate and set default if empty
+                        const val = parseInt(e.target.value)
+                        if (isNaN(val) || val < 1) {
+                          setNumExamples('100')
+                        } else if (val > 1000) {
+                          setNumExamples('1000')
+                        }
+                      }}
                       disabled={isGenerating}
                       className="h-11"
                     />
@@ -790,7 +870,7 @@ export default function DatasetGeneratorPage() {
           </TabsContent>
 
           <TabsContent value="upload" className="outline-none animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
-            <Card className="border-border shadow-sm bg-card">
+            <Card className="border-border shadow-sm bg-card" data-tour="upload-dataset">
               <CardHeader className="bg-muted/30 border-b pb-4">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center ring-1 ring-border">
@@ -888,7 +968,7 @@ export default function DatasetGeneratorPage() {
         </Tabs>
 
         {/* ============= DATASET TABLE SECTION ============= */}
-        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden" data-tour="dataset-list">
           {/* Toolbar */}
           <div className="p-4 border-b flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="relative w-full sm:max-w-xs group">
