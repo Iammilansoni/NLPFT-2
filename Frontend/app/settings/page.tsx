@@ -36,6 +36,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { OnboardingTour } from '@/components/onboarding/OnboardingTour'
 
 // ============================================================================
 // NAVIGATION ITEMS
@@ -564,7 +565,7 @@ export default function SettingsPage() {
 
       {/* Model Selection */}
       <div className="space-y-4">
-        <h3 className="font-semibold text-foreground">Select Embedding Model</h3>
+        <h3 className="font-semibold text-foreground" data-tour="model-select">Select Embedding Model</h3>
 
         {settingsLoading ? (
           <div className="flex items-center justify-center py-16">
@@ -610,6 +611,7 @@ export default function SettingsPage() {
           onClick={handleSaveModel}
           disabled={updateSettingsMutation.isPending || !hasModelChanged}
           className="transition-all duration-200 active:scale-95"
+          data-tour="save-settings"
         >
           {updateSettingsMutation.isPending ? 'Saving...' : 'Save Model'}
         </Button>
@@ -661,6 +663,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <OnboardingTour tourId="settings" />
       <div className="max-w-6xl mx-auto p-6 md:p-8">
         {/* Page Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 mb-8 border-b border-border/40">

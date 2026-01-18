@@ -28,7 +28,7 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { ConfidenceBadge } from "@/components/ui/confidence-badge"
 import { EmptyState } from "@/components/ui/empty-state"
-import { CardGridSkeleton } from "@/components/ui/skeleton"
+import { TemplateListSkeleton } from "@/components/ui/skeleton"
 import { SearchInput } from "@/components/ui/search-input"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
@@ -46,6 +46,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { DataExportButton } from "@/components/data-export/DataExportButton"
+import { OnboardingTour } from "@/components/onboarding/OnboardingTour"
 
 export default function TemplatesPage() {
   const router = useRouter()
@@ -238,9 +240,16 @@ export default function TemplatesPage() {
               </Tooltip>
             </TooltipProvider>
 
+            <DataExportButton
+              data={filteredTemplates}
+              filename="nlpforge_templates"
+              disabled={!filteredTemplates || filteredTemplates.length === 0}
+              label="Export"
+            />
+
             <div className="h-6 w-px bg-border/60 mx-1" />
 
-            <Button onClick={() => router.push("/templates/new")} className="shadow-sm">
+            <Button onClick={() => router.push("/templates/new")} className="shadow-sm" data-tour="create-template">
               <Plus className="h-4 w-4 mr-2" />
               New Template
             </Button>
@@ -325,7 +334,7 @@ export default function TemplatesPage() {
         {isLoading && (
           <div className="space-y-4">
             <div className="h-12 w-full bg-muted/10 rounded-lg animate-pulse" />
-            <CardGridSkeleton count={4} />
+            <TemplateListSkeleton count={4} />
           </div>
         )}
 
@@ -372,7 +381,7 @@ export default function TemplatesPage() {
 
         {/* Template List - Modern Grid/Table */}
         {filteredTemplates.length > 0 && (
-          <div className="rounded-xl border border-border/40 bg-card overflow-hidden shadow-sm">
+          <div className="rounded-xl border border-border/40 bg-card overflow-hidden shadow-sm" data-tour="template-list">
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead>
@@ -512,6 +521,8 @@ export default function TemplatesPage() {
           </div>
         )}
       </main>
+      {/* Onboarding Tour for templates */}
+      <OnboardingTour tourId="templates" />
     </div>
   )
 }
