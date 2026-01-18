@@ -125,7 +125,7 @@ function LogItem({
         {/* Message */}
         <div className="flex-1 min-w-0">
           <p className={cn(
-            "text-xs leading-tight truncate",
+            "text-sm leading-tight truncate",
             isCritical && "text-amber-500 font-medium"
           )}>
             {displayMessage}
@@ -215,30 +215,52 @@ export function SystemLogsSidebar() {
 
   return (
     <>
-      {/* Toggle Button (Visible when closed) */}
+      {/* Mobile Overlay */}
+      {isSystemLogsOpen && (
+        <div
+          onClick={() => setIsSystemLogsOpen(false)}
+          className="lg:hidden fixed inset-0 bg-black/50 z-40 transition-opacity"
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Toggle Button (Visible when closed) - Enhanced visibility */}
       {!isSystemLogsOpen && (
         <button
           onClick={() => setIsSystemLogsOpen(true)}
-          className="fixed right-0 top-20 z-40 flex items-center gap-1.5 rounded-l-sm bg-card border border-r-0 border-border px-2 py-1.5 hover:bg-accent transition-colors"
+          className={cn(
+            "fixed right-0 z-40 flex items-center gap-2 rounded-l-lg",
+            "bg-card border border-r-0 border-border shadow-lg",
+            "px-3 py-3 hover:bg-accent hover:border-primary/30 transition-all duration-200",
+            "hover:translate-x-0 translate-x-0",
+            // Position: different on mobile vs desktop
+            "top-20 md:top-1/2 md:-translate-y-1/2"
+          )}
+          aria-label="Open Activity Panel"
         >
-          <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-[10px] font-medium">Activity</span>
-          {isConnected && (
-            <span className="h-1.5 w-1.5 rounded-full bg-success animate-cc-pulse" />
-          )}
-          {counts.error > 0 && (
-            <span className="h-4 min-w-4 px-1 rounded-sm bg-error text-[9px] text-white flex items-center justify-center font-mono font-bold">
-              {counts.error > 99 ? '99+' : counts.error}
-            </span>
-          )}
+          <div className="flex flex-col items-center gap-1.5">
+            <Terminal className="h-5 w-5 text-primary" />
+            <span className="text-xs font-semibold tracking-wide uppercase">Activity</span>
+            {isConnected && (
+              <span className="h-2 w-2 rounded-full bg-success animate-cc-pulse" />
+            )}
+            {counts.error > 0 && (
+              <span className="h-5 min-w-5 px-1 rounded-md bg-error text-[10px] text-white flex items-center justify-center font-mono font-bold shadow-sm">
+                {counts.error > 99 ? '99+' : counts.error}
+              </span>
+            )}
+          </div>
         </button>
       )}
 
       {/* Sidebar */}
       <div
         className={cn(
-          'fixed inset-y-0 right-0 z-50 flex flex-col bg-card border-l border-border transition-all duration-200 ease-out',
-          isSystemLogsOpen ? 'w-[320px]' : 'w-0 overflow-hidden pointer-events-none'
+          'fixed inset-y-0 right-0 z-50 flex flex-col bg-card border-l border-border transition-all duration-300 ease-out shadow-2xl',
+          // Responsive width: full on small, fixed on lg+
+          isSystemLogsOpen 
+            ? 'w-full sm:w-[380px] lg:w-[400px]' 
+            : 'w-0 overflow-hidden pointer-events-none'
         )}
       >
         {/* Header */}
@@ -247,10 +269,10 @@ export function SystemLogsSidebar() {
           isScrolled && "bg-card"
         )}>
           <div className="flex items-center gap-2">
-            <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
-            <h2 className="font-medium text-xs">Activity</h2>
+            <Terminal className="h-4 w-4 text-muted-foreground" />
+            <h2 className="font-semibold text-sm">Activity</h2>
             <span className={cn(
-              "font-mono text-[9px] px-1.5 py-0.5 rounded-sm",
+              "font-mono text-[10px] px-1.5 py-0.5 rounded-sm",
               isConnected
                 ? "bg-success/10 text-success"
                 : "bg-error/10 text-error"
