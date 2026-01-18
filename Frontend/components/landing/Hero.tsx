@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useRef, useState, MouseEvent } from 'react'
 import Link from 'next/link'
@@ -12,14 +12,14 @@ import { cn } from '@/lib/utils'
 // import { HeroDemo } from './HeroDemo'
 
 const STATS = [
-  { value: '50K+', label: 'Tests / day', Icon: TrendingUp },
-  { value: '45ms', label: 'Avg latency', Icon: Gauge },
-  { value: '99.8%', label: 'Accuracy', Icon: CheckCircle2 },
+  { value: '10K+', label: 'Test cases / template', Icon: TrendingUp },
+  { value: '<50ms', label: 'Vector search', Icon: Gauge },
+  { value: '95%+', label: 'Match accuracy', Icon: CheckCircle2 },
 ]
 
 const TRUST = [
-  { name: 'ISO 27001', Icon: Shield },
-  { name: 'SOC 2', Icon: Award },
+  { name: 'Redis Vector', Icon: Shield },
+  { name: 'Ollama LLM', Icon: Award },
 ]
 
 export function Hero() {
@@ -79,7 +79,7 @@ export function Hero() {
             <div className="relative z-10 space-y-6">
               <Badge className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary/30 bg-primary/8 text-sm font-semibold shadow-sm backdrop-blur-sm">
                 <Cpu className="h-4 w-4 text-primary" />
-                AI-Powered Test Generation
+                LLM-Powered API Testing
               </Badge>
 
               <motion.h1
@@ -88,9 +88,9 @@ export function Hero() {
                 transition={{ duration: 0.6 }}
                 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.1]"
               >
-                Turn plain English into{' '}
+                Generate API Tests{' '}
                 <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary via-accent to-primary bg-[length:200%_auto] animate-gradient">
-                  full test coverage
+                  From Natural Language
                 </span>
               </motion.h1>
 
@@ -100,36 +100,35 @@ export function Hero() {
                 transition={{ duration: 0.6, delay: 0.1 }}
                 className="text-lg md:text-xl text-muted-foreground max-w-2xl leading-relaxed"
               >
-                Skip the CSV. Type your intent, and we generate datasets, embeddings, and live tests.
+                Define your API templates once. NLPForge generates thousands of semantic test cases using LLM-powered data generation and Redis vector search. Stop writing fragile test scripts.
               </motion.p>
 
               {/* CTA row */}
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.15 }}>
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <Link href="/run/new" className="relative inline-block group">
+                  <Link href="/dashboard" className="relative inline-block group">
                     <div className="absolute -inset-1 rounded-2xl blur-xl opacity-60 group-hover:opacity-100 transition-opacity duration-300"
                       style={{ background: 'linear-gradient(90deg, rgba(6,182,212,0.3), rgba(124,58,237,0.3))' }} />
                     <Button size="lg" className="relative h-14 px-8 py-3 rounded-2xl font-semibold inline-flex items-center gap-3 text-base">
                       <Play className="h-5 w-5" />
-                      Try a Sample Run
+                      Start Testing
                       <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
                     </Button>
                   </Link>
 
-                  <Link href="#how-it-works" className="inline-block group">
-                    <button
-                      className="h-14 px-6 rounded-2xl border border-border/50 bg-card/60 hover:bg-card/80 hover:border-primary/40 transition-all inline-flex items-center gap-3 text-base font-medium backdrop-blur-sm"
-                      aria-label="See how it works"
-                    >
-                      <Play className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                      See how it works
-                    </button>
+                  <Link 
+                    href="/templates" 
+                    className="inline-flex items-center gap-3 h-14 px-6 rounded-2xl border border-border/50 bg-card/60 hover:bg-card/80 hover:border-primary/40 transition-all text-base font-medium backdrop-blur-sm group"
+                    aria-label="View templates"
+                  >
+                    <Network className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    View Templates
                   </Link>
                 </div>
 
                 {/* micro-note */}
                 <div className="mt-4 text-sm text-muted-foreground max-w-xl leading-relaxed">
-                  <span className="font-medium text-foreground">No setup required.</span> Paste your test intent and watch as we automatically generate datasets, create embeddings, and execute Selenium tests.
+                  <span className="font-medium text-foreground">Three simple steps:</span> Create API templates → Generate datasets with AI → Search with natural language queries.
                 </div>
               </motion.div>
 
@@ -182,15 +181,36 @@ export function Hero() {
               </motion.div>
             </div>
 
-            {/* RIGHT: MacBook-style interactive demo */}
+            {/* RIGHT: Interactive Demo */}
             <motion.div
               initial={{ opacity: 0, x: 20, scale: 0.95 }}
               animate={{ opacity: 1, x: 0, scale: 1 }}
               transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-              className="relative z-10"
+              className="relative z-10 hidden lg:block"
             >
-              {/* <HeroDemo /> */}
-              <div className="text-muted-foreground text-center">Demo placeholder</div>
+              {/* Demo Card - MacBook-style frame */}
+              <div className="relative">
+                {/* Glow effect */}
+                <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 via-accent/20 to-primary/20 rounded-3xl blur-2xl opacity-50" />
+                
+                {/* Card container */}
+                <Card className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/80 backdrop-blur-sm shadow-2xl">
+                  {/* Window controls */}
+                  <div className="flex items-center gap-2 px-4 py-3 border-b border-border/50 bg-muted/30">
+                    <div className="flex gap-1.5">
+                      <div className="w-3 h-3 rounded-full bg-red-500/80" />
+                      <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+                      <div className="w-3 h-3 rounded-full bg-green-500/80" />
+                    </div>
+                    <span className="flex-1 text-center text-xs text-muted-foreground font-mono">NLPForge - Test Generator</span>
+                  </div>
+                  
+                  {/* Demo content */}
+                  <div className="p-5 min-h-[320px]">
+                    <DemoInline />
+                  </div>
+                </Card>
+              </div>
             </motion.div>
           </div>
         </motion.div>
@@ -204,48 +224,77 @@ export function Hero() {
 
 /* ----------------- DemoInline - lightweight inline demo (typewriter + mini steps + JSON preview) ----------------- */
 
+const TYPEWRITER_PHRASES = [
+  'Find all user authentication APIs',
+  'Search for payment processing endpoints',
+  'Show me APIs that handle file uploads',
+  'Get inventory management endpoints',
+  'Find APIs for order tracking',
+]
+
 function DemoInline() {
   const [text, setText] = useState('')
-  const full = 'Login to demo.com with user milan and password Mila@123.'
+  const [phraseIndex, setPhraseIndex] = useState(0)
+  const full = TYPEWRITER_PHRASES[phraseIndex]
   const [step, setStep] = useState(0)
   const prefersReduced = useReducedMotion()
   const [confidence, setConfidence] = useState(0)
+  const [isDeleting, setIsDeleting] = useState(false)
 
-  // typewriter
+  // typewriter with cycling phrases
   useEffect(() => {
-    if (text.length < full.length) {
-      const id = setTimeout(() => setText(full.slice(0, text.length + 1)), prefersReduced ? 0 : 28)
-      return () => clearTimeout(id)
+    if (prefersReduced) {
+      setText(full)
+      setStep(1)
+      return
     }
-    // start pipeline
-    const start = setTimeout(() => setStep(1), 450)
-    return () => clearTimeout(start)
+
+    if (!isDeleting && text.length < full.length) {
+      // Typing
+      const id = setTimeout(() => setText(full.slice(0, text.length + 1)), 35)
+      return () => clearTimeout(id)
+    } else if (!isDeleting && text.length === full.length) {
+      // Pause at end, then start deleting
+      const start = setTimeout(() => setStep(1), 400)
+      const deleteStart = setTimeout(() => setIsDeleting(true), 4000)
+      return () => { clearTimeout(start); clearTimeout(deleteStart) }
+    } else if (isDeleting && text.length > 0) {
+      // Deleting
+      const id = setTimeout(() => setText(text.slice(0, -1)), 20)
+      return () => clearTimeout(id)
+    } else if (isDeleting && text.length === 0) {
+      // Move to next phrase
+      setIsDeleting(false)
+      setStep(0)
+      setConfidence(0)
+      setPhraseIndex((prev) => (prev + 1) % TYPEWRITER_PHRASES.length)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text])
+  }, [text, isDeleting, full])
 
   useEffect(() => {
     if (step > 0 && step < 5) {
-      const id = setTimeout(() => setStep((s) => s + 1), prefersReduced ? 200 : 600)
+      const id = setTimeout(() => setStep((s) => s + 1), prefersReduced ? 200 : 500)
       return () => clearTimeout(id)
     }
     if (step >= 5) {
       // fake confidence fill
       let cur = 50
       const id = setInterval(() => {
-        cur = Math.min(96, cur + Math.floor(Math.random() * 6))
+        cur = Math.min(96, cur + Math.floor(Math.random() * 8))
         setConfidence(cur)
         if (cur >= 96) clearInterval(id)
-      }, 90)
+      }, 60)
       return () => clearInterval(id)
     }
   }, [step, prefersReduced])
 
   const steps = [
-    'Parsing intent & slots',
-    'Expanding dataset (200 cases)',
-    'Embedding vectors',
-    'Vector search / match',
-    'Ready ΓÇö review JSON'
+    'Parsing natural language query',
+    'Generating embeddings',
+    'Vector similarity search',
+    'Matching API templates',
+    'Results ready'
   ]
 
   return (

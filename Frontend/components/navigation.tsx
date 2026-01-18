@@ -26,7 +26,6 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Templates', href: '/templates', icon: FileCode },
   { name: 'Datasets', href: '/datasets', icon: Database },
-  { name: 'Audit Log', href: '/audit', icon: Shield },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 

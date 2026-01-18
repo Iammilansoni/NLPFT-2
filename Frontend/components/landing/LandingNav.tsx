@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
@@ -73,13 +73,13 @@ export function LandingNav() {
             {/* Logo */}
             <Link
               href="/"
-              className="flex items-center gap-2.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="flex items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               aria-label="NLPForge home"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-semibold text-sm">
-                <Zap className="h-4 w-4" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground font-semibold text-sm">
+                <Zap className="h-5 w-5" />
               </div>
-              <span className="font-semibold text-lg tracking-tight text-foreground">
+              <span className="font-bold text-xl tracking-tight text-foreground">
                 NLPForge
               </span>
             </Link>

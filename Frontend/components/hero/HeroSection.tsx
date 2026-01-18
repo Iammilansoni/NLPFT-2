@@ -60,14 +60,14 @@ export function HeroSection() {
             </div>
 
             {/* Main Headline */}
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[3.25rem] font-bold tracking-tight text-foreground leading-[1.15] mb-6">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[4rem] font-bold tracking-tight text-foreground leading-[1.1] mb-6">
               Generate API Test Cases
               <br />
               <span className="text-primary">From Natural Language</span>
             </h1>
 
             {/* Subheadline */}
-            <p className="text-base sm:text-lg text-muted-foreground max-w-lg leading-relaxed mb-8">
+            <p className="text-lg sm:text-xl text-muted-foreground max-w-lg leading-relaxed mb-8">
               Define your API templates once. NLPForge generates thousands of
               semantic test cases using LLM-powered data generation and Redis
               vector search. Stop writing fragile test scripts.

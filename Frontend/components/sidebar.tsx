@@ -19,10 +19,13 @@ import {
   User,
   LogOut,
   Zap,
+  Shield,
+  HelpCircle,
 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { useSidebar } from '@/contexts/sidebar-context'
 import { useAuth } from '@/contexts/AuthContext'
+import { HelpButton } from '@/components/help/HelpButton'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -62,16 +65,16 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile Menu Button */}
+      {/* Mobile Menu Button - Enhanced visibility */}
       <div className="lg:hidden fixed top-3 left-3 z-50">
         <Button
           size="icon"
           variant="outline"
           onClick={() => setIsMobileOpen(!isMobileOpen)}
-          className="h-9 w-9 rounded-sm bg-background border"
+          className="h-11 w-11 rounded-lg bg-background/95 backdrop-blur-sm border shadow-lg hover:shadow-xl transition-all"
           aria-label={isMobileOpen ? 'Close menu' : 'Open menu'}
         >
-          {isMobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          {isMobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </Button>
       </div>
 
@@ -87,10 +90,12 @@ export function Sidebar() {
       <aside
         className={cn(
           'fixed inset-y-0 left-0 flex flex-col z-40',
-          'bg-card border-r border-border',
-          'transition-all duration-200 ease-out',
-          // Command Center widths: 48px collapsed, 240px expanded
-          isExpanded ? 'w-[240px]' : 'w-[48px]',
+          'bg-card border-r border-border shadow-xl lg:shadow-none',
+          'transition-all duration-300 ease-out',
+          // Responsive widths: full width on small mobile, fixed on larger
+          isMobileOpen 
+            ? 'w-[280px] sm:w-[300px]' 
+            : isExpanded ? 'w-[240px]' : 'w-[48px]',
           isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
@@ -127,10 +132,10 @@ export function Sidebar() {
             </div>
             {isExpanded && (
               <div className="flex flex-col">
-                <span className="font-semibold text-sm text-foreground whitespace-nowrap leading-tight">
+                <span className="font-bold text-base text-foreground whitespace-nowrap leading-tight">
                   NLPForge
                 </span>
-                <span className="text-[9px] text-muted-foreground tracking-wide">
+                <span className="text-[10px] text-muted-foreground tracking-wide">
                   API Testing
                 </span>
               </div>
@@ -153,8 +158,8 @@ export function Sidebar() {
               >
                 <div
                   className={cn(
-                    'flex items-center gap-3 rounded-sm text-sm font-medium transition-colors',
-                    isExpanded ? 'px-3 py-2' : 'px-2 py-2 justify-center',
+                    'flex items-center gap-3 rounded-sm font-medium transition-colors',
+                    isExpanded ? 'px-3 py-2.5 text-sm' : 'px-2 py-2 justify-center',
                     isActive
                       ? 'bg-primary/10 text-primary border-l-2 border-l-primary ml-0 pl-[10px]'
                       : 'text-muted-foreground hover:text-foreground hover:bg-accent'
@@ -208,8 +213,8 @@ export function Sidebar() {
 
                 {isExpanded && (
                   <div className="flex-1 min-w-0 text-left">
-                    <p className="text-xs font-medium truncate">{user.username || 'User'}</p>
-                    <p className="text-[10px] text-muted-foreground truncate">{user.email}</p>
+                    <p className="text-sm font-medium truncate">{user.username || 'User'}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                   </div>
                 )}
               </button>
@@ -244,13 +249,22 @@ export function Sidebar() {
             </div>
           )}
 
+          {/* Help Button */}
+          <div className={cn(
+            'flex items-center rounded-sm transition-colors hover:bg-accent',
+            isExpanded ? 'px-2 py-1.5' : 'p-1 justify-center'
+          )}>
+            <HelpButton className="!h-auto !w-auto p-0 hover:bg-transparent" />
+            {isExpanded && <span className="text-xs text-muted-foreground ml-2">Help</span>}
+          </div>
+
           {/* Theme Toggle */}
           <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             className={cn(
-              'w-full flex items-center gap-2 rounded-sm transition-colors hover:bg-accent',
+              'w-full flex items-center gap-2 rounded-sm transition-colors hover:bg-accent text-foreground',
               isExpanded ? 'px-2 py-1.5' : 'p-1 justify-center'
             )}
           >
@@ -270,7 +284,7 @@ export function Sidebar() {
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             className={cn(
-              'w-full hidden lg:flex items-center gap-2 rounded-sm transition-colors hover:bg-accent',
+              'w-full hidden lg:flex items-center gap-2 rounded-sm transition-colors hover:bg-accent text-foreground',
               isExpanded ? 'px-2 py-1.5' : 'p-1 justify-center'
             )}
           >
@@ -290,7 +304,7 @@ export function Sidebar() {
           {/* Version Footer */}
           {isExpanded && (
             <div className="pt-2 border-t border-border">
-              <p className="text-[9px] text-muted-foreground text-center font-mono">
+              <p className="text-[10px] text-muted-foreground text-center font-mono">
                 v1.0.0
               </p>
             </div>

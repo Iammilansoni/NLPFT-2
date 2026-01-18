@@ -20,21 +20,12 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     if (typeof document !== 'undefined') {
       const cookieExists = document.cookie.includes('nlpforge_access_token')
       setHasCookie(cookieExists)
-      console.log('[ProtectedRoute] Check:', {
-        isAuthenticated,
-        isLoading,
-        hasCookie: cookieExists,
-        pathname
-      })
     }
   }, [isAuthenticated, isLoading, pathname])
 
   useEffect(() => {
     // Only redirect if we're done loading AND no auth AND no cookie
     if (!isLoading && !isAuthenticated && !hasCookie) {
-      console.log('[ProtectedRoute] Not authenticated, redirecting to login')
-      console.log('State:', { isLoading, isAuthenticated, hasCookie })
-
       // Add delay to prevent immediate redirect loop
       const timer = setTimeout(() => {
         router.push(`/auth/login?from=${encodeURIComponent(pathname)}`)
@@ -59,7 +50,6 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   // If authenticated OR has cookie, render content
   // (Cookie check allows rendering while AuthContext initializes)
   if (isAuthenticated || hasCookie) {
-    console.log('[ProtectedRoute] Rendering protected content')
     return <>{children}</>
   }
 
