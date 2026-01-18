@@ -10,7 +10,7 @@ Multi-tenant isolation: Users can only access their own audit logs
 """
 
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -98,7 +98,7 @@ async def create_audit_log(
             resource_id=UUID(data.template_id) if data.template_id else None,
             changes=data.payload,
             success=1,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         
         db.add(new_log)
@@ -154,11 +154,16 @@ async def get_audit_logs(
             query = query.where(AuditLog.resource_type == resource_type)
             count_query = count_query.where(AuditLog.resource_type == resource_type)
         
+        # Normalize timezone-aware dates to timezone-naive UTC for PostgreSQL
         if start_date:
+            if start_date.tzinfo is not None:
+                start_date = start_date.astimezone(timezone.utc).replace(tzinfo=None)
             query = query.where(AuditLog.created_at >= start_date)
             count_query = count_query.where(AuditLog.created_at >= start_date)
         
         if end_date:
+            if end_date.tzinfo is not None:
+                end_date = end_date.astimezone(timezone.utc).replace(tzinfo=None)
             query = query.where(AuditLog.created_at <= end_date)
             count_query = count_query.where(AuditLog.created_at <= end_date)
         
@@ -286,8 +291,8 @@ async def get_audit_stats(
     - Recent activity (last 10 actions)
     """
     try:
-        # Calculate date range
-        start_date = datetime.utcnow() - timedelta(days=days)
+        # Calculate date range - use timezone-naive datetime for TIMESTAMP WITHOUT TIME ZONE column
+        start_date = (datetime.now(timezone.utc) - timedelta(days=days)).replace(tzinfo=None)
         
         # Get all logs for period
         query = select(AuditLog).where(

@@ -13,7 +13,7 @@ KEY DESIGN: ONE EMBEDDING MODEL PER DATASET
 import os
 import pandas as pd
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict
 from uuid import UUID
 from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException, Depends, status, Query, Request
@@ -191,7 +191,7 @@ async def store_csv_to_postgresql(
         generated_with_llm=generated_with_llm,
         generation_prompt=generation_prompt,
         scenario_distribution=scenario_distribution,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None)
     )
     db.add(dataset)
     await db.flush()  # Get the dataset_id
@@ -231,7 +231,7 @@ async def store_csv_to_postgresql(
             generated_with_llm=generated_with_llm,
             generation_prompt=generation_prompt,
             is_embedded=0,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         csv_rows.append(csv_row)
         
@@ -268,7 +268,7 @@ def process_upload_task(task_id: str, file_path: str, user_id: str = None, templ
                 task_id,
                 status="completed",
                 message=f"Successfully ingested {result['count']} entries",
-                completed_at=datetime.utcnow().isoformat(),
+                completed_at=datetime.now(timezone.utc).isoformat(),
                 statistics={
                     "total_apis": len(result.get("intents", [])),
                     "total_nl_variations": result["count"],
@@ -567,7 +567,7 @@ async def generate_dataset(
                     user_id=current_user.u_id,
                     template_id=UUID(dataset_request.template_id),
                     db=db,
-                    dataset_name=f"{result['template_name']}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
+                    dataset_name=f"{result['template_name']}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
                     generated_with_llm=result.get("model_used"),
                     generation_prompt=dataset_request.user_prompt,
                     scenario_distribution=result.get("scenario_distribution")
@@ -791,6 +791,77 @@ async def get_task_status(
         "error": task.get("error")
     }
 
+
+@router.get("/tasks")
+async def list_tasks(
+    current_user: User = Depends(get_current_user),
+    include_completed: bool = Query(True, description="Include completed/failed tasks"),
+    max_age_hours: int = Query(24, ge=1, le=168, description="Max age of tasks to return (hours)")
+):
+    """
+    List all active and recent dataset generation tasks for the current user.
+    
+    User Isolation: Only returns tasks belonging to the authenticated user.
+    
+    Returns active tasks for display in the UI, useful for:
+    - Showing progress after page reload
+    - Displaying multiple concurrent generations
+    - Reviewing recently completed tasks
+    
+    Tasks are automatically filtered to include only those created within max_age_hours.
+    """
+    from datetime import datetime, timezone, timedelta
+    
+    task_manager = get_task_manager()
+    # Get all tasks for this user (enforces multi-tenant isolation)
+    all_tasks = task_manager.list_tasks(user_id=current_user.u_id)
+    
+    # Filter by age
+    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    
+    filtered_tasks = []
+    for task in all_tasks:
+        # Parse created_at
+        created_at_str = task.get("created_at")
+        if created_at_str:
+            try:
+                created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+                if created_at < cutoff_time:
+                    continue  # Skip old tasks
+            except (ValueError, TypeError):
+                pass  # Include if we can't parse date
+        
+        # Filter by status if requested
+        status = task.get("status", "")
+        if not include_completed and status in ("completed", "failed"):
+            continue
+        
+        filtered_tasks.append({
+            "task_id": task.get("task_id"),
+            "status": task.get("status"),
+            "progress": task.get("progress", 0),
+            "message": task.get("message", ""),
+            "current_step": task.get("current_step", ""),
+            "created_at": task.get("created_at"),
+            "completed_at": task.get("completed_at"),
+            "error": task.get("error"),
+            "result": task.get("result")  # Contains template_name, total_generated, etc.
+        })
+    
+    # Sort by created_at descending (newest first)
+    filtered_tasks.sort(key=lambda t: t.get("created_at", ""), reverse=True)
+    
+    # Count by status
+    status_counts = {}
+    for task in filtered_tasks:
+        status = task.get("status", "unknown")
+        status_counts[status] = status_counts.get(status, 0) + 1
+    
+    return {
+        "total": len(filtered_tasks),
+        "status_counts": status_counts,
+        "tasks": filtered_tasks
+    }
 
 # ============= DATASET EMBEDDING =============
 # NOTE: These endpoints are temporarily disabled due to missing Dataset model
@@ -1106,7 +1177,7 @@ async def rename_dataset(
         
         old_name = dataset.name
         dataset.name = request.name
-        dataset.updated_at = datetime.utcnow()
+        dataset.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         
         await db.commit()
         await db.refresh(dataset)
