@@ -30,7 +30,7 @@ import asyncio
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -185,7 +185,7 @@ class MultiModelDatasetEmbeddingService:
             dataset.embedding_progress = 0
             dataset.embedding_model = model_id
             dataset.embedding_dimension = dimension
-            dataset.embedding_started_at = datetime.utcnow()
+            dataset.embedding_started_at = datetime.now(timezone.utc).replace(tzinfo=None)
             dataset.embedding_error = None
             await db.commit()
             
@@ -312,7 +312,7 @@ class MultiModelDatasetEmbeddingService:
             dataset.embedding_status = EmbeddingStatus.COMPLETED
             dataset.embedding_progress = 100
             dataset.embedded_rows = embedded_count
-            dataset.embedding_completed_at = datetime.utcnow()
+            dataset.embedding_completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
             
             if failed_count > 0:
                 dataset.embedding_error = f"{failed_count} rows failed to embed"

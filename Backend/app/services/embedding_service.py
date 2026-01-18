@@ -23,7 +23,7 @@ import uuid
 import asyncio
 import pandas as pd
 from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -288,6 +288,20 @@ class EnhancedEmbeddingService:
                     
                     # Store as JSON document for RedisSearch
                     # Use template values from PostgreSQL, CSV values where available
+                    
+                    # Auto-classify intent if missing
+                    intent_type = row.get('intent_type', '')
+                    if not intent_type or intent_type == 'unknown' or str(intent_type).lower() == 'nan':
+                        from app.services.intent_classification_service import get_intent_from_method
+                        intent_type = get_intent_from_method(template_method)
+                    
+                    # Get confidence score, default based on scenario
+                    confidence_score = row.get('confidence_score', 0.5)
+                    try:
+                        confidence_score = float(confidence_score) if confidence_score else 0.5
+                    except (ValueError, TypeError):
+                        confidence_score = 0.5
+                    
                     document = {
                         "user_id": str(user_id),
                         "t_id": str(template_id),
@@ -296,15 +310,15 @@ class EnhancedEmbeddingService:
                         "api": template_api_name,  # From PostgreSQL template
                         "endpoint": template_endpoint,  # From PostgreSQL template
                         "method": template_method,  # From PostgreSQL template
-                        "intent_type": row.get('intent_type', ''),  # From CSV
+                        "intent_type": intent_type,  # Auto-classified if missing
                         "scenario_type": row.get('scenario_type', row.get('intent_type', 'valid')),  # Fallback
                         "test_category": row.get('test_category', 'valid_flow'),
-                        "confidence_score": row.get('confidence_score', 0.5),  # From CSV
+                        "confidence_score": confidence_score,  # From CSV or default
                         "notes": row.get('notes', ''),
                         "vector": vector,
                         "dimension": dimension,
                         "model": model_id,
-                        "embedded_at": datetime.utcnow().isoformat()
+                        "embedded_at": datetime.now(timezone.utc).isoformat()
                     }
                     
                     # Store in Redis
@@ -325,7 +339,7 @@ class EnhancedEmbeddingService:
                     "embedding_dim": dimension,
                     "redis_namespace": redis_namespace,
                     "total_embedded": embedded_count,
-                    "embedded_at": datetime.utcnow().isoformat(),
+                    "embedded_at": datetime.now(timezone.utc).isoformat(),
                     "csv_path": csv_path,
                     "hnsw_index": self.index_mapping[dimension],
                     "ollama_service": "localhost:11434"
@@ -669,7 +683,7 @@ class EnhancedEmbeddingService:
             dataset.embedding_status = EmbeddingStatus.IN_PROGRESS
             dataset.embedding_progress = 0
             dataset.embedded_rows = 0
-            dataset.embedding_started_at = datetime.utcnow()
+            dataset.embedding_started_at = datetime.now(timezone.utc).replace(tzinfo=None)
             dataset.embedding_completed_at = None
             dataset.embedding_error = None
             await db.commit()
@@ -751,11 +765,11 @@ class EnhancedEmbeddingService:
             # Calculate estimated completion
             estimated_completion = None
             if dataset.embedding_status == EmbeddingStatus.IN_PROGRESS and dataset.embedding_started_at:
-                elapsed = (datetime.utcnow() - dataset.embedding_started_at).total_seconds()
+                elapsed = (datetime.now(timezone.utc) - dataset.embedding_started_at).total_seconds()
                 if dataset.embedding_progress > 0:
                     total_estimated = elapsed / (dataset.embedding_progress / 100)
                     remaining = total_estimated - elapsed
-                    estimated_completion = (datetime.utcnow() + timedelta(seconds=remaining)).isoformat()
+                    estimated_completion = (datetime.now(timezone.utc) + timedelta(seconds=remaining)).isoformat()
             
             return {
                 "dataset_id": str(dataset_id),
@@ -918,7 +932,7 @@ def create_embedding_task(csv_path: str, user_id: str, template_id: str, model_n
                     "vector": embedding,
                     "dimension": len(embedding),
                     "model": model_id,
-                    "embedded_at": datetime.utcnow().isoformat()
+                    "embedded_at": datetime.now(timezone.utc).isoformat()
                 }
                 
                 redis_service.redis_client.json().set(redis_key, '$', document)
@@ -1007,7 +1021,7 @@ def reembed_dataset_sync(
                 if dataset:
                     dataset.embedding_status = "completed"
                     dataset.embedding_progress = 100
-                    dataset.embedding_completed_at = datetime.utcnow()
+                    dataset.embedding_completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
                     db.commit()
             finally:
                 db.close()
@@ -1118,7 +1132,7 @@ def reembed_dataset_sync(
                     "vector": embeddings[j],
                     "dimension": dimension,
                     "model": model_id,
-                    "embedded_at": datetime.utcnow().isoformat()
+                    "embedded_at": datetime.now(timezone.utc).isoformat()
                 }
                 
                 redis_service.redis_client.json().set(redis_key, '$', document)
@@ -1146,7 +1160,7 @@ def reembed_dataset_sync(
                 dataset.embedding_status = "completed"
                 dataset.embedding_progress = 100
                 dataset.embedded_rows = embedded_count
-                dataset.embedding_completed_at = datetime.utcnow()
+                dataset.embedding_completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
                 
                 if failed_count > 0:
                     dataset.embedding_error = f"{failed_count} rows failed to embed"

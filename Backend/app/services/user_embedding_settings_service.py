@@ -20,7 +20,7 @@ the Settings page is the SINGLE SOURCE OF TRUTH for all embedding operations.
 
 import uuid
 from typing import Optional, Tuple, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update
@@ -132,7 +132,7 @@ class UserEmbeddingSettingsService:
             old_dimension = user_settings.embedding_dimension
             user_settings.default_embedding_model = model_id
             user_settings.embedding_dimension = model_spec.dimension
-            user_settings.updated_at = datetime.utcnow()
+            user_settings.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         else:
             # Create settings
             user_settings = UserSettings(
@@ -245,7 +245,7 @@ class UserEmbeddingSettingsService:
             old_dimension = user_settings.embedding_dimension
             user_settings.default_embedding_model = model_id
             user_settings.embedding_dimension = model_spec.dimension
-            user_settings.updated_at = datetime.utcnow()
+            user_settings.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         else:
             # Create settings
             user_settings = UserSettings(
