@@ -16,7 +16,7 @@ Audit Service - Enterprise logging for security, compliance, and debugging
 """
 
 from typing import Optional, Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
@@ -91,7 +91,7 @@ class AuditService:
             ip_address=ip_address,
             user_agent=user_agent,
             endpoint=endpoint,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         
         db.add(audit_entry)

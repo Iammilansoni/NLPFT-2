@@ -2,7 +2,7 @@
 
 from typing import List, Optional
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func, delete
@@ -22,7 +22,7 @@ class EnterpriseService:
         """Create API template"""
         template = Template(
             t_id=uuid.uuid4(), user_id=user_id, api_name=api_name,
-            description=description, base_url=base_url, method=method, created_at=datetime.utcnow()
+            description=description, base_url=base_url, method=method, created_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         db.add(template)
         await db.commit()
@@ -57,7 +57,7 @@ class EnterpriseService:
         csv_data = CSVData(
             csv_id=uuid.uuid4(), user_id=user_id, t_id=t_id, query=query, api_name=api_name,
             endpoint=endpoint, request=request, response=response, description=description,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         db.add(csv_data)
         await db.commit()
@@ -90,7 +90,7 @@ class EnterpriseService:
         """Create embedding metadata (vector in Redis)"""
         embedding = Embedding(
             emb_id=uuid.uuid4(), user_id=user_id, t_id=t_id, csv_id=csv_id,
-            redis_key=redis_key, created_at=datetime.utcnow()
+            redis_key=redis_key, created_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         db.add(embedding)
         await db.commit()
