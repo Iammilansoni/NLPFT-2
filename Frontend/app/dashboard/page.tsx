@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { useQueryStats } from '@/hooks/useQuery'
 import { useTemplateStats } from '@/hooks/useTemplates'
 import { apiClient } from '@/lib/api'
+import { SemanticRetrieveResponse } from '@/lib/api-types'
 import { DEFAULT_EMBEDDING_MODEL, getEmbeddingModelInfo, getDimensionForModel, areModelsCompatible } from '@/lib/constants/embedding-models'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -28,6 +29,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { JsonDisplay } from '@/components/ui/JsonDisplay'
 
 
 // New Components
@@ -35,6 +37,8 @@ import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
 import { SearchSection } from '@/components/dashboard/SearchSection'
 import { MetricCard } from '@/components/dashboard/MetricCard'
 import { TopIntents } from '@/components/dashboard/TopIntents'
+import { MetricGridSkeleton } from '@/components/ui/skeleton'
+import { OnboardingTour } from '@/components/onboarding/OnboardingTour'
 
 
 const TrendChart = dynamic(
@@ -87,7 +91,7 @@ export default function DashboardPage() {
 
 
   const [query, setQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<any>(null) // Type was complex, simplified for brevity or I should copy the type
+  const [searchResults, setSearchResults] = useState<SemanticRetrieveResponse | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [embeddingModel, setEmbeddingModel] = useState(DEFAULT_EMBEDDING_MODEL)
@@ -298,7 +302,7 @@ export default function DashboardPage() {
         <DashboardHeader systemStatus={allHealthy ? 'healthy' : 'degraded'} />
 
         {/* Main Search Area */}
-        <section className="py-8">
+        <section className="py-8" data-tour="search">
           <div className="text-center mb-8">
             <h2 className="text-2xl font-semibold tracking-tight mb-2">Semantic API Search</h2>
             <p className="text-muted-foreground max-w-lg mx-auto">
@@ -459,43 +463,33 @@ export default function DashboardPage() {
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <h5 className="font-semibold text-base">Full Response JSON</h5>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              navigator.clipboard.writeText(JSON.stringify(searchResults.final_output, null, 2))
-                              setCopied(true)
-                              setTimeout(() => setCopied(false), 2000)
-                            }}
-                          >
-                            {copied ? '✓ Copied!' : 'Copy JSON'}
-                          </Button>
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="outline" size="sm">
-                                <Maximize2 className="w-4 h-4 mr-2" />
-                                Enlarge
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
-                              <DialogHeader>
-                                <DialogTitle>Full Response JSON</DialogTitle>
-                              </DialogHeader>
-                              <div className="flex-1 overflow-auto bg-muted/30 rounded-lg border border-border/40 p-4">
-                                <pre className="text-sm font-mono leading-relaxed whitespace-pre-wrap">
-                                  {JSON.stringify(searchResults.final_output, null, 2)}
-                                </pre>
-                              </div>
-                            </DialogContent>
-                          </Dialog>
-                        </div>
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Maximize2 className="w-4 h-4 mr-2" />
+                              Expand View
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
+                            <DialogHeader>
+                              <DialogTitle>Full Response JSON</DialogTitle>
+                            </DialogHeader>
+                            <div className="flex-1 overflow-hidden">
+                              <JsonDisplay
+                                data={searchResults.final_output}
+                                maxHeight="calc(85vh - 120px)"
+                                showCopyButton={true}
+                                showLineNumbers={true}
+                              />
+                            </div>
+                          </DialogContent>
+                        </Dialog>
                       </div>
-                      <div className="bg-muted/20 rounded-xl border border-border/40 p-4 max-h-64 overflow-auto">
-                        <pre className="text-xs font-mono leading-relaxed text-muted-foreground">
-                          {JSON.stringify(searchResults.final_output, null, 2)}
-                        </pre>
-                      </div>
+                      <JsonDisplay
+                        data={searchResults.final_output}
+                        maxHeight="20rem"
+                        showCopyButton={true}
+                      />
                     </div>
                   </div>
                 ) : (
@@ -509,36 +503,40 @@ export default function DashboardPage() {
         )}
 
         {/* Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <MetricCard
-            label="Total Embeddings"
-            value={stats?.total_embeddings?.toLocaleString() || '0'}
-            subtitle="Vectors in Redis"
-            icon={<Brain className="w-4 h-4" />}
-          />
-          <MetricCard
-            label="Approved Templates"
-            value={templateStats?.by_status?.approved ?? templateStats?.total_templates ?? 0}
-            progress={{
-              value: templateStats?.by_status?.approved ?? templateStats?.total_templates ?? 0,
-              total: templateStats?.total_templates || 1,
-              label: `${templateStats?.total_templates || 0} total declared`
-            }}
-            icon={<CheckCircle2 className="w-4 h-4" />}
-          />
-          <MetricCard
-            label="Total Intents"
-            value={(stats as any)?.total_intents || Object.keys(stats?.intents || {}).length}
-            subtitle={`${(stats as any)?.unique_apis || 0} Unique APIs`}
-            icon={<Target className="w-4 h-4" />}
-          />
-          <MetricCard
-            label="Embedding Model"
-            value={getEmbeddingModelInfo(embeddingModel)?.label || 'Nomic Embed Text'}
-            subtitle={`${getEmbeddingModelInfo(embeddingModel)?.dimension || 768}D vectors`}
-            icon={<Cpu className="w-4 h-4" />}
-          />
-        </div>
+        {isLoadingStats ? (
+          <MetricGridSkeleton count={4} />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" data-tour="metrics">
+            <MetricCard
+              label="Total Embeddings"
+              value={stats?.total_embeddings?.toLocaleString() || '0'}
+              subtitle="Vectors in Redis"
+              icon={<Brain className="w-4 h-4" />}
+            />
+            <MetricCard
+              label="Approved Templates"
+              value={templateStats?.by_status?.approved ?? templateStats?.total_templates ?? 0}
+              progress={{
+                value: templateStats?.by_status?.approved ?? templateStats?.total_templates ?? 0,
+                total: templateStats?.total_templates || 1,
+                label: `${templateStats?.total_templates || 0} total declared`
+              }}
+              icon={<CheckCircle2 className="w-4 h-4" />}
+            />
+            <MetricCard
+              label="Total Intents"
+              value={(stats as any)?.total_intents || Object.keys(stats?.intents || {}).length}
+              subtitle={`${(stats as any)?.unique_apis || 0} Unique APIs`}
+              icon={<Target className="w-4 h-4" />}
+            />
+            <MetricCard
+              label="Embedding Model"
+              value={getEmbeddingModelInfo(embeddingModel)?.label || 'Nomic Embed Text'}
+              subtitle={`${getEmbeddingModelInfo(embeddingModel)?.dimension || 768}D vectors`}
+              icon={<Cpu className="w-4 h-4" />}
+            />
+          </div>
+        )}
 
         {/* Search Results Display - Kept inline for now due to complexity, but restyled */}
 
@@ -630,6 +628,9 @@ export default function DashboardPage() {
           </div>
         </DialogContent>
       </Dialog >
+
+      {/* Onboarding Tour for first-time users */}
+      <OnboardingTour tourId="dashboard" />
     </div >
   )
 }

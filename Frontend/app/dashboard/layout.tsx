@@ -10,6 +10,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Sidebar } from '@/components/sidebar';
 import { LayoutContent } from '@/components/layout-content';
 import { SystemLogsSidebar } from '@/components/system-logs-sidebar';
+import { MobileNav } from '@/components/MobileNav';
 
 export default function DashboardLayout({
   children,
@@ -22,6 +23,7 @@ export default function DashboardLayout({
         <Sidebar />
         <SystemLogsSidebar />
         <LayoutContent>{children}</LayoutContent>
+        <MobileNav />
       </div>
     </ProtectedRoute>
   );
