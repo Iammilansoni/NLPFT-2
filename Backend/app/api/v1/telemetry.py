@@ -6,7 +6,7 @@ Performance Telemetry API - Track and return real performance metrics
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 import redis
 import json
 
@@ -87,7 +87,7 @@ async def get_performance_metrics(
             try:
                 data = json.loads(raw)
                 # Parse timestamp and round to minute
-                ts = datetime.fromisoformat(data.get('timestamp', datetime.utcnow().isoformat()))
+                ts = datetime.fromisoformat(data.get('timestamp', datetime.now(timezone.utc).isoformat()))
                 minute_key = ts.strftime('%H:%M')
                 
                 if minute_key not in metrics_by_minute:

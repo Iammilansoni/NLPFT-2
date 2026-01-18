@@ -395,10 +395,10 @@ async def semantic_retrieve_api(
         
         try:
             from app.api.v1.telemetry import record_metric, PerformanceMetric
-            from datetime import datetime
+            from datetime import datetime, timezone
             
             metric = PerformanceMetric(
-                timestamp=datetime.utcnow().isoformat(),
+                timestamp=datetime.now(timezone.utc).isoformat(),
                 search_latency_ms=processing_time * 0.4,  # Estimate 40% for search
                 embedding_latency_ms=processing_time * 0.2,  # Estimate 20% for embedding
                 reranker_latency_ms=processing_time * 0.3,  # Estimate 30% for reranking

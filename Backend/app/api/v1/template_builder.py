@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.core.postgres import get_db
 from app.api.v1.auth import get_current_user
@@ -388,7 +388,7 @@ async def update_draft_template(
         if template_data.assertions is not None:
             template.assertions = template_data.assertions
         
-        template.updated_at = datetime.utcnow()
+        template.updated_at = datetime.now(timezone.utc)
         
         # Update parameters if provided
         if template_data.parameters is not None:
@@ -784,7 +784,7 @@ async def update_template(
         if template_data.assertions is not None:
             template.assertions = template_data.assertions
         
-        template.updated_at = datetime.utcnow()
+        template.updated_at = datetime.now(timezone.utc)
         
         # Update parameters if provided
         if template_data.parameters:
@@ -1058,8 +1058,8 @@ async def submit_template_for_review(
         
         # Update status
         metadata.status = TemplateStatus.REVIEW.value
-        metadata.submitted_at = datetime.utcnow()
-        metadata.updated_at = datetime.utcnow()
+        metadata.submitted_at = datetime.now(timezone.utc)
+        metadata.updated_at = datetime.now(timezone.utc)
         
         await db.commit()
         
@@ -1079,7 +1079,7 @@ async def submit_template_for_review(
             template_id=template_id,
             status=TemplateStatus.REVIEW.value,
             message="Template submitted for expert review",
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)
         )
         
     except HTTPException:
@@ -1140,8 +1140,8 @@ async def submit_for_review(
         
         # Update status
         metadata.status = TemplateStatus.REVIEW.value
-        metadata.submitted_at = datetime.utcnow()
-        metadata.updated_at = datetime.utcnow()
+        metadata.submitted_at = datetime.now(timezone.utc)
+        metadata.updated_at = datetime.now(timezone.utc)
         
         if submission_data.comments:
             metadata.remarks = submission_data.comments
@@ -1166,7 +1166,7 @@ async def submit_for_review(
             template_id=template_id,
             status=TemplateStatus.REVIEW.value,
             message="Template submitted for expert review",
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)
         )
         
     except HTTPException:
@@ -1227,8 +1227,8 @@ async def approve_template_by_id(
         # Approve template
         metadata.status = TemplateStatus.APPROVED.value
         metadata.approved_by = current_user.u_id
-        metadata.approved_at = datetime.utcnow()
-        metadata.updated_at = datetime.utcnow()
+        metadata.approved_at = datetime.now(timezone.utc)
+        metadata.updated_at = datetime.now(timezone.utc)
         
         await db.commit()
         
@@ -1252,7 +1252,7 @@ async def approve_template_by_id(
             status=TemplateStatus.APPROVED.value,
             message="Template approved for dataset generation",
             approved_by=str(current_user.u_id),
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)
         )
         
     except HTTPException:
@@ -1312,8 +1312,8 @@ async def approve_template(
         metadata.confidence = approval_data.confidence
         metadata.expert_notes = approval_data.expert_notes
         metadata.approved_by = current_user.u_id
-        metadata.approved_at = datetime.utcnow()
-        metadata.updated_at = datetime.utcnow()
+        metadata.approved_at = datetime.now(timezone.utc)
+        metadata.updated_at = datetime.now(timezone.utc)
         
         await db.commit()
         
@@ -1337,7 +1337,7 @@ async def approve_template(
             status=TemplateStatus.APPROVED.value,
             message="Template approved for dataset generation",
             approved_by=str(current_user.u_id),
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)
         )
         
     except HTTPException:
@@ -1401,8 +1401,8 @@ async def reject_template_by_id(
         metadata.status = TemplateStatus.REJECTED.value
         metadata.remarks = f"REJECTED: {rejection_reason}"
         metadata.rejected_by = current_user.u_id
-        metadata.rejected_at = datetime.utcnow()
-        metadata.updated_at = datetime.utcnow()
+        metadata.rejected_at = datetime.now(timezone.utc)
+        metadata.updated_at = datetime.now(timezone.utc)
         
         await db.commit()
         
@@ -1427,7 +1427,7 @@ async def reject_template_by_id(
             status=TemplateStatus.REJECTED.value,
             message=f"Template rejected - {rejection_reason}",
             rejected_by=str(current_user.u_id),
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)
         )
         
     except HTTPException:
@@ -1488,8 +1488,8 @@ async def reject_template(
         if rejection_data.improvement_suggestions:
             metadata.expert_notes = rejection_data.improvement_suggestions
         metadata.rejected_by = current_user.u_id
-        metadata.rejected_at = datetime.utcnow()
-        metadata.updated_at = datetime.utcnow()
+        metadata.rejected_at = datetime.now(timezone.utc)
+        metadata.updated_at = datetime.now(timezone.utc)
         
         await db.commit()
         
@@ -1514,7 +1514,7 @@ async def reject_template(
             status=TemplateStatus.REJECTED.value,
             message=f"Template rejected: {rejection_data.rejection_reason}",
             rejected_by=str(current_user.u_id),
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)
         )
         
     except HTTPException:
@@ -1570,8 +1570,8 @@ async def disable_template(
         
         # Disable template (revert to draft)
         metadata.status = TemplateStatus.DRAFT.value
-        metadata.remarks = f"DISABLED: Template disabled by expert on {datetime.utcnow().isoformat()}"
-        metadata.updated_at = datetime.utcnow()
+        metadata.remarks = f"DISABLED: Template disabled by expert on {datetime.now(timezone.utc).isoformat()}"
+        metadata.updated_at = datetime.now(timezone.utc)
         
         await db.commit()
         
@@ -1596,7 +1596,7 @@ async def disable_template(
             status=TemplateStatus.DRAFT.value,
             message="Template disabled - reverted to draft status",
             rejected_by=str(current_user.u_id),
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)
         )
         
     except HTTPException:
@@ -1653,8 +1653,8 @@ async def enable_template(
         
         # Enable template (set back to approved)
         metadata.status = TemplateStatus.APPROVED.value
-        metadata.remarks = f"ENABLED: Template re-enabled by expert on {datetime.utcnow().isoformat()}"
-        metadata.updated_at = datetime.utcnow()
+        metadata.remarks = f"ENABLED: Template re-enabled by expert on {datetime.now(timezone.utc).isoformat()}"
+        metadata.updated_at = datetime.now(timezone.utc)
         
         await db.commit()
         
@@ -1679,7 +1679,7 @@ async def enable_template(
             status=TemplateStatus.APPROVED.value,
             message="Template enabled - now available for dataset generation",
             approved_by=str(current_user.u_id),
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)
         )
         
     except HTTPException:
@@ -1750,12 +1750,12 @@ async def toggle_template_visibility(
             # Turn ON - show in dataset page (from draft, rejected, or review)
             metadata.status = TemplateStatus.APPROVED.value
             metadata.approved_by = current_user.u_id
-            metadata.approved_at = datetime.utcnow()
+            metadata.approved_at = datetime.now(timezone.utc)
             new_status = TemplateStatus.APPROVED.value
             message = "Template now visible in dataset page"
             action = "template_visibility_on"
         
-        metadata.updated_at = datetime.utcnow()
+        metadata.updated_at = datetime.now(timezone.utc)
         await db.commit()
         
         logger.info(f"Template visibility toggled: {template_id} -> {new_status} by user {current_user.u_id}")
@@ -1777,7 +1777,7 @@ async def toggle_template_visibility(
             status=new_status,
             message=message,
             approved_by=str(current_user.u_id) if new_status == TemplateStatus.APPROVED.value else None,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)
         )
         
     except HTTPException:
