@@ -45,10 +45,15 @@ Tables (as per diagram):
 from sqlalchemy import Column, Text, Integer, TIMESTAMP, ForeignKey, Index, Numeric
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 from app.core.postgres import Base
+
+
+def utc_now():
+    """Returns current UTC time as timezone-naive for PostgreSQL TIMESTAMP WITHOUT TIME ZONE columns"""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class User(Base):
@@ -66,7 +71,7 @@ class User(Base):
     is_active = Column(Integer, nullable=False, default=1)  # 0=disabled, 1=active
     is_expert = Column(Integer, nullable=False, default=0)  # 0=regular user, 1=expert (can approve templates)
     email_verified = Column(Integer, nullable=False, default=0)  # 0=no, 1=yes
-    created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
+    created_at = Column(TIMESTAMP, default=utc_now, nullable=False)
     
     # Relationships
     settings = relationship("UserSettings", back_populates="user", uselist=False, cascade="all, delete-orphan")
@@ -105,8 +110,8 @@ class UserSettings(Base):
     # Auto-embedding on dataset generation
     auto_embed_on_generation = Column(Integer, nullable=False, default=1)  # 0=no, 1=yes
     
-    created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
-    updated_at = Column(TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(TIMESTAMP, default=utc_now, nullable=False)
+    updated_at = Column(TIMESTAMP, default=utc_now, onupdate=utc_now)
     
     # Relationships
     user = relationship("User", back_populates="settings")
@@ -136,7 +141,7 @@ class Template(Base):
     base_url = Column(Text, nullable=True)
     endpoint = Column(Text, nullable=True)  # API endpoint path (e.g., /api/v1/users)
     method = Column(Text, nullable=True)  # GET, POST, PUT, DELETE, PATCH
-    created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
+    created_at = Column(TIMESTAMP, default=utc_now, nullable=False)
     Field = Column(Text, nullable=True)  # Type field from diagram
     
     # JSON Schema for strict validation
@@ -161,7 +166,7 @@ class Template(Base):
     # Dataset generation configuration
     dataset_generation_config = Column(JSONB, nullable=True)  # {"system_prompt": "...", "rules": [...], "quality_split": {"valid": 70, "edge": 20, "extreme": 10}}
     
-    updated_at = Column(TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(TIMESTAMP, default=utc_now, onupdate=utc_now)
     
     # Relationships
     user = relationship("User", back_populates="templates")
@@ -263,8 +268,8 @@ class Metadata(Base):
     rejected_at = Column(TIMESTAMP, nullable=True)  # Rejection timestamp
     submitted_at = Column(TIMESTAMP, nullable=True)  # When submitted for review
     
-    created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
-    updated_at = Column(TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(TIMESTAMP, default=utc_now, nullable=False)
+    updated_at = Column(TIMESTAMP, default=utc_now, onupdate=utc_now)
     
     # Relationships
     user = relationship("User", back_populates="metadata_records")
@@ -321,10 +326,10 @@ class Dataset(Base):
     embedded_rows = Column(Integer, nullable=False, default=0)
     
     # Timestamps
-    created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
+    created_at = Column(TIMESTAMP, default=utc_now, nullable=False)
     embedding_started_at = Column(TIMESTAMP, nullable=True)
     embedding_completed_at = Column(TIMESTAMP, nullable=True)
-    updated_at = Column(TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(TIMESTAMP, default=utc_now, onupdate=utc_now)
     
     # Generation metadata
     generated_with_llm = Column(Text, nullable=True)  # LLM used for generation
@@ -403,7 +408,7 @@ class CSVData(Base):
     intent_type = Column(Text, nullable=True)  # "create", "read", "update", "delete", "query", "unknown"
     confidence_score = Column(Numeric, nullable=True)  # 0.0 - 1.0 confidence score for this query
     
-    created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
+    created_at = Column(TIMESTAMP, default=utc_now, nullable=False)
     
     # Relationships
     user = relationship("User", back_populates="csv_data")
@@ -440,8 +445,8 @@ class Model(Base):
     notes = Column(Text, nullable=True)  # Use cases, notes
     status = Column(Text, nullable=False, default="active")  # active, deprecated
     
-    created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
-    updated_at = Column(TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(TIMESTAMP, default=utc_now, nullable=False)
+    updated_at = Column(TIMESTAMP, default=utc_now, onupdate=utc_now)
     
     # Indexes
     __table_args__ = (
@@ -485,7 +490,7 @@ class EmbeddingModel(Base):
     requires_api_key = Column(Integer, nullable=False, default=0)  # 0=no, 1=yes (for OpenAI)
     
     description = Column(Text, nullable=True)  # Use cases, notes
-    created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
+    created_at = Column(TIMESTAMP, default=utc_now, nullable=False)
     
     # Indexes
     __table_args__ = (
@@ -530,7 +535,7 @@ class Embedding(Base):
     # Generation tracking
     auto_generated = Column(Integer, nullable=False, default=1)  # 0=manual, 1=auto after dataset generation
     
-    created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
+    created_at = Column(TIMESTAMP, default=utc_now, nullable=False)
     
     # Relationships
     user = relationship("User", back_populates="embeddings")
@@ -588,7 +593,7 @@ class TestRun(Base):
     executed_with_selenium = Column(Integer, nullable=False, default=1)  # 0=mock, 1=real
     headless = Column(Integer, nullable=False, default=1)  # 0=no, 1=yes
     
-    created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
+    created_at = Column(TIMESTAMP, default=utc_now, nullable=False)
     completed_at = Column(TIMESTAMP, nullable=True)
     
     # Indexes
@@ -634,7 +639,7 @@ class AuditLog(Base):
     success = Column(Integer, nullable=False, default=1)  # 0=failed, 1=success
     error_message = Column(Text, nullable=True)
     
-    created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
+    created_at = Column(TIMESTAMP, default=utc_now, nullable=False)
     
     # Indexes
     __table_args__ = (

@@ -2,7 +2,7 @@
 Common Schemas - Shared response models
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from pydantic import BaseModel, Field
 
@@ -24,4 +24,4 @@ class HealthResponse(BaseModel):
     status: str
     service: str
     features: Optional[List[str]] = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

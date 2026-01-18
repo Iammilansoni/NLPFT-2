@@ -304,7 +304,7 @@ def create_app() -> FastAPI:
             "version": settings.app_version,
             "status": "running",
             "docs": "/docs",
-            "health": "/api/v1/dataset/list" 
+            "health": "/api/v1/health" 
         }
 
     @app.websocket("/ws/system-logs")
