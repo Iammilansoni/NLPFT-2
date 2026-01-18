@@ -173,14 +173,18 @@
     @apply border-border;
   }
 
-  input, select, textarea {
+  input,
+  select,
+  textarea {
     @apply bg-background text-foreground;
   }
 
   html {
-    font-size: 14px;
+    font-size: 15px;
+    /* Premium SaaS: 15px for better readability */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   body {
@@ -200,32 +204,43 @@
     color: hsl(240 10% 4%);
   }
 
-  /* Typography Scale - Command Center */
+  /* Typography Scale - Premium SaaS */
   h1,
   .h1 {
-    @apply text-xl font-semibold leading-tight tracking-tight;
+    @apply text-2xl font-bold leading-tight tracking-tight;
   }
 
   h2,
   .h2 {
-    @apply text-lg font-semibold leading-tight;
+    @apply text-xl font-semibold leading-tight tracking-tight;
   }
 
   h3,
   .h3 {
-    @apply text-base font-medium leading-snug;
+    @apply text-lg font-semibold leading-snug;
   }
 
   h4,
   .h4 {
-    @apply text-sm font-medium leading-snug;
+    @apply text-base font-medium leading-snug;
   }
 
-  /* Code blocks - Monospace */
+  /* Code blocks - Monospace with better sizing */
   code,
   pre,
   .font-mono {
     font-family: var(--font-mono);
+    font-size: 0.9em;
+    /* Slightly smaller but readable */
+    letter-spacing: -0.01em;
+  }
+
+  /* JSON/Code display - Premium sizing */
+  pre.json-display,
+  .json-display pre {
+    font-size: 0.875rem;
+    /* 14px - readable JSON */
+    line-height: 1.6;
   }
 
   /* Focus visible for keyboard navigation */
@@ -566,4 +581,380 @@
 
 .animate-cc-pulse {
   animation: cc-pulse 2s ease-in-out infinite;
+}
+
+/* ===========================================
+   MICROINTERACTION ANIMATIONS
+   Beautiful subtle effects for icons & buttons
+   =========================================== */
+
+/* Keyframes */
+@keyframes micro-bounce {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes micro-wiggle {
+
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  25% {
+    transform: rotate(-3deg);
+  }
+
+  75% {
+    transform: rotate(3deg);
+  }
+}
+
+@keyframes micro-pop {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.15);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes micro-shake {
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  20% {
+    transform: translateX(-2px);
+  }
+
+  40% {
+    transform: translateX(2px);
+  }
+
+  60% {
+    transform: translateX(-2px);
+  }
+
+  80% {
+    transform: translateX(2px);
+  }
+}
+
+@keyframes micro-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
+  }
+
+  50% {
+    box-shadow: 0 0 12px 2px hsl(var(--primary) / 0.3);
+  }
+}
+
+@keyframes micro-float {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes micro-heartbeat {
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  14% {
+    transform: scale(1.1);
+  }
+
+  28% {
+    transform: scale(1);
+  }
+
+  42% {
+    transform: scale(1.1);
+  }
+
+  70% {
+    transform: scale(1);
+  }
+}
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Microinteraction Utility Classes */
+@layer utilities {
+
+  /* Icon hover effects */
+  .icon-hover-bounce:hover svg,
+  .icon-hover-bounce:hover [data-lucide] {
+    animation: micro-bounce 0.4s ease-out;
+  }
+
+  .icon-hover-wiggle:hover svg,
+  .icon-hover-wiggle:hover [data-lucide] {
+    animation: micro-wiggle 0.4s ease-out;
+  }
+
+  .icon-hover-pop:hover svg,
+  .icon-hover-pop:hover [data-lucide] {
+    animation: micro-pop 0.3s ease-out;
+  }
+
+  .icon-hover-spin:hover svg,
+  .icon-hover-spin:hover [data-lucide] {
+    animation: spin 0.5s ease-out;
+  }
+
+  /* Button microinteractions - Apply to buttons directly */
+  .btn-micro {
+    @apply transition-all duration-200 ease-out;
+  }
+
+  .btn-micro:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px -2px hsl(var(--primary) / 0.2);
+  }
+
+  .btn-micro:active {
+    transform: translateY(0) scale(0.98);
+    box-shadow: 0 2px 4px -1px hsl(var(--primary) / 0.1);
+  }
+
+  /* Icon inside button - scale on hover */
+  .btn-micro:hover svg {
+    transform: scale(1.1);
+    transition: transform 0.2s ease-out;
+  }
+
+  /* Glow effect for primary buttons */
+  .btn-glow {
+    @apply transition-all duration-300;
+  }
+
+  .btn-glow:hover {
+    animation: micro-glow 1.5s ease-in-out infinite;
+  }
+
+  /* Float effect - subtle hover lift */
+  .hover-float {
+    @apply transition-transform duration-300 ease-out;
+  }
+
+  .hover-float:hover {
+    transform: translateY(-2px);
+  }
+
+  /* Scale effect - subtle grow */
+  .hover-scale {
+    @apply transition-transform duration-200 ease-out;
+  }
+
+  .hover-scale:hover {
+    transform: scale(1.02);
+  }
+
+  /* Icon scale on hover */
+  .hover-icon-scale:hover svg {
+    transform: scale(1.15);
+    transition: transform 0.2s ease-out;
+  }
+
+  /* Rotate icon on hover */
+  .hover-icon-rotate:hover svg {
+    transform: rotate(15deg);
+    transition: transform 0.2s ease-out;
+  }
+
+  /* Card lift effect */
+  .card-lift {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .card-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px -8px hsl(var(--foreground) / 0.1);
+  }
+
+  /* Interactive row effect */
+  .row-interactive {
+    @apply transition-all duration-150 ease-out cursor-pointer;
+  }
+
+  .row-interactive:hover {
+    @apply bg-muted/50;
+    transform: translateX(2px);
+  }
+
+  /* Link with arrow animation */
+  .link-arrow::after {
+    content: '→';
+    @apply ml-1 inline-block transition-transform duration-200;
+  }
+
+  .link-arrow:hover::after {
+    transform: translateX(3px);
+  }
+
+  /* Nav item with indicator slide */
+  .nav-slide {
+    @apply relative;
+  }
+
+  .nav-slide::before {
+    content: '';
+    @apply absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-0 bg-primary rounded-full transition-all duration-200;
+  }
+
+  .nav-slide:hover::before,
+  .nav-slide.active::before {
+    @apply h-4/5;
+  }
+
+  /* Gradient text animation */
+  .text-gradient-animate {
+    background: linear-gradient(90deg,
+        hsl(var(--primary)) 0%,
+        hsl(217 91% 70%) 50%,
+        hsl(var(--primary)) 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradient-shift 3s linear infinite;
+  }
+
+  /* Heartbeat animation for notifications */
+  .animate-heartbeat {
+    animation: micro-heartbeat 1.5s ease-in-out infinite;
+  }
+
+  /* Shake animation for errors */
+  .animate-shake {
+    animation: micro-shake 0.5s ease-out;
+  }
+
+  /* Float animation (continuous) */
+  .animate-float {
+    animation: micro-float 3s ease-in-out infinite;
+  }
+
+  /* Success checkmark pop */
+  .animate-success svg {
+    animation: micro-pop 0.4s ease-out;
+  }
+
+  /* Ripple effect on click */
+  .ripple {
+    @apply relative overflow-hidden;
+  }
+
+  .ripple::after {
+    content: '';
+    @apply absolute inset-0 bg-foreground/10 opacity-0;
+    transform: scale(0);
+    border-radius: inherit;
+    transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+  }
+
+  .ripple:active::after {
+    @apply opacity-100;
+    transform: scale(1);
+  }
+
+  /* Badge bounce on change */
+  .badge-bounce {
+    animation: micro-bounce 0.4s ease-out;
+  }
+
+  /* Tooltip fade scale */
+  .tooltip-animate {
+    @apply transition-all duration-150 ease-out;
+    transform-origin: center top;
+  }
+
+  /* Subtle border glow */
+  .border-glow:hover {
+    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.3),
+      0 0 8px 0 hsl(var(--primary) / 0.1);
+  }
+}
+
+/* Apply microinteractions to common button types by default */
+@layer components {
+
+  /* Primary buttons get glow on hover */
+  button[class*="bg-primary"]:hover,
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px -2px hsl(var(--primary) / 0.35);
+  }
+
+  button[class*="bg-primary"]:active,
+  .btn-primary:active {
+    transform: translateY(0) scale(0.98);
+  }
+
+  /* Icon buttons scale on hover - use data attribute or class */
+  [data-size="icon"]:hover svg,
+  .btn-icon:hover svg {
+    transform: scale(1.1);
+    transition: transform 0.15s ease-out;
+  }
+
+  /* Dropdown menu items */
+  [role="menuitem"]:hover {
+    transform: translateX(2px);
+    transition: transform 0.15s ease-out;
+  }
+
+  /* Tab items */
+  [role="tab"] {
+    @apply transition-all duration-200;
+  }
+
+  [role="tab"]:hover:not([data-state="active"]) {
+    transform: translateY(-1px);
+  }
+
+  /* Cards with hover - transition on base, effects on hover */
+  [role="article"],
+  .card {
+    @apply transition-all duration-200;
+  }
 }

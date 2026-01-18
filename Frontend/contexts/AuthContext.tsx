@@ -33,24 +33,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const token = authService.getToken();
         const storedUser = authService.getUser();
 
-        console.log('[Auth] Initialization:', { hasToken: !!token, hasUser: !!storedUser });
-
         if (token && storedUser) {
           // Set stored user immediately to prevent redirect
           setUser(storedUser);
-          console.log('[Auth] User loaded from storage:', storedUser.email);
 
           // Try to refresh user data from API in background
           try {
             const currentUser = await authService.getCurrentUser();
             setUser(currentUser);
-            console.log('[Auth] User refreshed from API');
           } catch (error) {
-            console.warn('[Auth] Failed to refresh user from API, using stored user');
             // Keep using stored user
           }
-        } else {
-          console.log('[Auth] No token or user found in storage');
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
@@ -67,35 +60,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await authService.login(data);
 
-      console.log('[Auth] Setting user state:', response.user);
       setUser(response.user);
 
       // Sync token to cookies for middleware
       if (typeof document !== 'undefined') {
-        // Set cookie with explicit domain and path
+        // Set cookie without explicit domain - browser automatically scopes to current hostname
+        // This works for both localhost and 10.0.0.1
         const cookieString = `nlpforge_access_token=${response.access_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
         document.cookie = cookieString;
-
-        console.log('[Auth] Setting cookie');
-        console.log('Cookie string:', cookieString.substring(0, 80) + '...');
 
         // Verify cookie was set
         const cookies = document.cookie.split(';').map(c => c.trim());
         const tokenCookie = cookies.find(c => c.startsWith('nlpforge_access_token='));
 
-        console.log('[Auth] Cookie verification:', tokenCookie ? 'Found' : 'Not found');
-        console.log('All cookies:', document.cookie);
-
         if (!tokenCookie) {
-          console.error('[Auth] Failed to set authentication cookie');
           throw new Error('Authentication cookie not set properly');
         }
       }
 
-      console.log('[Auth] Login complete, user authenticated');
       return response;
     } catch (error) {
-      console.error('[Auth] Login error:', error);
       throw error;
     }
   };

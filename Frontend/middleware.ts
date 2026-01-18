@@ -36,31 +36,22 @@ function isPublicRoute(pathname: string): boolean {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  console.log('[Middleware] Check:', pathname);
-
   // Allow public routes
   if (isPublicRoute(pathname)) {
-    console.log('[Middleware] Public route, allowing access');
     return NextResponse.next()
   }
 
   // Check for authentication token
   const token = request.cookies.get('nlpforge_access_token')?.value
-  const allCookies = request.cookies.getAll();
-
-  console.log('[Middleware] Cookies:', allCookies.map(c => c.name).join(', '));
-  console.log('[Middleware] Token found:', !!token);
 
   // If no token and not on public route, redirect to login
   if (!token) {
-    console.log('[Middleware] No token, redirecting to login');
     const loginUrl = new URL('/auth/login', request.url)
     loginUrl.searchParams.set('from', pathname)
     return NextResponse.redirect(loginUrl)
   }
 
   // Allow authenticated requests
-  console.log('[Middleware] Token found, allowing access');
   return NextResponse.next()
 }
 
