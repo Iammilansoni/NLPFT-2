@@ -11,7 +11,7 @@ Handles:
 
 from sqlalchemy import Column, Text, TIMESTAMP, Integer, Boolean
 from sqlalchemy.dialects.postgresql import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 from app.core.postgres import Base
@@ -33,7 +33,7 @@ class EmailVerification(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(Text, nullable=False, index=True)
     otp = Column(Text, nullable=False)
-    created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
+    created_at = Column(TIMESTAMP, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), nullable=False)
     expires_at = Column(TIMESTAMP, nullable=False)
     is_verified = Column(Boolean, nullable=False, default=False)
     attempts = Column(Integer, nullable=False, default=0)

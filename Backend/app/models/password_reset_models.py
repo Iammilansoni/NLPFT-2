@@ -9,7 +9,7 @@ Handles:
 
 from sqlalchemy import Column, Text, TIMESTAMP, Boolean
 from sqlalchemy.dialects.postgresql import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 from app.core.postgres import Base
@@ -30,7 +30,7 @@ class PasswordReset(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(Text, nullable=False, index=True)
     token = Column(Text, nullable=False, unique=True, index=True)
-    created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
+    created_at = Column(TIMESTAMP, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), nullable=False)
     expires_at = Column(TIMESTAMP, nullable=False)
     is_used = Column(Boolean, nullable=False, default=False)
     ip_address = Column(Text, nullable=True)
