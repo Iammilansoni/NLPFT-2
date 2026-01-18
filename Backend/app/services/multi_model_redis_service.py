@@ -33,7 +33,7 @@ import redis
 import numpy as np
 from typing import List, Dict, Optional, Tuple, Any
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 
 from redis.commands.search.field import VectorField, TextField, NumericField, TagField
@@ -373,7 +373,7 @@ class MultiModelRedisVectorService:
             "embedding_model": model_id,
             "dimension": expected_dim,
             "vector": vector.astype(np.float32).tolist(),
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             # Metadata fields
             "query": metadata.get("query", ""),
             "api_name": metadata.get("api_name", ""),
@@ -450,7 +450,7 @@ class MultiModelRedisVectorService:
                     "embedding_model": model_id,
                     "dimension": expected_dim,
                     "vector": vector.tolist(),
-                    "created_at": datetime.utcnow().isoformat(),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
                     "query": metadata.get("query", ""),
                     "api_name": metadata.get("api_name", ""),
                     "endpoint": metadata.get("endpoint", ""),
