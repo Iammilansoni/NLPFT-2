@@ -22,14 +22,10 @@ import type {
 } from './api-types';
 import { getApiBase } from './runtime-config';
 
-const RAW_API_BASE = getApiBase();
-const API_BASE_URL = RAW_API_BASE ? RAW_API_BASE.replace(/\/$/, '') : '';
-
 class ApiClient {
-  private baseUrl: string;
-
-  constructor(baseUrl: string = API_BASE_URL) {
-    this.baseUrl = baseUrl;
+  private get baseUrl(): string {
+    // Evaluate getApiBase() on each access to get dynamic hostname
+    return getApiBase().replace(/\/$/, '');
   }
 
   private async request<T>(
@@ -40,9 +36,6 @@ class ApiClient {
 
     // Get auth token from localStorage
     const token = typeof window !== 'undefined' ? localStorage.getItem('nlpforge_access_token') : null;
-
-    console.log('[API] Request:', endpoint);
-    console.log('[API] Token:', token ? token.substring(0, 20) + '...' : 'No token');
 
     const config: RequestInit = {
       ...options,
@@ -56,22 +49,22 @@ class ApiClient {
     try {
       const response = await fetch(url, config);
 
-      console.log('[API] Response:', response.status, endpoint);
-
       if (!response.ok) {
         // Handle 401 Unauthorized
         if (response.status === 401) {
-          console.log('[API] 401 Unauthorized - Token might be invalid or expired');
-          console.log('Token was:', token ? 'present' : 'missing');
-
           if (typeof window !== 'undefined') {
-            // Don't immediately redirect - let's see what's happening first
-            console.log('[API] Would redirect to login, but holding off for debugging');
-            // localStorage.removeItem('nlpforge_access_token');
-            // localStorage.removeItem('nlpforge_user');
-            // if (!window.location.pathname.startsWith('/auth')) {
-            //   window.location.href = '/auth/login';
-            // }
+            const hasToken = localStorage.getItem('nlpforge_access_token');
+
+            // Only clear and redirect if we actually had a token (meaning it's expired)
+            if (hasToken) {
+              localStorage.removeItem('nlpforge_access_token');
+              localStorage.removeItem('nlpforge_user');
+
+              // Redirect to login if not already on auth page
+              if (!window.location.pathname.startsWith('/auth')) {
+                window.location.href = '/auth/login';
+              }
+            }
           }
         }
 

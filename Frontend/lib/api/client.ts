@@ -4,42 +4,44 @@
  */
 import { getApiBase } from '../runtime-config';
 
-const RAW_API_BASE = getApiBase();
-const API_BASE_URL = RAW_API_BASE ? RAW_API_BASE.replace(/\/$/, '') : ''
+// Helper to get API base dynamically (not at module load time)
+function getApiBaseUrl(): string {
+  return getApiBase().replace(/\/$/, '');
+}
 
 export const API_ENDPOINTS = {
-  // Base
-  root: `${API_BASE_URL}/`,
-  health: `${API_BASE_URL}/api/v1/dataset/list`,
-  
+  // Base - computed at runtime via getters
+  get root() { return `${getApiBaseUrl()}/` },
+  get datasetList() { return `${getApiBaseUrl()}/api/v1/dataset/list` },
+
   // Query Processing
-  query: `${API_BASE_URL}/api/v1/query`,
-  stats: `${API_BASE_URL}/api/v1/stats`,
-  reindex: (intent: string) => `${API_BASE_URL}/api/v1/reindex/${intent}`,
-  
+  get query() { return `${getApiBaseUrl()}/api/v1/query` },
+  get stats() { return `${getApiBaseUrl()}/api/v1/stats` },
+  reindex: (intent: string) => `${getApiBaseUrl()}/api/v1/reindex/${intent}`,
+
   // Search
-  search: `${API_BASE_URL}/api/v1/search`,
-  
+  get search() { return `${getApiBaseUrl()}/api/v1/search` },
+
   // Templates
   templates: {
-    list: `${API_BASE_URL}/api/v1/templates`,
-    get: (intent: string) => `${API_BASE_URL}/api/v1/templates/${intent}`,
-    create: `${API_BASE_URL}/api/v1/templates`,
-    update: (intent: string) => `${API_BASE_URL}/api/v1/templates/${intent}`,
-    delete: (intent: string) => `${API_BASE_URL}/api/v1/templates/${intent}`,
-    sync: `${API_BASE_URL}/api/v1/templates/sync`,
-    reload: `${API_BASE_URL}/api/v1/templates/reload`,
-    stats: `${API_BASE_URL}/api/v1/templates/stats`,
+    get list() { return `${getApiBaseUrl()}/api/v1/templates` },
+    get: (intent: string) => `${getApiBaseUrl()}/api/v1/templates/${intent}`,
+    get create() { return `${getApiBaseUrl()}/api/v1/templates` },
+    update: (intent: string) => `${getApiBaseUrl()}/api/v1/templates/${intent}`,
+    delete: (intent: string) => `${getApiBaseUrl()}/api/v1/templates/${intent}`,
+    get sync() { return `${getApiBaseUrl()}/api/v1/templates/sync` },
+    get reload() { return `${getApiBaseUrl()}/api/v1/templates/reload` },
+    get stats() { return `${getApiBaseUrl()}/api/v1/templates/stats` },
   },
-  
+
   // Datasets
   dataset: {
-    list: `${API_BASE_URL}/api/v1/dataset/list`,
-    upload: `${API_BASE_URL}/api/v1/dataset/upload`,
-    ingest: `${API_BASE_URL}/api/v1/dataset/ingest`,
-    generate: `${API_BASE_URL}/api/v1/dataset/generate`,
+    get list() { return `${getApiBaseUrl()}/api/v1/dataset/list` },
+    get upload() { return `${getApiBaseUrl()}/api/v1/dataset/upload` },
+    get ingest() { return `${getApiBaseUrl()}/api/v1/dataset/ingest` },
+    get generate() { return `${getApiBaseUrl()}/api/v1/dataset/generate` },
   },
-} as const
+}
 
 /**
  * Custom error class for API errors
@@ -62,7 +64,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))
     const errorMessage = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`
-    
+
     // Check for invalid token format error
     if (response.status === 401 && errorMessage.includes('Token format invalid')) {
       // Clear invalid token from storage
@@ -74,19 +76,19 @@ async function handleResponse<T>(response: Response): Promise<T> {
         window.location.href = '/login'
       }
     }
-    
+
     throw new ApiError(
       errorMessage,
       response.status,
       errorData
     )
   }
-  
+
   const contentType = response.headers.get('content-type')
   if (contentType?.includes('application/json')) {
     return response.json()
   }
-  
+
   return response.text() as any
 }
 
@@ -100,7 +102,7 @@ export async function apiFetch<T>(
   try {
     // Get auth token from localStorage
     const token = typeof window !== 'undefined' ? localStorage.getItem('nlpforge_access_token') : null
-    
+
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -109,13 +111,13 @@ export async function apiFetch<T>(
         ...options.headers,
       },
     })
-    
+
     return handleResponse<T>(response)
   } catch (error) {
     if (error instanceof ApiError) {
       throw error
     }
-    
+
     // Network or other errors
     throw new ApiError(
       error instanceof Error ? error.message : 'An unknown error occurred',
@@ -131,7 +133,7 @@ export async function apiGet<T>(url: string, params?: Record<string, any>): Prom
   const urlWithParams = params
     ? `${url}?${new URLSearchParams(params as any)}`
     : url
-    
+
   return apiFetch<T>(urlWithParams, { method: 'GET' })
 }
 

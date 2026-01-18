@@ -385,3 +385,71 @@ export interface CreateRunResponse {
   message?: string;
 }
 
+// ============================================================================
+// Semantic Retrieve API Types
+// ============================================================================
+
+export interface SemanticRetrieveStage1Result {
+  query: string;
+  similarity_score: number;
+  t_id: string;
+}
+
+export interface SemanticRetrieveStage2Result {
+  t_id: string;
+  avg_similarity: number;
+  avg_confidence_score: number;
+  final_score: number;
+  rank: number;
+  match_count: number;
+}
+
+export interface SemanticRetrieveFinalOutput {
+  t_id: string;
+  api_name: string;
+  endpoint: string;
+  method: string;
+  confidence_score: number;
+  request_schema: Record<string, unknown>;
+  response_schema: Record<string, unknown>;
+  extracted_request_body?: Record<string, unknown>;
+}
+
+export interface SemanticRetrieveMetadata {
+  query: string;
+  top_k: number;
+  total_candidates: number;
+  processing_time_ms: number;
+  t_id?: string;
+  match_count?: number;
+  avg_similarity?: number;
+  avg_confidence?: number;
+  intent_alignment?: number;
+  dominant_intent?: string;
+  domain_tags?: string[];
+  matched_queries?: string[];
+}
+
+export interface SemanticRetrieveResponse {
+  success: boolean;
+  stage1_vector_search: SemanticRetrieveStage1Result[];
+  stage2_reranking: SemanticRetrieveStage2Result[];
+  final_output: SemanticRetrieveFinalOutput | null;
+  metadata: SemanticRetrieveMetadata;
+  extracted_request_body?: Record<string, unknown>;
+  // Legacy fields
+  api_name?: string;
+  endpoint?: string;
+  method?: string;
+  base_url?: string;
+  confidence?: number;
+  alternatives?: Array<{
+    t_id: string;
+    api_name: string;
+    endpoint: string;
+    method: string;
+    avg_similarity: number;
+    match_count: number;
+  }>;
+  error?: string;
+}

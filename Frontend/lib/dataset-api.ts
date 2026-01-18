@@ -6,8 +6,10 @@
 import axios, { AxiosInstance } from 'axios';
 import { getApiBase } from './runtime-config';
 
-const RAW_API_BASE = getApiBase();
-const API_BASE_URL = RAW_API_BASE ? RAW_API_BASE.replace(/\/$/, '') : '';
+// Helper to get API base dynamically (not at module load time)
+function getApiBaseUrl(): string {
+  return getApiBase().replace(/\/$/, '');
+}
 
 
 // ==================== Types ====================
@@ -129,7 +131,7 @@ export interface ListDatasetsParams {
 export class DatasetApiClient {
   private client: AxiosInstance;
 
-  constructor(baseURL: string = API_BASE_URL) {
+  constructor(baseURL: string = getApiBaseUrl()) {
     this.client = axios.create({
       baseURL,
       headers: {
@@ -190,7 +192,7 @@ export class DatasetApiClient {
    */
   triggerDownload(taskId: string, filename?: string, format: string = 'csv'): void {
     const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : '';
-    const url = `${API_BASE_URL}/api/v1/datasets/download/${taskId}/${format}`;
+    const url = `${getApiBaseUrl()}/api/v1/datasets/download/${taskId}/${format}`;
 
     // Create temporary link
     const link = document.createElement('a');
@@ -206,7 +208,7 @@ export class DatasetApiClient {
    */
   triggerDownloadByFilename(filename: string): void {
     const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : '';
-    const url = `${API_BASE_URL}/api/v1/datasets/download-file/${filename}`;
+    const url = `${getApiBaseUrl()}/api/v1/datasets/download-file/${filename}`;
 
     // Create temporary link
     const link = document.createElement('a');
