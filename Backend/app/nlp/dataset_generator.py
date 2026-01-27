@@ -8,6 +8,7 @@ Features:
 - 70% valid cases, 20% edge cases, 10% extreme scenarios
 - Boundary conditions, rare combinations, synthetic but schema-correct values
 - CSV output with preview/download capability
+- DYNAMIC PROVIDER SUPPORT: Uses user's configured LLM provider from database
 """
 
 import os
@@ -16,33 +17,44 @@ import math
 import csv
 import random
 import string
+import asyncio
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any, Tuple, TYPE_CHECKING
 from uuid import UUID
 import pandas as pd
 
-from app.core.config import settings, DATASETS_DIR, GEMINI_API_KEY
+from app.core.config import settings, DATASETS_DIR
 from app.core.logger import logger
 
-# --- Google Gemini Configuration ---
-# Uses Gemini 2.5 Flash for fast, high-quality generation
+if TYPE_CHECKING:
+    from app.llm.providers.base import BaseLLMProvider
+
+# --- Gemini Fallback Configuration (only if explicitly enabled via env) ---
+# This is a FALLBACK only - system prefers user's configured provider
 _gemini_available = False
 _gemini_model = "gemini-2.5-flash"
+_gemini_client = None
 
-try:
-    import google.generativeai as genai
-    if GEMINI_API_KEY:
-        genai.configure(api_key=GEMINI_API_KEY)
-        _gemini_available = True
-        logger.info(f"Google Gemini API configured successfully")
-        logger.info(f"Using model: {_gemini_model}")
-    else:
-        logger.warning("GEMINI_API_KEY not set. Please add it to your .env file.")
-except ImportError as e:
-    logger.warning(f"google-generativeai package not installed: {e}")
-    logger.warning("Install with: pip install google-generativeai")
-except Exception as e:
-    logger.warning(f"Gemini API configuration failed: {e}")
+def _init_gemini_fallback():
+    """Initialize Gemini as fallback provider if GEMINI_API_KEY is set"""
+    global _gemini_available, _gemini_client
+    try:
+        from app.core.config import GEMINI_API_KEY
+        import google.generativeai as genai
+        if GEMINI_API_KEY:
+            genai.configure(api_key=GEMINI_API_KEY)
+            _gemini_client = genai.GenerativeModel(_gemini_model)
+            _gemini_available = True
+            logger.info(f"Gemini fallback available: {_gemini_model}")
+        else:
+            logger.debug("GEMINI_API_KEY not set - Gemini fallback disabled")
+    except ImportError:
+        logger.debug("google-generativeai package not installed - Gemini fallback disabled")
+    except Exception as e:
+        logger.debug(f"Gemini fallback init failed: {e}")
+
+# Initialize Gemini fallback on module load
+_init_gemini_fallback()
 
 
 class EnterpriseDatasetGenerator:
@@ -59,26 +71,33 @@ class EnterpriseDatasetGenerator:
     - 70% valid cases, 20% edge cases, 10% extreme/error cases
     - Strict template schema compliance
     - Clean UTF-8, properly escaped CSV output
+    
+    PROVIDER PRIORITY:
+    1. User's configured LLM provider from database (highest priority)
+    2. Gemini API key from environment (fallback)
+    3. Error if no provider available
     """
     
-    def __init__(self, datasets_dir: str = str(DATASETS_DIR)):
-        """Initialize the enterprise dataset generator"""
+    def __init__(self, datasets_dir: str = str(DATASETS_DIR), user_id: Optional[str] = None):
+        """
+        Initialize the enterprise dataset generator
+        
+        Args:
+            datasets_dir: Directory for storing generated datasets
+            user_id: Optional user ID to load their configured LLM provider
+        """
         self.datasets_dir = datasets_dir
         os.makedirs(datasets_dir, exist_ok=True)
         
-        self.gemini_available = _gemini_available
-        self.gemini_model = _gemini_model
+        self.user_id = user_id
+        self._llm_provider: Optional["BaseLLMProvider"] = None
+        self._provider_initialized = False
+        self._provider_user_id: Optional[str] = None  # Track which user's provider is cached
+        self._provider_lock = asyncio.Lock()  # Mutex for provider initialization
         
-        if self.gemini_available:
-            import google.generativeai as genai
-            self.client = genai.GenerativeModel(self.gemini_model)
-            self.model_name = self.gemini_model
-            self.provider = "gemini"
-            logger.info(f"Using Gemini {self.model_name} for dataset generation")
-        else:
-            self.client = None
-            self.provider = None
-            logger.error("Gemini API not available. Set GOOGLE_API_KEY in your .env file.")
+        # Track provider info for logging
+        self.provider = "not_configured"
+        self.model_name = "not_configured"
     
     def _build_system_prompt(
         self,
@@ -329,11 +348,7 @@ Return ONLY the JSON array, nothing else."""
             logger.debug(f"Raw response length: {len(response_text)} chars")
             logger.debug(f"First 200 chars: {response_text[:200]}")
 
-            if any(keyword in response_text[:500] for keyword in ['import ', 'def ', 'class ', 'from ', 'print(', 'if __name__']):
-                logger.error("Response appears to contain Python code instead of JSON")
-                logger.error(f"Response start: {response_text[:300]}")
-                return []
-            
+            # Extract from code blocks FIRST before checking for Python code
             if "```" in response_text:
                 code_block_pattern = r'```(?:json)?\s*([\s\S]*?)```'
                 matches = re.findall(code_block_pattern, response_text)
@@ -345,6 +360,18 @@ Return ONLY the JSON array, nothing else."""
       
             if response_text.lower().startswith("json"):
                 response_text = response_text[4:].strip()
+            
+            # Check for Python code AFTER extracting from code blocks
+            # Only flag as Python code if it starts with Python-specific patterns
+            first_100 = response_text[:100].strip()
+            if (first_100.startswith('import ') or 
+                first_100.startswith('from ') or 
+                first_100.startswith('def ') or 
+                first_100.startswith('class ') or
+                'if __name__' in first_100):
+                logger.error("Response appears to contain Python code instead of JSON")
+                logger.error(f"Response start: {response_text[:300]}")
+                return []
            
             bracket_start = response_text.find("[")
             bracket_end = response_text.rfind("]")
@@ -564,9 +591,199 @@ Return ONLY the JSON array, nothing else."""
         
         return csv_rows
     
+    async def _get_llm_provider(self, user_id: Optional[str] = None) -> Optional["BaseLLMProvider"]:
+        """
+        Get the configured LLM provider for the user from database.
+        
+        Priority:
+        1. User's default configured provider from database
+        2. Returns None (caller should fallback to Gemini or raise error)
+        
+        Args:
+            user_id: User ID to load provider for
+            
+        Returns:
+            BaseLLMProvider instance or None
+        """
+        target_user_id = user_id or self.user_id
+        
+        # Use lock to prevent race conditions during provider initialization
+        # Entire check-then-create logic must be synchronized
+        async with self._provider_lock:
+            # Check if cached provider belongs to the requested user
+            if self._provider_initialized and self._llm_provider:
+                if self._provider_user_id == target_user_id:
+                    return self._llm_provider
+                # Different user - need to create new provider
+                self._provider_initialized = False
+                self._llm_provider = None
+                self._provider_user_id = None
+            
+            if not target_user_id:
+                logger.debug("No user_id provided for provider lookup")
+                return None
+            
+            try:
+                import asyncio
+                
+                def _load_user_llm_provider_sync(user_uuid_str, t_user_id):
+                    """Synchronous helper to load LLM provider from database."""
+                    from sqlalchemy import create_engine, select, and_
+                    from sqlalchemy.engine import make_url
+                    from sqlalchemy.orm import sessionmaker
+                    from app.llm.provider_factory import LLMProviderFactory
+                    from app.core.encryption import decrypt_api_key
+                    from app.models.database_models import LLMProviderConfig
+                    from app.core.config import settings
+                    from uuid import UUID
+                    
+                    # Create synchronous database connection using proper URL parsing
+                    parsed_url = make_url(settings.database_url)
+                    # Strip async driver suffix (e.g., postgresql+asyncpg -> postgresql)
+                    sync_drivername = parsed_url.drivername.split("+")[0]
+                    sync_url = parsed_url.set(drivername=sync_drivername)
+                    engine = create_engine(sync_url)
+                    SyncSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+                    
+                    db = SyncSessionLocal()
+                    try:
+                        user_uuid = UUID(user_uuid_str) if isinstance(user_uuid_str, str) else user_uuid_str
+                        
+                        # Query for user's default provider config directly
+                        result = db.execute(
+                            select(LLMProviderConfig).where(
+                                and_(
+                                    LLMProviderConfig.u_id == user_uuid,
+                                    LLMProviderConfig.is_default == 1,
+                                    LLMProviderConfig.is_active == 1,
+                                )
+                            )
+                        )
+                        default_config = result.scalar_one_or_none()
+                        
+                        if default_config:
+                            # Decrypt API key if present
+                            decrypted_key = None
+                            if default_config.api_key_encrypted:
+                                try:
+                                    decrypted_key = decrypt_api_key(default_config.api_key_encrypted)
+                                except Exception as decrypt_error:
+                                    logger.error(f"Failed to decrypt API key: {decrypt_error}")
+                                    return None
+                            
+                            # Create provider using factory
+                            provider = LLMProviderFactory.create_from_db_config(
+                                default_config, 
+                                decrypted_api_key=decrypted_key
+                            )
+                            
+                            return {
+                                "provider": provider,
+                                "provider_type": default_config.provider,
+                                "model_name": default_config.model_name,
+                                "user_id": t_user_id
+                            }
+                        else:
+                            return None
+                    finally:
+                        db.close()
+                        engine.dispose()
+                
+                # Run the synchronous DB operations in a thread pool
+                result = await asyncio.to_thread(
+                    _load_user_llm_provider_sync,
+                    target_user_id,
+                    target_user_id
+                )
+                
+                if result:
+                    self._llm_provider = result["provider"]
+                    self._provider_initialized = True
+                    self._provider_user_id = result["user_id"]
+                    self.provider = result["provider_type"]
+                    self.model_name = result["model_name"]
+                    
+                    logger.info(f"Loaded user's configured LLM provider: {result['provider_type']}/{result['model_name']}")
+                    return self._llm_provider
+                else:
+                    logger.debug(f"No default LLM config found for user {target_user_id}")
+                    
+            except Exception as e:
+                logger.warning(f"Failed to load configured LLM provider: {e}")
+                import traceback
+                logger.debug(f"Provider load traceback: {traceback.format_exc()}")
+            
+            return None
+    
+    async def _call_llm_api(self, system_prompt: str, user_prompt: str, num_examples: int, user_id: Optional[str] = None) -> str:
+        """
+        Call LLM API using configured provider (priority) or fallback to Gemini.
+        
+        Provider Priority:
+        1. User's configured provider from database
+        2. Gemini API (if GEMINI_API_KEY set in environment)
+        3. Raise error if no provider available
+        
+        Args:
+            system_prompt: System instructions
+            user_prompt: User request
+            num_examples: Number of test cases
+            user_id: Optional user ID for provider lookup
+            
+        Returns:
+            Response text from LLM
+            
+        Raises:
+            ValueError: If no LLM provider is available
+        """
+        # Try to get configured provider
+        provider = await self._get_llm_provider(user_id)
+        
+        if provider:
+            try:
+                from app.llm.providers.base import LLMConfig
+                
+                config = LLMConfig(
+                    temperature=0.7,
+                    max_tokens=65536,
+                    top_p=0.9,
+                )
+                
+                response = await provider.generate(
+                    prompt=user_prompt,
+                    system_prompt=system_prompt,
+                    config=config,
+                )
+                
+                logger.info(f"LLM response received from {self.provider}/{self.model_name}: {len(response.content)} chars")
+                return response.content
+                
+            except Exception as e:
+                logger.warning(f"Configured provider failed: {e}")
+                # Reset provider so we can try fallback
+                self._llm_provider = None
+                self._provider_initialized = False
+                
+                # If Gemini is available, fall through to use it
+                if not _gemini_available:
+                    raise ValueError(f"LLM provider '{self.provider}' failed: {e}")
+                logger.info("Attempting Gemini fallback...")
+        
+        # Fallback to Gemini
+        if _gemini_available and _gemini_client:
+            self.provider = "gemini"
+            self.model_name = _gemini_model
+            return await self._call_gemini_api(system_prompt, user_prompt, num_examples)
+        
+        raise ValueError(
+            "No LLM provider available. "
+            "Please configure a provider in Settings → LLM Providers, "
+            "or set GEMINI_API_KEY in your environment for fallback."
+        )
+    
     async def _call_gemini_api(self, system_prompt: str, user_prompt: str, num_examples: int) -> str:
         """
-        Call Gemini API with Gemini 2.5 Flash
+        Call Gemini API as fallback provider.
         
         Args:
             system_prompt: System instructions
@@ -578,11 +795,14 @@ Return ONLY the JSON array, nothing else."""
         """
         import asyncio
         
+        if not _gemini_available or not _gemini_client:
+            raise ValueError("Gemini fallback not available. Set GEMINI_API_KEY in environment.")
+        
         max_retries = 3
         
         for attempt in range(max_retries):
             try:
-                logger.info(f"Calling Gemini {self.gemini_model} (attempt {attempt + 1})...")
+                logger.info(f"Calling Gemini {_gemini_model} (attempt {attempt + 1})...")
                 
                 # Combine system prompt and user prompt for Gemini
                 full_prompt = f"{system_prompt}\n\n{user_prompt}"
@@ -596,7 +816,7 @@ Return ONLY the JSON array, nothing else."""
                 
                 # Run the synchronous generate_content in a thread pool
                 response = await asyncio.to_thread(
-                    self.client.generate_content,
+                    _gemini_client.generate_content,
                     full_prompt,
                     generation_config=generation_config
                 )
@@ -637,12 +857,13 @@ Return ONLY the JSON array, nothing else."""
         user_prompt: str = "",
         focus_areas: Optional[List[str]] = None,
         scenario_distribution: Optional[Dict[str, float]] = None,
-        task_id: Optional[str] = None
+        task_id: Optional[str] = None,
+        user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate comprehensive, embedding-ready CSV dataset from approved template
         
-        LOCAL GENERATION using Ollama Llama 3.2 / Gemma 2B
+        Uses user's configured LLM provider or falls back to Gemini.
         
         Args:
             template_data: Full template information from database
@@ -651,10 +872,15 @@ Return ONLY the JSON array, nothing else."""
             focus_areas: Specific areas to focus on
             scenario_distribution: Custom distribution of scenarios
             task_id: Optional task ID for progress tracking
+            user_id: Optional user ID for loading configured LLM provider
         
         Returns:
             Dictionary with generation results and file paths
         """
+        # Store user_id for provider lookup
+        if user_id:
+            self.user_id = user_id
+        
         def update_progress(progress: int, message: str, step: str = None):
             if task_id:
                 try:
@@ -667,8 +893,28 @@ Return ONLY the JSON array, nothing else."""
         
         update_progress(5, "Initializing dataset generation...", "init")
         
-        if not self.gemini_available:
-            raise ValueError("Gemini API not available. Set GOOGLE_API_KEY in your .env file.")
+        # Check if any LLM provider is available (configured or Gemini fallback)
+        has_configured_provider = False
+        if self.user_id:
+            try:
+                test_provider = await self._get_llm_provider(self.user_id)
+                has_configured_provider = test_provider is not None
+                if has_configured_provider:
+                    logger.info(f"Using configured provider: {self.provider}/{self.model_name}")
+            except Exception as e:
+                logger.debug(f"Provider check failed: {e}")
+        
+        if not _gemini_available and not has_configured_provider:
+            raise ValueError(
+                "No LLM provider available. Please either:\n"
+                "1. Configure a provider in Settings → LLM Providers, or\n"
+                "2. Set GEMINI_API_KEY in your .env file for Gemini fallback."
+            )
+        
+        # Set fallback provider info if not configured
+        if not has_configured_provider and _gemini_available:
+            self.provider = "gemini"
+            self.model_name = _gemini_model
         
         template_name = "Unknown"
         template_id_str = "unknown"
@@ -718,7 +964,7 @@ Return ONLY the JSON array, nothing else."""
                 
                 response_text = None
                 try:
-                    response_text = await self._call_gemini_api(system_prompt, user_prompt_msg, batch_count)
+                    response_text = await self._call_llm_api(system_prompt, user_prompt_msg, batch_count, self.user_id)
                 except Exception as api_error:
                     logger.error(f"API call failed for batch {batch_num + 1}: {type(api_error).__name__}: {api_error}")
                     
