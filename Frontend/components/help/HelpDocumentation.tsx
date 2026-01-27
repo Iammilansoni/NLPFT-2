@@ -71,7 +71,7 @@ const GettingStartedContent = () => (
     </div>
 
     <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 mt-4">
-      <p className="text-sm font-medium text-primary">💡 Pro Tip</p>
+      <p className="text-sm font-medium text-primary">Pro Tip</p>
       <p className="text-sm text-muted-foreground mt-1">
         Press <kbd className="px-1.5 py-0.5 text-xs font-mono bg-muted rounded">?</kbd> anytime to see keyboard shortcuts.
       </p>
@@ -226,41 +226,59 @@ const SettingsContent = () => (
 
     <div className="space-y-4">
       <div>
-        <h4 className="font-semibold mb-2">Embedding Models</h4>
-        <p className="text-sm text-muted-foreground">
-          The embedding model determines how text is converted to vectors for semantic search.
+        <h4 className="font-semibold mb-2">Embedding Models (15+ via Ollama)</h4>
+        <p className="text-sm text-muted-foreground mb-2">
+          Choose from various models based on speed, accuracy, and context length needs:
         </p>
         <table className="w-full text-sm mt-2">
           <thead>
             <tr className="border-b">
               <th className="text-left py-2">Model</th>
               <th className="text-left py-2">Speed</th>
-              <th className="text-left py-2">Quality</th>
+              <th className="text-left py-2">Best For</th>
             </tr>
           </thead>
           <tbody className="text-muted-foreground">
             <tr className="border-b">
-              <td className="py-2">all-MiniLM-L6-v2</td>
-              <td className="py-2">⚡ Fast</td>
-              <td className="py-2">Good</td>
+              <td className="py-2 font-medium">nomic-embed-text</td>
+              <td className="py-2 text-emerald-600">Fast</td>
+              <td className="py-2">RAG, Long docs (Recommended)</td>
             </tr>
             <tr className="border-b">
-              <td className="py-2">all-mpnet-base-v2</td>
-              <td className="py-2">Medium</td>
-              <td className="py-2">Better</td>
+              <td className="py-2">all-minilm</td>
+              <td className="py-2 text-emerald-600">Fastest</td>
+              <td className="py-2">Prototyping, Edge devices</td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-2">mxbai-embed-large</td>
+              <td className="py-2 text-amber-600">Moderate</td>
+              <td className="py-2">State-of-the-art accuracy</td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-2">bge-m3</td>
+              <td className="py-2 text-amber-600">Moderate</td>
+              <td className="py-2">Multilingual (100+ langs)</td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-2">snowflake-arctic-embed</td>
+              <td className="py-2 text-emerald-600">Fast</td>
+              <td className="py-2">Enterprise retrieval</td>
             </tr>
             <tr>
-              <td className="py-2">nomic-embed-text</td>
-              <td className="py-2">Slower</td>
-              <td className="py-2">Best</td>
+              <td className="py-2">qwen3-embedding</td>
+              <td className="py-2 text-red-600">Slow</td>
+              <td className="py-2">Maximum quality (0.6-8B)</td>
             </tr>
           </tbody>
         </table>
+        <p className="text-xs text-muted-foreground mt-2">
+          More: bge-base/large, granite-embedding, paraphrase-multilingual, embeddinggemma
+        </p>
       </div>
 
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <p className="text-sm font-medium text-yellow-800">⚠️ Important</p>
-        <p className="text-sm text-yellow-700 mt-1">
+      <div className="bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+        <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Important</p>
+        <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
           Changing the embedding model requires re-embedding all datasets for consistent search results.
         </p>
       </div>

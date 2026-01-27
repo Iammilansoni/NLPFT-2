@@ -1,6 +1,7 @@
 'use client';
 
 import { LandingNav } from '@/components/landing/LandingNav';
+import { UserFlowDiagram } from '@/components/diagrams/UserFlowDiagram';
 import {
     Zap,
     Search,
@@ -112,8 +113,8 @@ export default function ProductPage() {
                             />
                             <FeatureCard
                                 icon={<Database className="w-6 h-6" />}
-                                title="Synthetic Datasets"
-                                description="Generate diverse test data using local LLMs and embed them for semantic search capabilities."
+                                title="AI Dataset Generation"
+                                description="Generate diverse test datasets from templates using any configured LLM. Export as CSV or JSON for testing."
                             />
                             <FeatureCard
                                 icon={<GitBranch className="w-6 h-6" />}
@@ -127,8 +128,8 @@ export default function ProductPage() {
                             />
                             <FeatureCard
                                 icon={<Zap className="w-6 h-6" />}
-                                title="Local-First AI"
-                                description="All AI processing runs locally via Ollama. Your data never leaves your infrastructure."
+                                title="Multi-Provider AI"
+                                description="Choose from 7 LLM providers: OpenAI, Google Gemini, Anthropic Claude, Grok, DeepSeek, Ollama (local), and HuggingFace."
                             />
                         </div>
                     </section>
@@ -139,7 +140,9 @@ export default function ProductPage() {
                         <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
                             From natural language to executable test cases in seconds
                         </p>
-                        <div className="grid md:grid-cols-4 gap-6">
+                        
+                        {/* Quick Overview Cards */}
+                        <div className="grid md:grid-cols-4 gap-6 mb-12">
                             <div className="text-center p-6 rounded-xl border border-border bg-card">
                                 <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg">1</div>
                                 <h3 className="font-semibold text-foreground mb-2">Describe Your Test</h3>
@@ -160,6 +163,12 @@ export default function ProductPage() {
                                 <h3 className="font-semibold text-foreground mb-2">Execute Test</h3>
                                 <p className="text-sm text-muted-foreground">Get ready-to-run test cases instantly</p>
                             </div>
+                        </div>
+
+                        {/* Detailed Pipeline Diagram */}
+                        <div className="p-8 rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20">
+                            <h3 className="text-xl font-semibold text-foreground mb-6 text-center">Detailed Processing Pipeline</h3>
+                            <UserFlowDiagram />
                         </div>
                     </section>
 

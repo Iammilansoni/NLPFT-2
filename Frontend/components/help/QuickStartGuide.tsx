@@ -149,7 +149,7 @@ export function QuickStartGuide({ open, onOpenChange }: QuickStartGuideProps) {
               {step.tip && (
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
                   <p className="text-sm text-primary font-medium">
-                    💡 {step.tip}
+                    Tip: {step.tip}
                   </p>
                 </div>
               )}

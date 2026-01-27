@@ -1,6 +1,9 @@
 'use client';
 
 import { LandingNav } from '@/components/landing/LandingNav';
+import { UserFlowDiagram } from '@/components/diagrams/UserFlowDiagram';
+import { ArchitectureDiagram } from '@/components/diagrams/ArchitectureDiagram';
+import { CompleteUserJourney } from '@/components/diagrams/CompleteUserJourney';
 import {
     Zap,
     Search,
@@ -183,7 +186,7 @@ export default function AboutPage() {
                             <FeatureCard
                                 icon={<Database className="w-6 h-6" />}
                                 title="Synthetic Datasets"
-                                description="Generate diverse test data using local LLMs and embed them for semantic search capabilities."
+                                description="Generate diverse test data using any LLM provider, then embed for semantic search via Ollama."
                             />
                             <FeatureCard
                                 icon={<GitBranch className="w-6 h-6" />}
@@ -197,8 +200,8 @@ export default function AboutPage() {
                             />
                             <FeatureCard
                                 icon={<Zap className="w-6 h-6" />}
-                                title="Local-First AI"
-                                description="All AI processing runs locally via Ollama. Your data never leaves your infrastructure."
+                                title="Flexible AI Providers"
+                                description="Supports 7 LLM providers: OpenAI, Gemini, Claude, Ollama (local), DeepSeek, Grok, and HuggingFace."
                             />
                         </div>
                     </section>
@@ -250,9 +253,11 @@ export default function AboutPage() {
                                         AI / ML
                                     </h3>
                                     <div className="flex flex-wrap gap-2">
+                                        <TechBadge name="OpenAI" category="ai" />
+                                        <TechBadge name="Gemini" category="ai" />
+                                        <TechBadge name="Anthropic" category="ai" />
                                         <TechBadge name="Ollama" category="ai" />
                                         <TechBadge name="FlashRank" category="ai" />
-                                        <TechBadge name="Llama 3.1" category="ai" />
                                     </div>
                                 </div>
                             </div>
@@ -261,54 +266,110 @@ export default function AboutPage() {
 
                     {/* Embedding Models */}
                     <section className="mb-16">
-                        <h2 className="text-3xl font-bold text-foreground mb-8 text-center">Embedding Models</h2>
+                        <h2 className="text-3xl font-bold text-foreground mb-4 text-center">Embedding Models</h2>
+                        <p className="text-center text-muted-foreground mb-8 max-w-2xl mx-auto">
+                            NLPForge supports 13+ embedding models via Ollama for semantic search, with additional size variants available. Choose based on your speed, accuracy, and resource requirements.
+                        </p>
                         <div className="overflow-hidden rounded-xl border border-border">
                             <table className="w-full">
                                 <thead className="bg-muted/50">
                                     <tr>
-                                        <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Model</th>
-                                        <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Dimensions</th>
-                                        <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Speed</th>
-                                        <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Best For</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Model</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Parameters</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Context</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Speed</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Best For</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-border bg-card">
+                                <tbody className="divide-y divide-border bg-card text-sm">
                                     <tr>
-                                        <td className="px-6 py-4">
-                                            <span className="font-mono text-sm text-primary">nomic-embed-text</span>
+                                        <td className="px-4 py-3">
+                                            <span className="font-mono text-primary">nomic-embed-text</span>
+                                            <span className="ml-2 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">Recommended</span>
                                         </td>
-                                        <td className="px-6 py-4 text-muted-foreground">768</td>
-                                        <td className="px-6 py-4 text-muted-foreground">⚡ Fast</td>
-                                        <td className="px-6 py-4">
-                                            <span className="text-sm text-foreground font-medium">General use, recommended default</span>
-                                        </td>
+                                        <td className="px-4 py-3 text-muted-foreground">137M</td>
+                                        <td className="px-4 py-3 text-muted-foreground">8192</td>
+                                        <td className="px-4 py-3"><span className="text-emerald-600">Fast</span></td>
+                                        <td className="px-4 py-3 text-foreground">Long documents, RAG, Production</td>
                                     </tr>
                                     <tr>
-                                        <td className="px-6 py-4">
-                                            <span className="font-mono text-sm text-primary">all-minilm</span>
-                                        </td>
-                                        <td className="px-6 py-4 text-muted-foreground">384</td>
-                                        <td className="px-6 py-4 text-muted-foreground">⚡⚡ Fastest</td>
-                                        <td className="px-6 py-4">
-                                            <span className="text-sm text-foreground">Prototyping, low-resource environments</span>
-                                        </td>
+                                        <td className="px-4 py-3"><span className="font-mono text-primary">all-minilm</span></td>
+                                        <td className="px-4 py-3 text-muted-foreground">22-33M</td>
+                                        <td className="px-4 py-3 text-muted-foreground">256</td>
+                                        <td className="px-4 py-3"><span className="text-emerald-600">Fastest</span></td>
+                                        <td className="px-4 py-3 text-foreground">Prototyping, Edge devices</td>
                                     </tr>
                                     <tr>
-                                        <td className="px-6 py-4">
-                                            <span className="font-mono text-sm text-primary">mxbai-embed-large</span>
-                                        </td>
-                                        <td className="px-6 py-4 text-muted-foreground">1024</td>
-                                        <td className="px-6 py-4 text-muted-foreground">🐢 Moderate</td>
-                                        <td className="px-6 py-4">
-                                            <span className="text-sm text-foreground">Maximum accuracy, enterprise search</span>
-                                        </td>
+                                        <td className="px-4 py-3"><span className="font-mono text-primary">mxbai-embed-large</span></td>
+                                        <td className="px-4 py-3 text-muted-foreground">335M</td>
+                                        <td className="px-4 py-3 text-muted-foreground">512</td>
+                                        <td className="px-4 py-3"><span className="text-amber-600">Moderate</span></td>
+                                        <td className="px-4 py-3 text-foreground">State-of-the-art accuracy</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="px-4 py-3"><span className="font-mono text-primary">bge-m3</span></td>
+                                        <td className="px-4 py-3 text-muted-foreground">567M</td>
+                                        <td className="px-4 py-3 text-muted-foreground">8192</td>
+                                        <td className="px-4 py-3"><span className="text-amber-600">Moderate</span></td>
+                                        <td className="px-4 py-3 text-foreground">Multilingual (100+ languages)</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="px-4 py-3"><span className="font-mono text-primary">snowflake-arctic-embed</span></td>
+                                        <td className="px-4 py-3 text-muted-foreground">22-335M</td>
+                                        <td className="px-4 py-3 text-muted-foreground">512</td>
+                                        <td className="px-4 py-3"><span className="text-emerald-600">Fast</span></td>
+                                        <td className="px-4 py-3 text-foreground">Enterprise retrieval</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="px-4 py-3"><span className="font-mono text-primary">qwen3-embedding</span></td>
+                                        <td className="px-4 py-3 text-muted-foreground">0.6-8B</td>
+                                        <td className="px-4 py-3 text-muted-foreground">8192</td>
+                                        <td className="px-4 py-3"><span className="text-red-600">Slow</span></td>
+                                        <td className="px-4 py-3 text-foreground">Maximum quality, Research</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="px-4 py-3"><span className="font-mono text-primary">granite-embedding</span></td>
+                                        <td className="px-4 py-3 text-muted-foreground">30-278M</td>
+                                        <td className="px-4 py-3 text-muted-foreground">512</td>
+                                        <td className="px-4 py-3"><span className="text-emerald-600">Fast</span></td>
+                                        <td className="px-4 py-3 text-foreground">IBM Enterprise, Multilingual</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
+                        <p className="text-center text-xs text-muted-foreground mt-4">
+                            Additional models available: bge-base, bge-large, nomic-embed-text-v2-moe, snowflake-arctic-embed2, embeddinggemma, paraphrase-multilingual
+                        </p>
                     </section>
 
 
+
+                    {/* Complete User Journey Section */}
+                    <section className="mb-16">
+                        <h2 className="text-3xl font-bold text-foreground mb-4 text-center">Complete User Journey</h2>
+                        <p className="text-center text-muted-foreground mb-8 max-w-2xl mx-auto">
+                            Follow the complete end-to-end flow from signing up to running semantic searches on your datasets
+                        </p>
+                        <CompleteUserJourney />
+                    </section>
+
+                    {/* User Flow Diagram Section */}
+                    <section className="mb-16">
+                        <h2 className="text-3xl font-bold text-foreground mb-4 text-center">Processing Pipeline</h2>
+                        <p className="text-center text-muted-foreground mb-8 max-w-2xl mx-auto">
+                            Follow the journey from your natural language query to a complete, executable API test case
+                        </p>
+                        <UserFlowDiagram />
+                    </section>
+
+                    {/* Architecture Diagram Section */}
+                    <section className="mb-16">
+                        <h2 className="text-3xl font-bold text-foreground mb-4 text-center">System Architecture</h2>
+                        <p className="text-center text-muted-foreground mb-8 max-w-2xl mx-auto">
+                            A comprehensive view of NLPForge&apos;s layered architecture and component interactions
+                        </p>
+                        <ArchitectureDiagram />
+                    </section>
 
                     {/* CTA Section */}
                     <section className="text-center">
