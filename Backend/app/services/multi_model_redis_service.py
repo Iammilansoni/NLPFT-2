@@ -807,6 +807,23 @@ class MultiModelRedisVectorService:
                 "redis": "disconnected",
                 "indexes": {}
             }
+    
+    async def ensure_index_exists(self, model_id: str) -> bool:
+        """
+        Async wrapper to ensure index exists for a model.
+        
+        This is called when registering new dynamic models to ensure
+        their Redis HNSW index is created.
+        
+        Args:
+            model_id: Embedding model ID
+            
+        Returns:
+            True if index exists or was created successfully
+        """
+        import asyncio
+        # Run synchronous method in thread pool to avoid blocking
+        return await asyncio.to_thread(self.ensure_model_index_exists, model_id)
 
 
 # =============================================================================

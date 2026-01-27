@@ -265,6 +265,10 @@ class EmbeddingModelRegistry:
     # Default model
     DEFAULT_MODEL_ID = "nomic-embed-text"
     
+    # Track dynamically registered models (not in _MODELS)
+    _dynamic_models: Dict[str, EmbeddingModelSpec] = {}
+    _dynamic_lock: threading.Lock = threading.Lock()
+    
     def __new__(cls):
         if cls._instance is None:
             with cls._lock:
@@ -279,7 +283,7 @@ class EmbeddingModelRegistry:
         self._initialized = True
         self._dimension_to_models: Dict[int, List[str]] = {}
         self._build_dimension_index()
-        logger.info(f"📚 EmbeddingModelRegistry initialized with {len(self._MODELS)} models")
+        logger.info(f"📚 EmbeddingModelRegistry initialized with {len(self._MODELS)} built-in models")
     
     def _build_dimension_index(self):
         """Build reverse index from dimension to model IDs."""
@@ -287,6 +291,161 @@ class EmbeddingModelRegistry:
             if spec.dimension not in self._dimension_to_models:
                 self._dimension_to_models[spec.dimension] = []
             self._dimension_to_models[spec.dimension].append(model_id)
+        # Also include dynamic models (protected by lock)
+        with self._dynamic_lock:
+            for model_id, spec in self._dynamic_models.items():
+                if spec.dimension not in self._dimension_to_models:
+                    self._dimension_to_models[spec.dimension] = []
+                if model_id not in self._dimension_to_models[spec.dimension]:
+                    self._dimension_to_models[spec.dimension].append(model_id)
+    
+    # ===========================================================================
+    # DYNAMIC MODEL REGISTRATION
+    # ===========================================================================
+    
+    def register_dynamic_model(
+        self,
+        model_id: str,
+        dimension: int,
+        display_name: Optional[str] = None,
+        description: Optional[str] = None,
+        ollama_model_name: Optional[str] = None,
+        max_context_length: int = 512,
+        parameters: str = "unknown",
+    ) -> EmbeddingModelSpec:
+        """
+        Register a dynamically discovered embedding model.
+        
+        This is used when a user selects an Ollama model that isn't in the
+        built-in registry. The system will:
+        1. Generate a test embedding to detect dimension
+        2. Register the model with that dimension
+        3. Create the appropriate Redis index
+        
+        Args:
+            model_id: Unique model identifier
+            dimension: Detected embedding dimension (MUST be accurate)
+            display_name: Human-readable name (defaults to model_id)
+            description: Brief description
+            ollama_model_name: Ollama model name (defaults to model_id)
+            max_context_length: Max input tokens
+            parameters: Model size string
+            
+        Returns:
+            EmbeddingModelSpec for the registered model
+            
+        Raises:
+            ValueError: If model_id already exists with different dimension
+        """
+        with self._dynamic_lock:
+            # Check if already registered (built-in or dynamic)
+            if model_id in self._MODELS:
+                existing = self._MODELS[model_id]
+                if existing.dimension != dimension:
+                    raise ValueError(
+                        f"Model '{model_id}' already registered with dimension {existing.dimension}, "
+                        f"cannot re-register with dimension {dimension}"
+                    )
+                return existing
+            
+            if model_id in self._dynamic_models:
+                existing = self._dynamic_models[model_id]
+                if existing.dimension != dimension:
+                    raise ValueError(
+                        f"Model '{model_id}' already registered with dimension {existing.dimension}, "
+                        f"cannot re-register with dimension {dimension}"
+                    )
+                return existing
+            
+            # Determine model characteristics based on dimension
+            speed, accuracy, category = self._infer_model_characteristics(dimension)
+            
+            # Create new model spec
+            spec = EmbeddingModelSpec(
+                model_id=model_id,
+                dimension=dimension,
+                display_name=display_name or model_id.replace("-", " ").replace("_", " ").title(),
+                description=description or f"Dynamically registered model ({dimension}D embeddings)",
+                speed=speed,
+                accuracy=accuracy,
+                category=category,
+                max_context_length=max_context_length,
+                parameters=parameters,
+                color="purple",  # Dynamic models get purple color
+                icon="sparkles",  # Dynamic models get sparkles icon
+                best_for=(
+                    "Custom use cases",
+                    f"{dimension}-dimensional embeddings",
+                ),
+                ollama_model_name=ollama_model_name or model_id,
+                ollama_pull_cmd=f"ollama pull {ollama_model_name or model_id}",
+            )
+            
+            # Register in dynamic models
+            self._dynamic_models[model_id] = spec
+            
+            # Update dimension index
+            if dimension not in self._dimension_to_models:
+                self._dimension_to_models[dimension] = []
+            self._dimension_to_models[dimension].append(model_id)
+            
+            logger.info(
+                f"🆕 Registered dynamic embedding model: {model_id} "
+                f"(dimension={dimension}, index={spec.redis_index_name})"
+            )
+            
+            return spec
+    
+    def _infer_model_characteristics(
+        self, 
+        dimension: int
+    ) -> tuple[ModelSpeed, ModelAccuracy, ModelCategory]:
+        """Infer model characteristics based on dimension."""
+        if dimension <= 384:
+            return ModelSpeed.FAST, ModelAccuracy.GOOD, ModelCategory.LIGHTWEIGHT
+        elif dimension <= 768:
+            return ModelSpeed.FAST, ModelAccuracy.EXCELLENT, ModelCategory.BALANCED
+        elif dimension <= 1024:
+            return ModelSpeed.MODERATE, ModelAccuracy.SUPERIOR, ModelCategory.HIGH_ACCURACY
+        else:
+            return ModelSpeed.SLOW, ModelAccuracy.SUPERIOR, ModelCategory.HIGH_ACCURACY
+    
+    def is_dynamic_model(self, model_id: str) -> bool:
+        """Check if a model was dynamically registered."""
+        with self._dynamic_lock:
+            return model_id in self._dynamic_models
+    
+    def get_dynamic_models(self) -> List[EmbeddingModelSpec]:
+        """Get all dynamically registered models."""
+        with self._dynamic_lock:
+            return list(self._dynamic_models.values())
+    
+    def unregister_dynamic_model(self, model_id: str) -> bool:
+        """
+        Unregister a dynamically registered model.
+        
+        Cannot unregister built-in models.
+        
+        Returns:
+            True if unregistered, False if not found or is built-in
+        """
+        with self._dynamic_lock:
+            if model_id in self._MODELS:
+                logger.warning(f"Cannot unregister built-in model: {model_id}")
+                return False
+            
+            if model_id not in self._dynamic_models:
+                return False
+            
+            spec = self._dynamic_models.pop(model_id)
+            
+            # Update dimension index
+            if spec.dimension in self._dimension_to_models:
+                if model_id in self._dimension_to_models[spec.dimension]:
+                    self._dimension_to_models[spec.dimension].remove(model_id)
+            
+            logger.info(f"🗑️ Unregistered dynamic model: {model_id}")
+            return True
     
     # ===========================================================================
     # PUBLIC API
@@ -295,6 +454,8 @@ class EmbeddingModelRegistry:
     def get_model(self, model_id: str) -> EmbeddingModelSpec:
         """
         Get model specification by ID.
+        
+        Checks both built-in and dynamically registered models.
         
         Args:
             model_id: Model identifier (e.g., "nomic-embed-text")
@@ -305,13 +466,22 @@ class EmbeddingModelRegistry:
         Raises:
             ValueError: If model_id is not registered
         """
-        if model_id not in self._MODELS:
-            available = list(self._MODELS.keys())
-            raise ValueError(
-                f"Unknown embedding model: '{model_id}'. "
-                f"Available models: {available}"
-            )
-        return self._MODELS[model_id]
+        # Check built-in models first
+        if model_id in self._MODELS:
+            return self._MODELS[model_id]
+        
+        # Check dynamic models (protected by lock)
+        with self._dynamic_lock:
+            if model_id in self._dynamic_models:
+                return self._dynamic_models[model_id]
+            # Build available list while holding lock
+            available = list(self._MODELS.keys()) + list(self._dynamic_models.keys())
+        
+        # Not found
+        raise ValueError(
+            f"Unknown embedding model: '{model_id}'. "
+            f"Available models: {available}"
+        )
     
     def get_model_or_default(self, model_id: Optional[str]) -> EmbeddingModelSpec:
         """
@@ -348,26 +518,69 @@ class EmbeddingModelRegistry:
         """Get Redis key namespace for a model."""
         return self.get_model(model_id).redis_namespace
     
-    def list_models(self) -> List[Dict[str, Any]]:
-        """Get all registered models as dictionaries."""
-        return [spec.to_dict() for spec in self._MODELS.values()]
+    def list_models(self, include_dynamic: bool = True) -> List[Dict[str, Any]]:
+        """
+        Get all registered models as dictionaries.
+        
+        Args:
+            include_dynamic: Include dynamically registered models (default: True)
+        """
+        models = []
+        for spec in self._MODELS.values():
+            model_dict = spec.to_dict()
+            model_dict["is_dynamic"] = False  # Mark as built-in
+            models.append(model_dict)
+        if include_dynamic:
+            with self._dynamic_lock:
+                for spec in self._dynamic_models.values():
+                    model_dict = spec.to_dict()
+                    model_dict["is_dynamic"] = True  # Mark as dynamic
+                    models.append(model_dict)
+        return models
     
-    def list_model_ids(self) -> List[str]:
-        """Get all registered model IDs."""
-        return list(self._MODELS.keys())
+    def list_model_ids(self, include_dynamic: bool = True) -> List[str]:
+        """
+        Get all registered model IDs.
+        
+        Args:
+            include_dynamic: Include dynamically registered models (default: True)
+        """
+        ids = list(self._MODELS.keys())
+        if include_dynamic:
+            with self._dynamic_lock:
+                ids.extend(list(self._dynamic_models.keys()))
+        return ids
     
     def get_models_by_dimension(self, dimension: int) -> List[EmbeddingModelSpec]:
-        """Get all models with a specific dimension."""
-        model_ids = self._dimension_to_models.get(dimension, [])
-        return [self._MODELS[mid] for mid in model_ids]
+        """Get all models (built-in + dynamic) with a specific dimension."""
+        with self._dynamic_lock:
+            model_ids = self._dimension_to_models.get(dimension, [])
+            models = []
+            for mid in model_ids:
+                if mid in self._MODELS:
+                    models.append(self._MODELS[mid])
+                elif mid in self._dynamic_models:
+                    models.append(self._dynamic_models[mid])
+        return models
+    
+    def get_all_models(self) -> Dict[str, EmbeddingModelSpec]:
+        """Get all models (built-in + dynamic) as a combined dictionary."""
+        all_models = dict(self._MODELS)
+        with self._dynamic_lock:
+            dynamic_copy = dict(self._dynamic_models)
+        all_models.update(dynamic_copy)
+        return all_models
     
     def get_default_model(self) -> EmbeddingModelSpec:
         """Get the default embedding model."""
         return self._MODELS[self.DEFAULT_MODEL_ID]
     
     def is_valid_model(self, model_id: str) -> bool:
-        """Check if a model ID is registered."""
-        return model_id in self._MODELS
+        """Check if a model ID is registered (built-in or dynamic)."""
+        if model_id in self._MODELS:
+            return True
+        with self._dynamic_lock:
+            return model_id in self._dynamic_models
     
     def validate_model_compatibility(
         self, 
@@ -454,7 +667,8 @@ class EmbeddingModelRegistry:
     
     def get_all_dimensions(self) -> List[int]:
         """Get all unique dimensions supported."""
-        return list(self._dimension_to_models.keys())
+        with self._dynamic_lock:
+            return list(self._dimension_to_models.keys())
 
 
 # =============================================================================

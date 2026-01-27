@@ -5,6 +5,7 @@ Features:
 - HTTP API integration with Ollama (localhost:11434)
 - Supports: all-minilm (384), nomic-embed-text (768), mxbai-embed-large (1024)
 - Automatic model pulling if not available
+- AUTO-DIMENSION DETECTION: Detects embedding dimensions automatically
 - Batch processing for efficiency
 - Error handling and retries
 - User-selected model from settings
@@ -13,7 +14,7 @@ Features:
 import httpx
 import asyncio
 import os
-from typing import List, Optional
+from typing import List, Optional, Dict, Any, Tuple
 from app.core.logger import logger
 
 
@@ -23,7 +24,15 @@ class OllamaEmbeddingService:
     
     Ollama runs locally on CPU and provides embeddings through HTTP API:
     POST http://localhost:11434/api/embeddings
+    
+    Features:
+    - Auto-dimension detection for unknown models
+    - Automatic model registration with detected dimensions
+    - Model pull on demand
     """
+    
+    # Cache for detected dimensions (model_name -> dimension)
+    _dimension_cache: Dict[str, int] = {}
     
     def __init__(self, base_url: str = None):
         # Default to environment `OLLAMA_HOST`, then to internal service name `http://ollama:11434`.
@@ -32,6 +41,7 @@ class OllamaEmbeddingService:
         self.base_url = base_url
         self.embeddings_endpoint = f"{base_url}/api/embeddings"
         self.pull_endpoint = f"{base_url}/api/pull"
+        self.tags_endpoint = f"{base_url}/api/tags"
         self.timeout = 60.0  # 60 seconds for embedding requests
         
     async def check_ollama_available(self) -> bool:
@@ -187,6 +197,180 @@ class OllamaEmbeddingService:
         else:
             logger.error(f"Test failed for model: {model_name}")
             return False
+    
+    async def detect_dimension(self, model_name: str, auto_pull: bool = True) -> Optional[int]:
+        """
+        Auto-detect embedding dimension for a model.
+        
+        This is the KEY function for dynamic model registration.
+        It generates a test embedding and returns the dimension.
+        
+        Args:
+            model_name: Ollama model name (e.g., "nomic-embed-text")
+            auto_pull: If True, automatically pull the model if not found
+            
+        Returns:
+            Embedding dimension (int) or None if detection failed
+        """
+        # Check cache first
+        if model_name in self._dimension_cache:
+            logger.debug(f"Using cached dimension for {model_name}: {self._dimension_cache[model_name]}")
+            return self._dimension_cache[model_name]
+        
+        test_text = "Dimension detection test."
+        
+        try:
+            logger.info(f"🔍 Detecting embedding dimension for: {model_name}")
+            embedding = await self.generate_embedding(model_name, test_text, retry_with_pull=auto_pull)
+            
+            if embedding:
+                dimension = len(embedding)
+                # Cache the result
+                self._dimension_cache[model_name] = dimension
+                logger.info(f"✅ Detected dimension for {model_name}: {dimension}")
+                return dimension
+            else:
+                logger.warning(f"❌ Could not detect dimension for {model_name}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error detecting dimension for {model_name}: {e}")
+            return None
+    
+    async def register_model_with_auto_dimension(
+        self, 
+        model_name: str,
+        auto_pull: bool = True
+    ) -> Tuple[bool, Optional[Dict[str, Any]]]:
+        """
+        Detect dimension and register model in the embedding registry.
+        
+        This is the main entry point for dynamic model registration:
+        1. Pull the model if needed (auto_pull=True)
+        2. Generate test embedding to detect dimension
+        3. Register in EmbeddingModelRegistry
+        4. Return registration details
+        
+        Args:
+            model_name: Ollama model name
+            auto_pull: Pull model if not available
+            
+        Returns:
+            Tuple of (success: bool, model_info: dict or None)
+        """
+        try:
+            from app.core.embedding_model_registry import get_embedding_registry
+            
+            registry = get_embedding_registry()
+            
+            # Check if already registered
+            try:
+                existing = registry.get_model(model_name)
+                return True, {
+                    "model_id": existing.model_id,
+                    "dimension": existing.dimension,
+                    "display_name": existing.display_name,
+                    "redis_index_name": existing.redis_index_name,
+                    "already_registered": True,
+                }
+            except ValueError:
+                pass  # Not registered, continue with detection
+            
+            # Detect dimension
+            dimension = await self.detect_dimension(model_name, auto_pull=auto_pull)
+            
+            if dimension is None:
+                return False, {"error": f"Could not detect dimension for model: {model_name}"}
+            
+            # Register the model
+            spec = registry.register_dynamic_model(
+                model_id=model_name,
+                dimension=dimension,
+                ollama_model_name=model_name,
+            )
+            
+            return True, {
+                "model_id": spec.model_id,
+                "dimension": spec.dimension,
+                "display_name": spec.display_name,
+                "redis_index_name": spec.redis_index_name,
+                "already_registered": False,
+            }
+            
+        except Exception as e:
+            logger.error(f"Error registering model {model_name}: {e}")
+            return False, {"error": str(e)}
+    
+    async def list_available_models(self) -> List[Dict[str, Any]]:
+        """
+        List all available Ollama models (embedding-capable).
+        
+        Returns:
+            List of model info dicts with name, size, modified date
+        """
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(self.tags_endpoint)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    models = data.get("models", [])
+                    
+                    # Filter and format models - include embedding models
+                    # Embedding models typically have "embed" in name or are known embedding models
+                    embedding_keywords = ["embed", "minilm", "bge", "e5", "gte", "nomic", "mxbai"]
+                    
+                    result = []
+                    for model in models:
+                        name = model.get("name", "")
+                        # Include all models - user may want to try any model for embeddings
+                        result.append({
+                            "name": name,
+                            "size": model.get("size", 0),
+                            "modified_at": model.get("modified_at", ""),
+                            "is_likely_embedding": any(kw in name.lower() for kw in embedding_keywords),
+                        })
+                    
+                    return result
+                else:
+                    logger.warning(f"Failed to list models: {response.status_code}")
+                    return []
+                    
+        except Exception as e:
+            logger.error(f"Error listing Ollama models: {e}")
+            return []
+    
+    async def get_model_info(self, model_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Get detailed info about a specific model.
+        
+        Args:
+            model_name: Model name (e.g., "nomic-embed-text")
+            
+        Returns:
+            Model info dict or None
+        """
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(
+                    f"{self.base_url}/api/show",
+                    json={"name": model_name}
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        "name": model_name,
+                        "modelfile": data.get("modelfile", ""),
+                        "parameters": data.get("parameters", ""),
+                        "template": data.get("template", ""),
+                        "details": data.get("details", {}),
+                    }
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error getting model info for {model_name}: {e}")
+            return None
 
 
 # Singleton instance

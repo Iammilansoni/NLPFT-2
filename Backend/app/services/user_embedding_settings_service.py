@@ -19,13 +19,18 @@ the Settings page is the SINGLE SOURCE OF TRUTH for all embedding operations.
 """
 
 import uuid
-from typing import Optional, Tuple, Dict, Any
+import asyncio
+from typing import Optional, Tuple, Dict, Any, Set
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update
 
 from app.core.logger import logger
+
+# Module-level tracking for in-flight model pulls to prevent duplicates
+_in_flight_pulls: Set[str] = set()
+_in_flight_lock = asyncio.Lock()
 from app.core.embedding_model_registry import (
     get_embedding_registry,
     EmbeddingModelSpec
@@ -168,16 +173,21 @@ class UserEmbeddingSettingsService:
     async def get_active_embedding_model_async(
         self, 
         db: AsyncSession, 
-        user_id: uuid.UUID
+        user_id: uuid.UUID,
+        auto_register: bool = True
     ) -> Tuple[str, int, EmbeddingModelSpec]:
         """
         Get user's active embedding model (ASYNC version).
         
         This is the SOURCE OF TRUTH for what model to use.
         
+        If the model is not in the registry but exists in Ollama,
+        it will be dynamically registered (dimension detected).
+        
         Args:
             db: AsyncSession
             user_id: User UUID
+            auto_register: If True, dynamically register unregistered models from Ollama
             
         Returns:
             Tuple of (model_id, dimension, model_spec)
@@ -194,9 +204,24 @@ class UserEmbeddingSettingsService:
                 model_spec = self.registry.get_model(model_id)
                 dimension = model_spec.dimension
             except ValueError:
-                logger.warning(f"Model '{model_id}' not in registry, using default")
-                model_spec = self.registry.get_default_model()
-                dimension = user_settings.embedding_dimension or model_spec.dimension
+                # Model not in registry - try to dynamically register it
+                if auto_register:
+                    logger.info(f"Model '{model_id}' not in registry, attempting dynamic registration...")
+                    model_spec = await self._try_register_model_async(model_id)
+                    if model_spec:
+                        dimension = model_spec.dimension
+                        logger.info(f"✅ Dynamically registered model '{model_id}' with dimension {dimension}")
+                    else:
+                        # Could not register - fall back to default model entirely
+                        logger.warning(f"Model '{model_id}' not in registry and could not be registered, using default")
+                        model_spec = self.registry.get_default_model()
+                        model_id = model_spec.model_id  # Use default model_id too!
+                        dimension = model_spec.dimension
+                else:
+                    logger.warning(f"Model '{model_id}' not in registry, using default")
+                    model_spec = self.registry.get_default_model()
+                    model_id = model_spec.model_id  # Use default model_id too!
+                    dimension = model_spec.dimension
         else:
             # Use default
             model_spec = self.registry.get_default_model()
@@ -209,6 +234,71 @@ class UserEmbeddingSettingsService:
         )
         
         return model_id, dimension, model_spec
+    
+    async def _try_register_model_async(self, model_id: str, auto_pull: bool = True) -> Optional[EmbeddingModelSpec]:
+        """
+        Try to dynamically register a model by detecting its dimension from Ollama.
+        
+        This handles the case where a model was previously pulled and set as default,
+        but the dynamic registration was lost (e.g., after container restart).
+        
+        If auto_pull is True and the model is not available locally, it will be
+        automatically pulled from Ollama (this may take time for large models).
+        
+        Args:
+            model_id: Model identifier (e.g., "bge-large")
+            auto_pull: If True, schedule a background pull of the model from Ollama if not available locally
+            
+        Returns:
+            EmbeddingModelSpec if registered successfully, None otherwise (including when background pull is scheduled)
+        """
+        try:
+            import asyncio
+            from app.services.embedding_model_service import get_embedding_model_service
+            
+            service = get_embedding_model_service()
+            
+            # Check if model is available in Ollama
+            is_available = await service.is_model_available_locally(model_id)
+            
+            if not is_available:
+                if auto_pull:
+                    # Check if pull is already in-flight to prevent duplicates
+                    async with _in_flight_lock:
+                        if model_id in _in_flight_pulls:
+                            logger.info(f"Model '{model_id}' pull already in-flight, skipping duplicate")
+                            return None
+                        _in_flight_pulls.add(model_id)
+                    
+                    # Don't block - schedule background pull and return None immediately
+                    logger.info(f"Model '{model_id}' not in Ollama, scheduling background pull...")
+                    
+                    async def _background_pull():
+                        try:
+                            spec = await service.pull_and_register(model_id)
+                            logger.info(f"✅ Background pull complete: model '{model_id}' (dim={spec.dimension})")
+                        except Exception as pull_error:
+                            logger.error(f"Background pull failed for model '{model_id}': {pull_error}")
+                        finally:
+                            # Always remove from in-flight set
+                            async with _in_flight_lock:
+                                _in_flight_pulls.discard(model_id)
+                                logger.debug(f"Removed '{model_id}' from in-flight pulls")
+                    
+                    # Fire and forget - don't await
+                    asyncio.create_task(_background_pull())
+                    return None
+                else:
+                    logger.warning(f"Model '{model_id}' is not available in Ollama, cannot register")
+                    return None
+            
+            # Model is available locally - detect dimension and register
+            spec = await service.ensure_model_registered(model_id, auto_detect=True)
+            return spec
+            
+        except Exception as e:
+            logger.error(f"Failed to dynamically register model '{model_id}': {e}")
+            return None
     
     async def set_active_embedding_model_async(
         self,

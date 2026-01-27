@@ -1,7 +1,7 @@
 {
-  "version": "1.0",
-  "last_updated": "2025-12-13",
-  "description": "Single embedding model + Ollama LLM for dataset generation",
+  "version": "1.1",
+  "last_updated": "2026-01-22",
+  "description": "Comprehensive embedding models from Ollama + LLM for dataset generation",
   "embedding_models": [
     {
       "model_id": "nomic-embed-text",
@@ -12,18 +12,242 @@
       "cpu_friendly": true,
       "provider": "ollama",
       "ollama_model": "nomic-embed-text",
-      "notes": "High-Quality, Balanced Embedding Model. Best balance between speed, context window (8192 tokens), and accuracy.",
+      "notes": "High-quality embedding model with large context window. Best balance of speed, context (8192 tokens), and accuracy for production RAG pipelines.",
       "status": "active",
-      "use_cases": [
-        "production",
-        "balanced",
-        "rag",
-        "semantic-search"
-      ],
+      "use_cases": ["production", "rag", "semantic-search", "long-documents"],
       "performance": {
         "speed": "fast",
         "quality": "excellent",
-        "memory_mb": 274
+        "memory_mb": 274,
+        "parameters": "137M"
+      }
+    },
+    {
+      "model_id": "nomic-embed-text-v2-moe",
+      "type": "embedding",
+      "name": "Nomic-Embed-Text-V2-MoE",
+      "dimension": 768,
+      "context_tokens": 8192,
+      "cpu_friendly": false,
+      "provider": "ollama",
+      "ollama_model": "nomic-embed-text-v2-moe",
+      "notes": "Multilingual MoE embedding model excelling at multilingual retrieval tasks.",
+      "status": "available",
+      "use_cases": ["multilingual", "retrieval", "high-performance"],
+      "performance": {
+        "speed": "moderate",
+        "quality": "superior",
+        "memory_mb": 600,
+        "parameters": "300M"
+      }
+    },
+    {
+      "model_id": "all-minilm",
+      "type": "embedding",
+      "name": "All-MiniLM",
+      "dimension": 384,
+      "context_tokens": 256,
+      "cpu_friendly": true,
+      "provider": "ollama",
+      "ollama_model": "all-minilm",
+      "notes": "Ultra-fast lightweight embedding model. Great for prototyping and resource-constrained environments.",
+      "status": "available",
+      "use_cases": ["prototyping", "edge-devices", "low-resources", "real-time"],
+      "performance": {
+        "speed": "fast",
+        "quality": "good",
+        "memory_mb": 50,
+        "parameters": "22M-33M"
+      }
+    },
+    {
+      "model_id": "mxbai-embed-large",
+      "type": "embedding",
+      "name": "MxBAI-Embed-Large",
+      "dimension": 1024,
+      "context_tokens": 512,
+      "cpu_friendly": false,
+      "provider": "ollama",
+      "ollama_model": "mxbai-embed-large",
+      "notes": "State-of-the-art embedding model from mixedbread.ai. Top accuracy for enterprise search and RAG.",
+      "status": "available",
+      "use_cases": ["enterprise", "high-accuracy", "rag", "semantic-search"],
+      "performance": {
+        "speed": "moderate",
+        "quality": "superior",
+        "memory_mb": 670,
+        "parameters": "335M"
+      }
+    },
+    {
+      "model_id": "bge-base",
+      "type": "embedding",
+      "name": "BGE-Base",
+      "dimension": 768,
+      "context_tokens": 512,
+      "cpu_friendly": true,
+      "provider": "ollama",
+      "ollama_model": "bge-base",
+      "notes": "BAAI's balanced embedding model. Good tradeoff between speed and accuracy for general retrieval.",
+      "status": "available",
+      "use_cases": ["general-retrieval", "balanced", "cost-effective"],
+      "performance": {
+        "speed": "fast",
+        "quality": "good",
+        "memory_mb": 220,
+        "parameters": "109M"
+      }
+    },
+    {
+      "model_id": "bge-large",
+      "type": "embedding",
+      "name": "BGE-Large",
+      "dimension": 1024,
+      "context_tokens": 512,
+      "cpu_friendly": false,
+      "provider": "ollama",
+      "ollama_model": "bge-large",
+      "notes": "BAAI's high-accuracy English embedding model. Excellent for question answering and semantic search.",
+      "status": "available",
+      "use_cases": ["english-search", "qa", "semantic-search", "high-accuracy"],
+      "performance": {
+        "speed": "moderate",
+        "quality": "superior",
+        "memory_mb": 670,
+        "parameters": "335M"
+      }
+    },
+    {
+      "model_id": "bge-m3",
+      "type": "embedding",
+      "name": "BGE-M3",
+      "dimension": 1024,
+      "context_tokens": 8192,
+      "cpu_friendly": false,
+      "provider": "ollama",
+      "ollama_model": "bge-m3",
+      "notes": "BAAI's multi-functional, multi-lingual, multi-granularity model. Supports 100+ languages with dense & sparse retrieval.",
+      "status": "available",
+      "use_cases": ["multilingual", "100-languages", "dense-sparse", "hybrid-search"],
+      "performance": {
+        "speed": "moderate",
+        "quality": "superior",
+        "memory_mb": 1134,
+        "parameters": "567M"
+      }
+    },
+    {
+      "model_id": "snowflake-arctic-embed",
+      "type": "embedding",
+      "name": "Snowflake-Arctic-Embed",
+      "dimension": 768,
+      "context_tokens": 512,
+      "cpu_friendly": true,
+      "provider": "ollama",
+      "ollama_model": "snowflake-arctic-embed",
+      "notes": "Snowflake's suite of enterprise-optimized embedding models. Available in multiple sizes (22M-335M).",
+      "status": "available",
+      "use_cases": ["enterprise", "retrieval", "scalable", "production"],
+      "performance": {
+        "speed": "fast",
+        "quality": "excellent",
+        "memory_mb": 220,
+        "parameters": "22M-335M"
+      }
+    },
+    {
+      "model_id": "snowflake-arctic-embed2",
+      "type": "embedding",
+      "name": "Snowflake-Arctic-Embed-2",
+      "dimension": 1024,
+      "context_tokens": 8192,
+      "cpu_friendly": false,
+      "provider": "ollama",
+      "ollama_model": "snowflake-arctic-embed2",
+      "notes": "Snowflake's frontier embedding model. Arctic Embed 2.0 adds multilingual support without sacrificing English performance.",
+      "status": "available",
+      "use_cases": ["multilingual", "frontier", "long-context", "enterprise"],
+      "performance": {
+        "speed": "moderate",
+        "quality": "superior",
+        "memory_mb": 1136,
+        "parameters": "568M"
+      }
+    },
+    {
+      "model_id": "embeddinggemma",
+      "type": "embedding",
+      "name": "EmbeddingGemma",
+      "dimension": 768,
+      "context_tokens": 2048,
+      "cpu_friendly": false,
+      "provider": "ollama",
+      "ollama_model": "embeddinggemma",
+      "notes": "Google's 300M parameter embedding model. Versatile for general-purpose embedding tasks.",
+      "status": "available",
+      "use_cases": ["general-purpose", "google-ecosystem", "versatile"],
+      "performance": {
+        "speed": "moderate",
+        "quality": "excellent",
+        "memory_mb": 600,
+        "parameters": "300M"
+      }
+    },
+    {
+      "model_id": "qwen3-embedding",
+      "type": "embedding",
+      "name": "Qwen3-Embedding",
+      "dimension": 1024,
+      "context_tokens": 8192,
+      "cpu_friendly": false,
+      "provider": "ollama",
+      "ollama_model": "qwen3-embedding",
+      "notes": "Alibaba's comprehensive text embedding models (0.6B-8B). Maximum quality for advanced retrieval.",
+      "status": "available",
+      "use_cases": ["research", "maximum-quality", "advanced-retrieval"],
+      "performance": {
+        "speed": "slow",
+        "quality": "superior",
+        "memory_mb": 1200,
+        "parameters": "0.6B-8B"
+      }
+    },
+    {
+      "model_id": "granite-embedding",
+      "type": "embedding",
+      "name": "Granite-Embedding",
+      "dimension": 768,
+      "context_tokens": 512,
+      "cpu_friendly": true,
+      "provider": "ollama",
+      "ollama_model": "granite-embedding",
+      "notes": "IBM's Granite embedding models. 30M English-only or 278M multilingual for enterprise use.",
+      "status": "available",
+      "use_cases": ["enterprise", "ibm-ecosystem", "multilingual"],
+      "performance": {
+        "speed": "fast",
+        "quality": "excellent",
+        "memory_mb": 60,
+        "parameters": "30M-278M"
+      }
+    },
+    {
+      "model_id": "paraphrase-multilingual",
+      "type": "embedding",
+      "name": "Paraphrase-Multilingual",
+      "dimension": 768,
+      "context_tokens": 512,
+      "cpu_friendly": true,
+      "provider": "ollama",
+      "ollama_model": "paraphrase-multilingual",
+      "notes": "Sentence-transformers model for 50+ languages. Excellent for clustering and semantic similarity.",
+      "status": "available",
+      "use_cases": ["multilingual", "50-languages", "clustering", "semantic-similarity"],
+      "performance": {
+        "speed": "moderate",
+        "quality": "excellent",
+        "memory_mb": 556,
+        "parameters": "278M"
       }
     }
   ],
