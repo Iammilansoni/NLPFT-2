@@ -935,6 +935,400 @@ class ApiClient {
   }
 
   // ============================================================================
+  // LLM Configuration API
+  // ============================================================================
+
+  /**
+   * List all LLM provider configurations for the current user
+   */
+  async listLLMConfigs(activeOnly: boolean = true): Promise<{
+    configs: Array<{
+      config_id: string;
+      name: string;
+      provider: string;
+      model_name: string;
+      base_url?: string;
+      model_type: string;
+      config_params: Record<string, any>;
+      is_default: boolean;
+      is_active: boolean;
+      has_api_key: boolean;
+      api_key_masked?: string;
+      last_tested_at?: string;
+      last_test_success?: boolean;
+      last_test_message?: string;
+      last_test_latency_ms?: number;
+      created_at: string;
+      updated_at?: string;
+    }>;
+  }> {
+    const params = activeOnly ? '' : '?active_only=false';
+    const configs = await this.request<any[]>(`/api/v1/llm-config${params}`);
+    return { configs };
+  }
+
+  /**
+   * Get a specific LLM configuration
+   */
+  async getLLMConfig(configId: string): Promise<{
+    config_id: string;
+    name: string;
+    provider: string;
+    model_name: string;
+    base_url?: string;
+    model_type: string;
+    config_params: Record<string, any>;
+    is_default: boolean;
+    is_active: boolean;
+    has_api_key: boolean;
+    api_key_masked?: string;
+    last_tested_at?: string;
+    last_test_success?: boolean;
+    last_test_message?: string;
+    last_test_latency_ms?: number;
+    created_at: string;
+    updated_at?: string;
+  }> {
+    return this.request(`/api/v1/llm-config/${configId}`);
+  }
+
+  /**
+   * Create a new LLM provider configuration
+   */
+  async createLLMConfig(data: {
+    name: string;
+    provider: string;
+    model_name: string;
+    api_key?: string;
+    base_url?: string;
+    model_type?: string;
+    config_params?: Record<string, any>;
+    is_default?: boolean;
+  }): Promise<{
+    config_id: string;
+    name: string;
+    provider: string;
+    model_name: string;
+    is_default: boolean;
+    created_at: string;
+  }> {
+    return this.request('/api/v1/llm-config', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Update an LLM configuration
+   */
+  async updateLLMConfig(
+    configId: string,
+    data: {
+      name?: string;
+      model_name?: string;
+      api_key?: string;
+      base_url?: string;
+      model_type?: string;
+      config_params?: Record<string, any>;
+      is_active?: boolean;
+    }
+  ): Promise<any> {
+    return this.request(`/api/v1/llm-config/${configId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Delete an LLM configuration
+   */
+  async deleteLLMConfig(configId: string): Promise<void> {
+    return this.request(`/api/v1/llm-config/${configId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Set an LLM configuration as default
+   */
+  async setDefaultLLMConfig(configId: string): Promise<{ message: string }> {
+    return this.request(`/api/v1/llm-config/${configId}/set-default`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Test LLM configuration connectivity
+   */
+  async testLLMConfig(configId: string): Promise<{
+    success: boolean;
+    message: string;
+    latency_ms?: number;
+    model_info?: Record<string, any>;
+    error_code?: string;
+  }> {
+    return this.request(`/api/v1/llm-config/${configId}/test`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Get default LLM configuration
+   */
+  async getDefaultLLMConfig(): Promise<{
+    config_id: string;
+    name: string;
+    provider: string;
+    model_name: string;
+  } | null> {
+    return this.request('/api/v1/llm-config/default');
+  }
+
+  /**
+   * Get list of supported LLM providers
+   */
+  async getLLMProviders(): Promise<{
+    providers: Record<string, {
+      name: string;
+      description: string;
+      requires_api_key: boolean;
+      supports_custom_base_url: boolean;
+      default_models: string[];
+      implemented?: boolean;
+    }>;
+    implemented: string[];
+  }> {
+    return this.request('/api/v1/llm-config/providers');
+  }
+
+  /**
+   * List available Ollama LLM models
+   */
+  async listOllamaLLMModels(): Promise<{
+    models: Array<{
+      id: string;
+      name: string;
+      description?: string;
+      context_length: number;
+      is_local: boolean;
+    }>;
+    local_count: number;
+  }> {
+    return this.request('/api/v1/llm-config/ollama/models');
+  }
+
+  /**
+   * Pull an Ollama LLM model
+   */
+  async pullOllamaLLMModel(modelName: string): Promise<{
+    status: string;
+    message: string;
+  }> {
+    return this.request(`/api/v1/llm-config/ollama/pull?model_name=${encodeURIComponent(modelName)}`, {
+      method: 'POST',
+    });
+  }
+
+  // ============================================================================
+  // Embedding Model API
+  // ============================================================================
+
+  /**
+   * List all available embedding models (Ollama + registered)
+   */
+  async listEmbeddingModels(): Promise<{
+    models: Array<{
+      name: string;
+      display_name: string;
+      size: string;
+      is_local: boolean;
+      is_registered: boolean;
+      dimension: number | null;
+      family: string | null;
+      is_likely_embedding?: boolean;
+    }>;
+    count: number;
+    local_count: number;
+    registered_count: number;
+  }> {
+    return this.request('/api/v1/embeddings/models/available');
+  }
+
+  /**
+   * Detect embedding dimension for an Ollama model
+   */
+  async detectEmbeddingDimension(
+    modelName: string,
+    autoPull: boolean = true
+  ): Promise<{
+    model_name: string;
+    dimension: number;
+    already_registered: boolean;
+    display_name?: string;
+    redis_index?: string;
+    message?: string;
+  }> {
+    const params = new URLSearchParams({
+      model_name: modelName,
+      auto_pull: autoPull.toString(),
+    });
+    return this.request(`/api/v1/embeddings/models/detect-dimension?${params}`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Register a new embedding model with auto-dimension detection
+   */
+  async registerEmbeddingModel(
+    modelName: string,
+    autoPull: boolean = true
+  ): Promise<{
+    success: boolean;
+    model_id: string;
+    dimension: number;
+    display_name: string;
+    redis_index_name: string;
+    already_registered: boolean;
+    redis_index_created?: boolean;
+    redis_index_error?: string;
+  }> {
+    const params = new URLSearchParams({
+      model_name: modelName,
+      auto_pull: autoPull.toString(),
+    });
+    return this.request(`/api/v1/embeddings/models/register?${params}`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Pull an Ollama embedding model
+   * Note: This operation can take several minutes for larger models.
+   * Uses a 10-minute timeout to accommodate large model downloads.
+   */
+  async pullEmbeddingModel(modelName: string): Promise<{
+    model_id: string;
+    dimension: number;
+    display_name: string;
+    redis_index: string;
+    status: string;
+  }> {
+    const params = new URLSearchParams({ model_name: modelName });
+    const url = `${this.baseUrl}/api/v1/embeddings/models/pull?${params}`;
+    
+    // Get auth token from localStorage
+    const token = typeof window !== 'undefined' ? localStorage.getItem('nlpforge_access_token') : null;
+    
+    // Use AbortController for timeout (10 minutes for large model pulls)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minute timeout
+    
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        // Handle 401 Unauthorized - same as main request method
+        if (response.status === 401) {
+          if (typeof window !== 'undefined') {
+            const hasToken = localStorage.getItem('nlpforge_access_token');
+            if (hasToken) {
+              localStorage.removeItem('nlpforge_access_token');
+              localStorage.removeItem('nlpforge_user');
+              if (!window.location.pathname.startsWith('/auth')) {
+                window.location.href = '/auth/login';
+              }
+            }
+          }
+        }
+        
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { error: `HTTP ${response.status}`, detail: `HTTP ${response.status}` };
+        }
+        throw { ...errorData, status: response.status };
+      }
+      
+      return await response.json();
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw { detail: 'Model pull timed out. The model may still be downloading in the background.' };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Check re-embedding impact when switching models
+   */
+  async checkReembeddingImpact(newModel: string): Promise<{
+    impact: 'none' | 'low' | 'medium' | 'high';
+    message: string;
+    affected_datasets: Array<{
+      dataset_id: string;
+      name: string;
+      embedding_count: number;
+      embedding_model: string;
+    }>;
+    reembedding_required: boolean;
+    total_embeddings_affected?: number;
+    current_model?: {
+      name: string;
+      dimension: number | null;
+    };
+    new_model?: {
+      name: string;
+      dimension: number | null;
+    };
+    warning?: string;
+  }> {
+    return this.request(`/api/v1/embeddings/reembedding-impact?new_model=${encodeURIComponent(newModel)}`);
+  }
+
+  /**
+   * Check embedding model compatibility for search
+   */
+  async checkEmbeddingCompatibility(
+    datasetId?: string,
+    templateId?: string
+  ): Promise<{
+    compatible: boolean;
+    current_model: string;
+    current_dimension: number;
+    dataset_model?: string;
+    dataset_dimension?: number;
+    dataset_info?: {
+      dataset_id: string;
+      name: string;
+      embedding_model: string;
+    };
+    message?: string;
+    options?: Array<{
+      action: string;
+      label: string;
+      description: string;
+      recommended: boolean;
+    }>;
+  }> {
+    const params = new URLSearchParams();
+    if (datasetId) params.append('dataset_id', datasetId);
+    if (templateId) params.append('template_id', templateId);
+    return this.request(`/api/v1/embeddings/check-compatibility?${params}`);
+  }
+
+  // ============================================================================
   // Generic Request Methods
   // ============================================================================
 

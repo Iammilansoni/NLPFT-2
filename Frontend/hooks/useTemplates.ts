@@ -41,6 +41,8 @@ export function useTemplateStats() {
   return useQuery({
     queryKey: ['templates', 'stats'],
     queryFn: () => apiClient.getTemplateStats(),
+    staleTime: 5000, // Consider data fresh for 5 seconds
+    refetchInterval: 10000, // Auto-refresh every 10 seconds for real-time updates
   });
 }
 

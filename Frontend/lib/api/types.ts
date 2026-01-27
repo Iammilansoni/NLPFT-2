@@ -52,6 +52,8 @@ export interface SearchResult {
 export interface StatsResponse {
   total_embeddings: number
   intents: Record<string, number>
+  total_intents: number
+  unique_apis: number
   model: string
   index_name: string
   total_runs: number
