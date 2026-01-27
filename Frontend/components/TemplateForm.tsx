@@ -1187,7 +1187,7 @@ export function TemplateForm({
               <Save className="w-4 h-4" /> Save Draft
             </button>
             <p className="text-xs text-muted-foreground">
-              💡 Auto-saved locally (survives refresh). Click "Save Draft" to save to database &amp; access from Templates page.
+              Auto-saved locally (survives refresh). Click "Save Draft" to save to database &amp; access from Templates page.
             </p>
           </div>
         </div>
