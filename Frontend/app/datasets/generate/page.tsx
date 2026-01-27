@@ -27,14 +27,12 @@ import {
   useEmbedDataset,
   useDownloadDataset,
 } from '@/hooks/useDatasetManagement';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api';
 
 const LLM_MODELS = [
   { value: 'llama3.2:3b-instruct-q4_K_M', label: 'Llama 3.2 3B (Recommended)', description: 'Fast & good quality' },
   { value: 'llama3.1:8b-instruct-q4_K_M', label: 'Llama 3.1 8B (Slow)', description: 'Best quality, CPU-intensive' },
-];
-
-const EMBEDDING_MODELS = [
-  { value: 'nomic-embed-text', label: 'Nomic-Embed-Text (Recommended)', description: '768 dimensions via Ollama' },
 ];
 
 export default function DatasetGenerationPage() {
@@ -46,12 +44,57 @@ export default function DatasetGenerationPage() {
   const [llmModel, setLlmModel] = useState('llama3.2:3b-instruct-q4_K_M');
   const [customPrompt, setCustomPrompt] = useState('');
   const [temperature, setTemperature] = useState(0.7);
-  const [embeddingModel, setEmbeddingModel] = useState('nomic-embed-text');
+  const [embeddingModel, setEmbeddingModel] = useState('');
 
   // Generation state
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+
+  // Fetch user settings for default embedding model
+  const { data: userSettings } = useQuery({
+    queryKey: ['userSettings'],
+    queryFn: () => apiClient.getUserSettings(),
+  });
+
+  // Fetch registered embedding models
+  const { data: embeddingModelsData } = useQuery({
+    queryKey: ['embedding-models-available'],
+    queryFn: () => apiClient.listEmbeddingModels(),
+    staleTime: 60000,
+  });
+
+  // Get only registered models
+  const registeredModels = (embeddingModelsData?.models || []).filter(m => m.is_registered);
+
+  // Set default embedding model from user settings (validate against registered models)
+  useEffect(() => {
+    // Wait until userSettings has resolved (not undefined) and registeredModels are loaded
+    if (userSettings === undefined || registeredModels.length === 0) {
+      return;
+    }
+    
+    // If embeddingModel is already set, don't override
+    if (embeddingModel) {
+      return;
+    }
+    
+    if (userSettings?.default_embedding_model) {
+      // Validate that the user's default model is actually registered
+      const isModelRegistered = registeredModels.some(
+        (m) => m.name === userSettings.default_embedding_model
+      );
+      if (isModelRegistered) {
+        setEmbeddingModel(userSettings.default_embedding_model);
+      } else {
+        // Fall back to first registered model if user's default is not available
+        setEmbeddingModel(registeredModels[0].name);
+      }
+    } else {
+      // No user default, use first registered model
+      setEmbeddingModel(registeredModels[0].name);
+    }
+  }, [userSettings, registeredModels, embeddingModel]);
 
   // Queries and mutations
   const { data: templatesData } = useTemplatesList({ status: 'approved' });
@@ -335,15 +378,24 @@ export default function DatasetGenerationPage() {
                     <select
                       value={embeddingModel}
                       onChange={e => setEmbeddingModel(e.target.value)}
-                      disabled={embedMutation.isPending}
+                      disabled={embedMutation.isPending || registeredModels.length === 0}
                       className="w-full px-4 py-3 bg-background border border-border rounded-lg"
                     >
-                      {EMBEDDING_MODELS.map(model => (
-                        <option key={model.value} value={model.value}>
-                          {model.label} - {model.description}
-                        </option>
-                      ))}
+                      {registeredModels.length === 0 ? (
+                        <option value="">No registered models - configure in Settings</option>
+                      ) : (
+                        registeredModels.map(model => (
+                          <option key={model.name} value={model.name}>
+                            {model.display_name || model.name} - {model.dimension}D vectors
+                          </option>
+                        ))
+                      )}
                     </select>
+                    {registeredModels.length === 0 && (
+                      <p className="text-xs text-amber-600 mt-2">
+                        Go to Settings → Embeddings to pull and register Ollama models
+                      </p>
+                    )}
                   </div>
 
                   <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">

@@ -199,7 +199,7 @@ export default function DatasetGeneratorPage() {
     try {
       const token = localStorage.getItem('nlpforge_access_token')
       const response = await fetch(
-        `${API_BASE}/api/v1/datasets/preview/${taskId}?limit=${limit}&offset=${offset}`,
+        `${API_BASE}/api/v1/datasets/preview/task/${taskId}?limit=${limit}&offset=${offset}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -487,7 +487,7 @@ export default function DatasetGeneratorPage() {
 
     // Show start notification
     toast({
-      title: forceReembed ? "⚡ Re-embedding Started" : "⚡ Embedding Started",
+      title: forceReembed ? "Re-embedding Started" : "Embedding Started",
       description: "Processing vectors with your current embedding model...",
     })
 
@@ -698,7 +698,7 @@ export default function DatasetGeneratorPage() {
                           : "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-300 dark:border-amber-700"
                       )}
                     >
-                      {currentTask.status === 'running' ? '⚡ Processing' : '⏳ Queued'}
+                      {currentTask.status === 'running' ? 'Processing' : 'Queued'}
                     </Badge>
                   </div>
 
@@ -747,7 +747,7 @@ export default function DatasetGeneratorPage() {
                   {/* Time Estimate */}
                   {currentTask.created_at && (
                     <p className="text-[10px] text-blue-600/70 dark:text-blue-400/70 text-center">
-                      Started {new Date(currentTask.created_at).toLocaleTimeString()} • Generation typically takes 30-60 seconds
+                      Started {formatDateTime(currentTask.created_at)} • Generation typically takes 30-60 seconds
                     </p>
                   )}
                 </CardContent>

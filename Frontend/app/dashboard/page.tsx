@@ -20,7 +20,7 @@ import { useQueryStats } from '@/hooks/useQuery'
 import { useTemplateStats } from '@/hooks/useTemplates'
 import { apiClient } from '@/lib/api'
 import { SemanticRetrieveResponse } from '@/lib/api-types'
-import { DEFAULT_EMBEDDING_MODEL, getEmbeddingModelInfo, getDimensionForModel, areModelsCompatible } from '@/lib/constants/embedding-models'
+import { DEFAULT_EMBEDDING_MODEL, areModelsCompatible, formatModelName } from '@/lib/constants/embedding-models'
 import { useToast } from '@/hooks/use-toast'
 import {
   Dialog,
@@ -143,18 +143,26 @@ export default function DashboardPage() {
     fetchSettings()
   }, [])
 
-  // Fetch available embedding models from backend
+  // Fetch available embedding models from backend - only show downloaded (is_local) models
   useEffect(() => {
     const fetchModels = async () => {
       try {
-        const data = await apiClient.getAvailableModels()
+        // Use listEmbeddingModels which returns is_local status
+        const data = await apiClient.listEmbeddingModels()
         if (data?.models && Array.isArray(data.models)) {
-          const formattedModels = data.models.map((m: any) => ({
-            model_id: m.model_id || m.id || m.name,
-            label: m.name || m.label || m.model_id,
+          // Filter to only show downloaded (is_local) models
+          const localModels = data.models.filter((m: any) => m.is_local)
+          const formattedModels = localModels.map((m: any) => ({
+            model_id: m.name || m.model_id || m.id,
+            label: m.display_name || m.name || m.label || m.model_id,
             dimension: m.dimension
           }))
-          setAvailableModels(formattedModels)
+          // If no local models found, show a default placeholder
+          if (formattedModels.length === 0) {
+            setAvailableModels([{ model_id: 'nomic-embed-text', label: 'Nomic Embed Text (not installed)', dimension: 768 }])
+          } else {
+            setAvailableModels(formattedModels)
+          }
         }
       } catch (err) {
         console.debug('Failed to fetch available models:', err)
@@ -162,6 +170,21 @@ export default function DashboardPage() {
     }
     fetchModels()
   }, [])
+
+  // Helper functions to get model info from availableModels
+  const getModelInfo = (modelId: string) => {
+    return availableModels.find(m => m.model_id === modelId)
+  }
+
+  const getDimensionForModel = (modelId: string): number => {
+    const model = getModelInfo(modelId)
+    return model?.dimension ?? 768 // Default to 768 if not found
+  }
+
+  const getModelLabel = (modelId: string): string => {
+    const model = getModelInfo(modelId)
+    return model?.label || formatModelName(modelId)
+  }
 
   // Check for model mismatch before search
   function checkModelMismatch(searchQuery: string): boolean {
@@ -172,7 +195,8 @@ export default function DashboardPage() {
     const settingsDim = getDimensionForModel(settingsModel)
     const selectedDim = getDimensionForModel(embeddingModel)
 
-    if (settingsDim !== selectedDim) {
+    // Use areModelsCompatible helper for centralized compatibility check
+    if (!areModelsCompatible(settingsDim, selectedDim)) {
       // Dimension mismatch - show warning dialog
       setMismatchInfo({
         settingsModel: settingsModel,
@@ -205,8 +229,8 @@ export default function DashboardPage() {
     setShowModelMismatchDialog(false)
     if (pendingQuery) {
       toast({
-        title: "⚠️ Using Different Model",
-        description: `Searching with ${getEmbeddingModelInfo(embeddingModel)?.label}. Results may not include all embedded data.`,
+        title: "Using Different Model",
+        description: `Searching with ${getModelLabel(embeddingModel)}. Results may not include all embedded data.`,
         variant: "default",
       })
       await performSearch(pendingQuery, embeddingModel)
@@ -249,7 +273,7 @@ export default function DashboardPage() {
 
       toast({
         title: "Search Complete",
-        description: `Found ${candidateCount} candidates in ${processingTime}ms using ${getEmbeddingModelInfo(model)?.label || model}`,
+        description: `Found ${candidateCount} candidates in ${processingTime}ms using ${getModelLabel(model)}`,
       })
     } catch (err: any) {
       console.error('Search failed:', err)
@@ -525,14 +549,14 @@ export default function DashboardPage() {
             />
             <MetricCard
               label="Total Intents"
-              value={(stats as any)?.total_intents || Object.keys(stats?.intents || {}).length}
-              subtitle={`${(stats as any)?.unique_apis || 0} Unique APIs`}
+              value={stats?.total_intents || Object.keys(stats?.intents || {}).length}
+              subtitle={`${stats?.unique_apis || 0} Unique APIs`}
               icon={<Target className="w-4 h-4" />}
             />
             <MetricCard
               label="Embedding Model"
-              value={getEmbeddingModelInfo(embeddingModel)?.label || 'Nomic Embed Text'}
-              subtitle={`${getEmbeddingModelInfo(embeddingModel)?.dimension || 768}D vectors`}
+              value={getModelLabel(embeddingModel)}
+              subtitle={`${getDimensionForModel(embeddingModel)}D vectors`}
               icon={<Cpu className="w-4 h-4" />}
             />
           </div>
@@ -607,8 +631,8 @@ export default function DashboardPage() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">
-              Your selected model <strong>{getEmbeddingModelInfo(mismatchInfo?.selectedModel || '')?.label}</strong> ({mismatchInfo?.selectedDimension}D)
-              does not match the system default settings <strong>{getEmbeddingModelInfo(mismatchInfo?.settingsModel || '')?.label}</strong> ({mismatchInfo?.settingsDimension}D).
+              Your selected model <strong>{getModelLabel(mismatchInfo?.selectedModel || '')}</strong> ({mismatchInfo?.selectedDimension}D)
+              does not match the system default settings <strong>{getModelLabel(mismatchInfo?.settingsModel || '')}</strong> ({mismatchInfo?.settingsDimension}D).
             </p>
             <div className="bg-muted p-3 rounded-md text-xs border border-border">
               <p className="font-semibold mb-1">Impact:</p>
@@ -619,10 +643,10 @@ export default function DashboardPage() {
             </div>
             <div className="flex flex-col gap-2 pt-2">
               <Button onClick={handleUseSettingsModel} className="w-full">
-                Switch to {getEmbeddingModelInfo(mismatchInfo?.settingsModel || '')?.label} (Recommended)
+                Switch to {getModelLabel(mismatchInfo?.settingsModel || '')} (Recommended)
               </Button>
               <Button variant="ghost" onClick={handleUseSelectedModelAnyway} className="w-full text-amber-600 hover:text-amber-700 hover:bg-amber-50">
-                Proceed with {getEmbeddingModelInfo(mismatchInfo?.selectedModel || '')?.label} anyway
+                Proceed with {getModelLabel(mismatchInfo?.selectedModel || '')} anyway
               </Button>
             </div>
           </div>

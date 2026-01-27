@@ -37,7 +37,8 @@ export function useQueryStats() {
   return useQuery({
     queryKey: queryKeys.stats,
     queryFn: () => queryApi.getStats(),
-    staleTime: 30000, // Consider data fresh for 30 seconds
+    staleTime: 5000, // Consider data fresh for 5 seconds
+    refetchInterval: 10000, // Auto-refresh every 10 seconds for real-time updates
   })
 }
 
