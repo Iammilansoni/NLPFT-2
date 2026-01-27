@@ -67,7 +67,7 @@ class AuditStatsResponse(BaseModel):
 class AuditLogCreate(BaseModel):
     """Create audit log entry from frontend"""
     action: str = Field(..., description="Action performed (e.g., 'submit_template_review', 'approve_template')")
-    user_id: Optional[str] = Field(None, description="User ID (optional, will use current user if not provided)")
+    # SECURITY: user_id is NOT accepted from client - always uses authenticated user
     template_id: Optional[str] = Field(None, description="Related template ID")
     resource_type: Optional[str] = Field(default="template", description="Type of resource")
     payload: Optional[dict] = Field(default=None, description="Additional payload data")
@@ -84,6 +84,9 @@ async def create_audit_log(
     """
     Create audit log entry from frontend
     
+    SECURITY: user_id is always taken from the authenticated user, never from request body.
+    This prevents audit log injection attacks.
+    
     Note: Most audit logs are created automatically by backend operations.
     This endpoint is for supplementary client-side logging.
     """
@@ -92,7 +95,7 @@ async def create_audit_log(
         
         new_log = AuditLog(
             log_id=uuid4(),
-            user_id=UUID(data.user_id) if data.user_id else current_user.u_id,
+            user_id=current_user.u_id,  # ALWAYS use authenticated user, never from request
             action=data.action,
             resource_type=data.resource_type or "template",
             resource_id=UUID(data.template_id) if data.template_id else None,

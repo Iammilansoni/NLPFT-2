@@ -30,6 +30,8 @@ from app.api.v1 import (
     # Multi-Model Embedding System
     model_validation,  # Model compatibility checks
     multi_model_query,  # Semantic search with model governance
+    # LLM Provider Configuration
+    llm_config,  # Dynamic LLM provider management
 )
 from app.core.postgres import get_db
 from app.api.v1.auth import get_current_user
@@ -63,6 +65,8 @@ router.include_router(ranking.router, prefix="/ranking", tags=["AI Ranking Engin
 router.include_router(models.router, tags=["Models"])
 # user_settings.py already has prefix="/user"
 router.include_router(user_settings.router, tags=["User Settings"])
+# llm_config.py has prefix="/llm-config"
+router.include_router(llm_config.router, tags=["LLM Configuration"])
 
 # === Audit Logs ===
 # audit_logs.py already has prefix="/audit"

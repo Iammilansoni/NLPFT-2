@@ -405,3 +405,321 @@ async def embeddings_health(
         "index_name": redis_service.index_name
     }
 
+
+# =============================================================================
+# EMBEDDING MODEL DISCOVERY & REGISTRATION
+# =============================================================================
+
+@router.get("/models/registered")
+async def list_registered_models(
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    include_dynamic: bool = True,
+):
+    """
+    List all registered embedding models from the registry.
+    
+    Args:
+        include_dynamic: Include dynamically registered models (default: True)
+    """
+    from app.core.embedding_model_registry import get_embedding_registry
+    
+    registry = get_embedding_registry()
+    
+    return {
+        "models": registry.list_models(include_dynamic=include_dynamic),
+        "default_model": registry.DEFAULT_MODEL_ID,
+        "dynamic_count": len(registry.get_dynamic_models()),
+    }
+
+
+@router.post("/models/pull")
+async def pull_embedding_model(
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    model_name: str = Query(..., description="Ollama model name to pull"),
+):
+    """
+    Pull an Ollama embedding model and register it.
+    
+    This is a synchronous operation that may take several minutes
+    for large models. Consider using with appropriate timeouts.
+    
+    Args:
+        model_name: Ollama model name to pull
+    """
+    from app.services.embedding_model_service import get_embedding_model_service
+    
+    service = get_embedding_model_service()
+    
+    try:
+        # pull_and_register now returns EmbeddingModelSpec directly or raises
+        spec = await service.pull_and_register(model_name)
+        
+        return {
+            "model_id": spec.model_id,
+            "dimension": spec.dimension,
+            "display_name": spec.display_name,
+            "redis_index": spec.redis_index_name,
+            "status": "pulled_and_registered",
+        }
+    except RuntimeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+
+
+@router.get("/models/available")
+async def list_available_embedding_models(
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+):
+    """
+    List all available embedding models (Ollama + registered).
+    
+    Returns models with their:
+    - Name and display name
+    - Dimension (if known)
+    - Local availability (pulled in Ollama)
+    - Registration status in the system
+    
+    Use this endpoint to populate embedding model selection dropdowns.
+    """
+    from app.services.embedding_model_service import get_embedding_model_service
+    
+    service = get_embedding_model_service()
+    
+    try:
+        models = await service.discover_ollama_models()
+        
+        return {
+            "models": [m.to_dict() for m in models],
+            "count": len(models),
+            "local_count": sum(1 for m in models if m.is_local),
+            "registered_count": sum(1 for m in models if m.is_registered),
+        }
+    except Exception as e:
+        logger.error(f"Failed to list embedding models: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list models: {e}",
+        )
+
+
+@router.post("/models/detect-dimension")
+async def detect_model_dimension(
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    model_name: str = Query(..., description="Ollama model name"),
+    auto_pull: bool = Query(True, description="Auto-pull if not available"),
+):
+    """
+    Detect the embedding dimension for an Ollama model.
+    
+    This generates a test embedding and returns the dimension.
+    Optionally pulls the model if not available locally.
+    
+    Args:
+        model_name: Ollama model name (e.g., "nomic-embed-text")
+        auto_pull: Whether to pull the model if not available
+    """
+    from app.services.ollama_embedding_service import get_ollama_service
+    from app.core.embedding_model_registry import get_embedding_registry
+    
+    ollama = get_ollama_service()
+    registry = get_embedding_registry()
+    
+    try:
+        # Check if already registered
+        if registry.is_valid_model(model_name):
+            spec = registry.get_model(model_name)
+            return {
+                "model_name": model_name,
+                "dimension": spec.dimension,
+                "already_registered": True,
+                "display_name": spec.display_name,
+                "redis_index": spec.redis_index_name,
+            }
+        
+        # Detect dimension
+        dimension = await ollama.detect_dimension(model_name, auto_pull=auto_pull)
+        
+        if dimension is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Could not detect dimension for model: {model_name}. "
+                       f"Make sure the model exists and is an embedding model.",
+            )
+        
+        return {
+            "model_name": model_name,
+            "dimension": dimension,
+            "already_registered": False,
+            "message": f"Detected dimension: {dimension}. Call /models/register to register this model.",
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error detecting dimension: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+
+
+@router.post("/models/register")
+async def register_embedding_model(
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    model_name: str = Query(..., description="Ollama model name"),
+    auto_pull: bool = Query(True, description="Auto-pull if not available"),
+):
+    """
+    Register a new embedding model with auto-dimension detection.
+    
+    This:
+    1. Pulls the model from Ollama if needed (auto_pull=True)
+    2. Detects the embedding dimension automatically
+    3. Registers the model in the EmbeddingModelRegistry
+    4. Creates the Redis HNSW index for the model
+    
+    Args:
+        model_name: Ollama model name (e.g., "mxbai-embed-large")
+        auto_pull: Whether to pull the model if not available
+    """
+    from app.services.ollama_embedding_service import get_ollama_service
+    from app.services.multi_model_redis_service import get_multi_model_redis_service
+    
+    ollama = get_ollama_service()
+    
+    try:
+        success, result = await ollama.register_model_with_auto_dimension(
+            model_name, 
+            auto_pull=auto_pull
+        )
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Registration failed"),
+            )
+        
+        # Ensure Redis index exists for the new model
+        try:
+            multi_redis = get_multi_model_redis_service()
+            await multi_redis.ensure_index_exists(model_name)
+            result["redis_index_created"] = True
+        except Exception as redis_error:
+            logger.warning(f"Could not create Redis index: {redis_error}")
+            result["redis_index_created"] = False
+            result["redis_index_error"] = str(redis_error)
+        
+        return {
+            "success": True,
+            **result,
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error registering model: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+
+
+@router.get("/reembedding-impact")
+async def check_reembedding_impact(
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    new_model: str = Query(..., description="New embedding model to switch to"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Check impact of switching embedding models.
+    
+    Returns information about datasets that would need re-embedding
+    if the user switches to a different embedding model.
+    
+    This is used to show warnings before model changes.
+    """
+    from sqlalchemy import select, func
+    from app.models.database_models import Dataset, UserSettings
+    from app.core.embedding_model_registry import get_embedding_registry
+    
+    registry = get_embedding_registry()
+    
+    # Get user's current model
+    query_settings = await db.execute(
+        select(UserSettings).where(UserSettings.u_id == current_user.u_id)
+    )
+    user_settings = query_settings.scalar_one_or_none()
+    current_model = user_settings.default_embedding_model if user_settings else "nomic-embed-text"
+    
+    # If same model, no impact
+    if current_model == new_model:
+        return {
+            "impact": "none",
+            "message": "No change - same model",
+            "affected_datasets": [],
+            "reembedding_required": False,
+        }
+    
+    # Find datasets with embeddings using current model
+    query_datasets = await db.execute(
+        select(Dataset).where(
+            Dataset.u_id == current_user.u_id,
+            Dataset.embedding_model == current_model,
+            Dataset.embedded_rows > 0
+        )
+    )
+    affected_datasets = query_datasets.scalars().all()
+    
+    # Calculate impact
+    total_embeddings = sum(d.embedded_rows or 0 for d in affected_datasets)
+    
+    # Get dimension info
+    try:
+        current_spec = registry.get_model(current_model)
+        current_dim = current_spec.dimension
+    except ValueError:
+        current_dim = None
+    
+    try:
+        new_spec = registry.get_model(new_model)
+        new_dim = new_spec.dimension
+    except ValueError:
+        new_dim = None
+    
+    if not affected_datasets:
+        return {
+            "impact": "none", 
+            "message": "No existing embeddings to re-embed",
+            "affected_datasets": [],
+            "reembedding_required": False,
+            "current_model": current_model,
+            "new_model": new_model,
+        }
+    
+    return {
+        "impact": "high" if total_embeddings > 1000 else "medium" if total_embeddings > 100 else "low",
+        "message": f"Switching from {current_model} to {new_model} will require re-embedding {len(affected_datasets)} datasets ({total_embeddings} total vectors)",
+        "affected_datasets": [
+            {
+                "dataset_id": str(d.dataset_id),
+                "name": d.name or d.csv_path.split('/')[-1] if d.csv_path else "Unknown",
+                "embedding_count": d.embedded_rows,
+                "embedding_model": d.embedding_model,
+            }
+            for d in affected_datasets
+        ],
+        "reembedding_required": True,
+        "total_embeddings_affected": total_embeddings,
+        "current_model": {
+            "name": current_model,
+            "dimension": current_dim,
+        },
+        "new_model": {
+            "name": new_model,
+            "dimension": new_dim,
+        },
+        "warning": "Embeddings from different models cannot be compared. "
+                   "You must re-embed datasets to use them with the new model.",
+    }

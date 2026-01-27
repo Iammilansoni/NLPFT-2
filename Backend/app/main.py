@@ -35,6 +35,20 @@ async def lifespan(app: FastAPI):
         logger.warning(f"PostgreSQL not available: {e}")
         logger.warning("Running without PostgreSQL - Limited functionality available")
 
+    # Check API key encryption configuration
+    encryption_configured = False
+    try:
+        from app.core.encryption import is_encryption_configured
+        encryption_configured = is_encryption_configured()
+        if encryption_configured:
+            logger.info("API key encryption configured successfully")
+        else:
+            logger.warning("SECRET_KEY_ENCRYPTION not set - LLM provider API keys cannot be stored securely")
+    except Exception as e:
+        logger.warning(f"Encryption check failed: {e}")
+    
+    app.state.encryption_configured = encryption_configured
+
     # Check Redis connection - Optional
     redis_connected = False
     redis_error = None
@@ -60,6 +74,15 @@ async def lifespan(app: FastAPI):
     app.state.postgres_error = postgres_error
     app.state.redis_connected = redis_connected
     app.state.redis_error = redis_error
+
+    # Auto-register any local Ollama embedding models
+    try:
+        from app.services.embedding_model_service import auto_register_local_embedding_models
+        registration_result = await auto_register_local_embedding_models()
+        if registration_result.get("registered"):
+            logger.info(f"Auto-registered {len(registration_result['registered'])} embedding model(s)")
+    except Exception as e:
+        logger.warning(f"Could not auto-register embedding models: {e}")
 
     logger.info("Application startup completed")
 
@@ -98,6 +121,49 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
         expose_headers=["*"],
     )
+    
+    # Security Headers Middleware for production
+    from starlette.middleware.base import BaseHTTPMiddleware
+    
+    class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request, call_next):
+            response = await call_next(request)
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["X-Frame-Options"] = "DENY"
+            # X-XSS-Protection is deprecated - use CSP instead
+            response.headers["X-XSS-Protection"] = "0"
+            response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+            
+            # Content Security Policy - environment conditional
+            if settings.environment == "production":
+                # Strict CSP for production - no unsafe-inline or unsafe-eval
+                # Note: Requires inline scripts to be moved to external files or use nonces
+                csp = (
+                    "default-src 'self'; "
+                    "script-src 'self'; "
+                    "style-src 'self'; "
+                    "img-src 'self' data: blob:; "
+                    "font-src 'self' data:; "
+                    "connect-src 'self' wss:; "
+                    "frame-ancestors 'none'; "
+                    "base-uri 'self'; "
+                    "form-action 'self'"
+                )
+                response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+            else:
+                # Development CSP - allows localhost connections and inline styles for dev tools
+                csp = (
+                    "default-src 'self'; "
+                    "script-src 'self'; "
+                    "style-src 'self' 'unsafe-inline'; "
+                    "img-src 'self' data: blob:; "
+                    "font-src 'self' data:; "
+                    "connect-src 'self' ws: wss: http://localhost:* http://127.0.0.1:* http://10.0.0.1:*;"
+                )
+            response.headers["Content-Security-Policy"] = csp
+            return response
+    
+    app.add_middleware(SecurityHeadersMiddleware)
     
     # Initialize rate limiter with Redis storage (or fallback to memory)
     # Redis config from centralized config.py (loaded from env)

@@ -540,13 +540,15 @@ async def generate_dataset(
             enterprise_generator = get_enterprise_dataset_generator()
             
             # Generate dataset with full template context (pass task_id for progress tracking)
+            # Pass user_id to enable loading user's configured LLM provider
             result = await enterprise_generator.generate_dataset_from_template(
                 template_data=template_data,
                 num_examples=dataset_request.num_examples,
                 user_prompt=dataset_request.user_prompt,
                 focus_areas=dataset_request.focus_areas,
                 scenario_distribution=dataset_request.scenario_distribution,
-                task_id=task_id
+                task_id=task_id,
+                user_id=str(current_user.u_id)  # Pass user ID for LLM provider lookup
             )
             
             if not result.get("success"):
@@ -1262,8 +1264,8 @@ async def embed_dataset_to_redis(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/preview/{task_id}")
-async def preview_dataset(
+@router.get("/preview/task/{task_id}")
+async def preview_dataset_by_task(
     task_id: str, 
     limit: int = 100, 
     offset: int = 0,
@@ -1273,6 +1275,8 @@ async def preview_dataset(
     Preview dataset records from a completed task
     
     AUTHENTICATION REQUIRED - Only returns task if owned by current user
+    
+    Note: Use /preview/file/{filename} for direct file preview
     """
     task_manager = get_task_manager()
     # Pass user_id for ownership check
@@ -1374,25 +1378,131 @@ async def download_dataset(
     return FileResponse(file_path, media_type=media_type, filename=filename)
 
 
+# =============================================================================
+# HELPER: Secure Dataset Ownership Verification
+# =============================================================================
+
+async def verify_dataset_ownership_by_filename(
+    filename: str,
+    user_id: UUID,
+    db: AsyncSession
+) -> Dataset:
+    """
+    Securely verify dataset ownership by filename.
+    
+    Security measures:
+    1. Sanitize filename to prevent path traversal attacks
+    2. Use exact path matching (not contains) for precise ownership
+    3. Never reveal whether a file exists to unauthorized users
+    
+    Args:
+        filename: The filename to verify (will be sanitized)
+        user_id: The authenticated user's ID
+        db: Database session
+        
+    Returns:
+        Dataset object if owned by user
+        
+    Raises:
+        HTTPException 404: If dataset not found or not owned by user
+    """
+    # Security: Sanitize filename to prevent path traversal
+    safe_filename = os.path.basename(filename)
+    
+    # Reject if filename contained path components
+    if safe_filename != filename or '..' in filename:
+        raise HTTPException(
+            status_code=404,
+            detail="Dataset not found"
+        )
+    
+    # Build the canonical path within DATASETS_DIR
+    datasets_base = Path(DATASETS_DIR).resolve()
+    canonical_path = (datasets_base / safe_filename).resolve()
+    
+    # Security: Ensure resolved path is within DATASETS_DIR (prevent symlink attacks)
+    try:
+        canonical_path.relative_to(datasets_base)
+    except ValueError:
+        # Path escaped DATASETS_DIR
+        raise HTTPException(
+            status_code=404,
+            detail="Dataset not found"
+        )
+    
+    # Query using exact path match AND user ownership
+    result = await db.execute(
+        select(Dataset).where(
+            Dataset.csv_path == str(canonical_path),
+            Dataset.u_id == user_id
+        )
+    )
+    dataset = result.scalar_one_or_none()
+    
+    # Also try matching just the filename suffix for legacy data
+    if not dataset:
+        result = await db.execute(
+            select(Dataset).where(
+                Dataset.csv_path.endswith(f"/{safe_filename}"),
+                Dataset.u_id == user_id
+            )
+        )
+        dataset = result.scalar_one_or_none()
+    
+    if not dataset:
+        # Security: Never reveal if file exists to unauthorized users
+        raise HTTPException(
+            status_code=404,
+            detail="Dataset not found"
+        )
+    
+    # Verify the file exists on disk
+    if not os.path.exists(dataset.csv_path):
+        raise HTTPException(
+            status_code=404,
+            detail="Dataset not found"
+        )
+    
+    return dataset
+
+
 @router.get("/download-file/{filename}")
-def download_dataset_file(filename: str):
-    """Download dataset file by filename"""
-    path = os.path.join(DATASETS_DIR, filename)
+async def download_dataset_file(
+    filename: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Download dataset file by filename
     
-    if not os.path.exists(path):
-        backend_dir = Path(__file__).parent.parent.parent
-        path = backend_dir / filename
-        if not os.path.exists(path):
-            raise HTTPException(status_code=404, detail="File not found")
+    AUTHENTICATION REQUIRED - Multi-tenant security:
+    Only allows download if the file belongs to a dataset owned by the current user
     
-    if filename.endswith('.csv'):
+    Security measures:
+    - Path traversal prevention
+    - Exact ownership verification
+    - No information disclosure about file existence
+    """
+    # Use secure ownership verification helper
+    dataset = await verify_dataset_ownership_by_filename(
+        filename=filename,
+        user_id=current_user.u_id,
+        db=db
+    )
+    
+    # Use the verified path from database
+    path = dataset.csv_path
+    safe_filename = os.path.basename(path)
+    
+    if safe_filename.endswith('.csv'):
         media_type = "text/csv"
-    elif filename.endswith('.json'):
+    elif safe_filename.endswith('.json'):
         media_type = "application/json"
     else:
         media_type = "application/octet-stream"
     
-    return FileResponse(str(path), media_type=media_type, filename=filename)
+    logger.info(f"User {current_user.u_id} downloading file: {safe_filename}")
+    return FileResponse(str(path), media_type=media_type, filename=safe_filename)
 
 
 @router.get("/embeddings/stats/{template_id}")
@@ -1473,13 +1583,23 @@ async def search_similar_test_cases(
         }
 
 
-@router.get("/preview/{filename}")
-def preview_dataset(
+@router.get("/preview/file/{filename}")
+async def preview_dataset_by_filename(
     filename: str,
-    limit: int = Query(default=10, ge=1, le=100, description="Number of rows to preview")
+    limit: int = Query(default=10, ge=1, le=100, description="Number of rows to preview"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Preview CSV dataset (first N rows)
+    
+    AUTHENTICATION REQUIRED - Multi-tenant security:
+    Only allows preview if the file belongs to a dataset owned by the current user
+    
+    Security measures:
+    - Path traversal prevention
+    - Exact ownership verification
+    - No information disclosure about file existence
     
     Returns JSON with:
     - rows: First N rows of CSV
@@ -1487,12 +1607,18 @@ def preview_dataset(
     - columns: List of column names
     - statistics: Distribution statistics (scenario_type, test_category)
     """
-    path = os.path.join(DATASETS_DIR, filename)
+    # Use secure ownership verification helper
+    dataset = await verify_dataset_ownership_by_filename(
+        filename=filename,
+        user_id=current_user.u_id,
+        db=db
+    )
     
-    if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="Dataset file not found")
+    # Use verified path from database
+    path = dataset.csv_path
+    safe_filename = os.path.basename(path)
     
-    if not filename.endswith('.csv'):
+    if not safe_filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="Only CSV files can be previewed")
     
     try:
@@ -1513,12 +1639,13 @@ def preview_dataset(
         
         return {
             "filename": filename,
+            "dataset_id": str(dataset.dataset_id),  # Include for frontend reference
             "total_rows": total_rows,
             "preview_rows": len(preview_rows),
             "columns": df.columns.tolist(),
             "rows": preview_rows,
             "statistics": statistics,
-            "download_url": f"/v1/datasets/download-file/{filename}"
+            "download_url": f"/v1/datasets/download-file/{safe_filename}"  # Requires authentication
         }
     
     except Exception as e:

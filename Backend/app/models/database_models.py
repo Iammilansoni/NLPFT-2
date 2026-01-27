@@ -82,6 +82,7 @@ class User(Base):
     metadata_records = relationship("Metadata", back_populates="user", cascade="all, delete-orphan")
     csv_data = relationship("CSVData", back_populates="user", cascade="all, delete-orphan")
     embeddings = relationship("Embedding", back_populates="user", cascade="all, delete-orphan")
+    llm_configs = relationship("LLMProviderConfig", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserSettings(Base):
@@ -104,8 +105,9 @@ class UserSettings(Base):
     default_embedding_model = Column(Text, nullable=False, default="nomic-embed-text")  # Default 768-dim Ollama model
     embedding_dimension = Column(Integer, nullable=False, default=768)  # 384, 768, or 1024
     
-    # LLM preferences (DEPRECATED - now hardcoded to Llama 3.2 Instruct via Ollama)
-    preferred_llm = Column(Text, nullable=True)  # Kept for backward compatibility, not used
+    # LLM preferences - Now links to LLMProviderConfig for dynamic configuration
+    preferred_llm = Column(Text, nullable=True)  # Legacy field, kept for backward compatibility
+    default_llm_config_id = Column(UUID(as_uuid=True), ForeignKey("llm_provider_configs.config_id", ondelete="SET NULL"), nullable=True)
     
     # Auto-embedding on dataset generation
     auto_embed_on_generation = Column(Integer, nullable=False, default=1)  # 0=no, 1=yes
@@ -115,6 +117,77 @@ class UserSettings(Base):
     
     # Relationships
     user = relationship("User", back_populates="settings")
+    default_llm_config = relationship("LLMProviderConfig", foreign_keys=[default_llm_config_id])
+
+
+class LLMProviderConfig(Base):
+    """
+    LLM_PROVIDER_CONFIGS table - User's LLM provider configurations
+    
+    Stores configuration for multiple LLM providers per user:
+    - OpenAI, Anthropic, Google Gemini, Ollama, HuggingFace, Custom
+    - Encrypted API keys for security
+    - Model parameters (temperature, max_tokens, etc.)
+    - Connection test history
+    
+    Each user can have multiple configs and set one as default.
+    """
+    __tablename__ = "llm_provider_configs"
+    
+    config_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    u_id = Column(UUID(as_uuid=True), ForeignKey("users.u_id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    # Provider identification
+    name = Column(Text, nullable=False)  # User-friendly name (e.g., "My OpenAI", "Production Gemini")
+    provider = Column(Text, nullable=False)  # Provider type: openai, anthropic, google, ollama, huggingface, deepseek, custom
+    is_default = Column(Integer, default=0)  # 0=no, 1=yes (only one default per user)
+    is_active = Column(Integer, default=1)  # 0=disabled, 1=active
+    
+    # Connection settings
+    base_url = Column(Text, nullable=True)  # Custom base URL (for self-hosted, proxies, DeepSeek, etc.)
+    api_key_encrypted = Column(Text, nullable=True)  # Encrypted API key (Fernet encryption)
+    model_name = Column(Text, nullable=False)  # Model identifier (e.g., "gpt-4", "claude-3-opus", "llama3.1:8b")
+    model_type = Column(Text, default="chat")  # Model capability: chat, completion, embeddings
+    
+    # Generation parameters (stored as JSONB for flexibility)
+    config_params = Column(JSONB, default=lambda: {
+        "temperature": 0.7,
+        "max_tokens": 4096,
+        "top_p": 0.9,
+        "timeout": 120.0,
+        "max_retries": 3
+    })
+    
+    # Connection test metadata
+    last_tested_at = Column(TIMESTAMP, nullable=True)
+    last_test_success = Column(Integer, nullable=True)  # 0=failed, 1=success
+    last_test_message = Column(Text, nullable=True)  # Error message or success info
+    last_test_latency_ms = Column(Numeric(10, 2), nullable=True)  # Response time in ms
+    
+    # Audit timestamps
+    created_at = Column(TIMESTAMP, default=utc_now, nullable=False)
+    updated_at = Column(TIMESTAMP, default=utc_now, onupdate=utc_now)
+    
+    # Relationships
+    user = relationship("User", back_populates="llm_configs")
+    
+    def __repr__(self):
+        return f"<LLMProviderConfig {self.name} ({self.provider}/{self.model_name})>"
+
+
+# Index for fast user config lookups
+Index("idx_llm_configs_user_active", LLMProviderConfig.u_id, LLMProviderConfig.is_active)
+Index("idx_llm_configs_user_default", LLMProviderConfig.u_id, LLMProviderConfig.is_default)
+
+# Partial unique index to enforce only one default config per user
+Index(
+    "idx_llm_configs_user_single_default",
+    LLMProviderConfig.u_id,
+    unique=True,
+    postgresql_where=(LLMProviderConfig.is_default == 1)
+)
+
+
 
 
 class Template(Base):
