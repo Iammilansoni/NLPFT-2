@@ -743,9 +743,13 @@ Return ONLY the JSON array, nothing else."""
             try:
                 from app.llm.providers.base import LLMConfig
                 
+                # Calculate max_tokens proportional to batch size
+                # ~150 tokens per example for JSON output
+                base_tokens = min(num_examples * 150, 32768)
+                
                 config = LLMConfig(
                     temperature=0.7,
-                    max_tokens=65536,
+                    max_tokens=max(base_tokens, 4096),  # At least 4096, proportional to examples
                     top_p=0.9,
                 )
                 
@@ -808,10 +812,12 @@ Return ONLY the JSON array, nothing else."""
                 full_prompt = f"{system_prompt}\n\n{user_prompt}"
                 
                 # Configure generation settings
+                # Calculate max_tokens proportional to batch size (same formula as LLMConfig path)
+                base_tokens = min(num_examples * 150, 65536)
                 generation_config = {
                     "temperature": 0.7,
                     "top_p": 0.9,
-                    "max_output_tokens": 65536,  # Gemini 2.5 Flash max limit
+                    "max_output_tokens": max(base_tokens, 8192),  # At least 8192, up to Gemini max
                 }
                 
                 # Run the synchronous generate_content in a thread pool
