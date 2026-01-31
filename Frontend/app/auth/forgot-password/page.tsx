@@ -1,13 +1,13 @@
 /**
- * Forgot Password Page
- * Enterprise-grade password reset with accessibility and polish
+ * Forgot Password Page - Premium SaaS Design
+ * Clean password reset form
  */
 
 'use client';
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Mail, ArrowLeft, ArrowRight, CheckCircle, Zap, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import authService from '@/lib/auth';
 
 export default function ForgotPasswordPage() {
@@ -34,130 +34,109 @@ export default function ForgotPasswordPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center py-12 px-4">
-        <div className="w-full max-w-sm">
-          <div className="bg-card border border-border rounded-xl p-6 shadow-sm text-center transition-shadow duration-200 hover:shadow-md">
-            <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <h2 className="text-xl font-semibold text-foreground mb-2">Check your email</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              We've sent a password reset link to <strong className="text-foreground">{email}</strong>
-            </p>
-            <p className="text-xs text-muted-foreground mb-6">
-              Didn't receive the email? Check your spam folder or{' '}
-              <button
-                onClick={() => setSuccess(false)}
-                className="text-primary hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                try again
-              </button>
-            </p>
-            <Link
-              href="/auth/login"
-              className="inline-flex items-center gap-2 text-sm text-primary hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to login
-            </Link>
+      <div className="w-full">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
           </div>
+          <h2 className="text-2xl font-bold text-foreground mb-3">Check your email</h2>
+          <p className="text-muted-foreground mb-6">
+            We've sent a password reset link to<br />
+            <strong className="text-foreground">{email}</strong>
+          </p>
+          <p className="text-sm text-muted-foreground mb-8">
+            Didn't receive the email? Check your spam folder or{' '}
+            <button
+              onClick={() => setSuccess(false)}
+              className="text-primary hover:text-primary/80 font-medium transition-colors"
+            >
+              try again
+            </button>
+          </p>
+          <Link
+            href="/auth/login"
+            className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-medium transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to login
+          </Link>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4">
-      <div className="w-full max-w-sm">
-        {/* Logo and Header */}
-        <div className="text-center mb-8">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 mb-6 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-opacity hover:opacity-80"
-          >
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-              <Zap className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-bold text-xl text-foreground">NLPForge</span>
-          </Link>
-          <h1 className="text-2xl font-bold text-foreground mb-2">
-            Forgot password?
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            No worries, we'll send you reset instructions
-          </p>
+    <div className="w-full">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-foreground mb-2">
+          Reset Password
+        </h1>
+        <p className="text-muted-foreground">
+          No worries, we'll send you reset instructions
+        </p>
+      </div>
+
+      {/* Error Alert */}
+      {error && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 p-4 mb-6 bg-destructive/10 border border-destructive/20 rounded-lg"
+        >
+          <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-destructive">{error}</p>
+        </div>
+      )}
+
+      {/* Reset Form */}
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Email Field */}
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
+            Email address
+          </label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (error) setError('');
+            }}
+            className="w-full px-4 py-3 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            placeholder="name@mail.com"
+          />
         </div>
 
-        {/* Reset Form Card */}
-        <div className="bg-card border border-border rounded-xl p-6 shadow-sm transition-shadow duration-200 hover:shadow-md">
-          <form onSubmit={handleSubmit} className="space-y-4" aria-describedby={error ? 'forgot-error' : undefined}>
-            {/* Error Alert */}
-            {error && (
-              <div
-                id="forgot-error"
-                role="alert"
-                className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg"
-              >
-                <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-destructive">{error}</p>
-              </div>
-            )}
+        {/* Submit Button */}
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="w-full px-6 py-3.5 bg-primary text-primary-foreground font-semibold rounded-lg hover:bg-primary/90 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Sending...
+            </>
+          ) : (
+            'Send Reset Link'
+          )}
+        </button>
+      </form>
 
-            {/* Email Field */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1.5">
-                Email address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    if (error) setError('');
-                  }}
-                  className="w-full pl-9 pr-3 py-2.5 bg-background border border-border rounded-lg text-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary focus:ring-offset-1 focus:ring-offset-background"
-                  placeholder="you@example.com"
-                />
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full px-4 py-2.5 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  Send reset link
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Back to Login Link */}
-          <div className="mt-4 text-center">
-            <Link
-              href="/auth/login"
-              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to login
-            </Link>
-          </div>
-        </div>
+      {/* Back to Login Link */}
+      <div className="mt-8 text-center">
+        <Link
+          href="/auth/login"
+          className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to login
+        </Link>
       </div>
     </div>
   );
