@@ -192,6 +192,8 @@ services:
     restart: unless-stopped
     expose:
       - "11434"
+    volumes:
+      - ollama_models:/root/.ollama  # Persist pulled models across container restarts
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 30s
@@ -209,6 +211,7 @@ volumes:
   pgadmin_data:
   backend_storage:
   backend_datasets:
+  ollama_models:  # Persists Ollama models so they don't need to be re-pulled
 
 # =============================================================================
 # Network
