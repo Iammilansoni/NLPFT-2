@@ -317,7 +317,7 @@ export const LLM_PROVIDERS: Record<LLMProviderType, LLMProviderInfo> = {
     huggingface: {
         id: 'huggingface',
         name: 'HuggingFace',
-        description: 'Inference API and custom model endpoints',
+        description: 'Inference API - CPU-friendly models available',
         color: '#ff9d00',
         icon: 'huggingface',
         requiresApiKey: true,
@@ -327,38 +327,59 @@ export const LLM_PROVIDERS: Record<LLMProviderType, LLMProviderInfo> = {
         docsUrl: 'https://huggingface.co/docs/api-inference',
         implemented: true,
         models: [
-            // Meta Llama 3 Series
-            { id: 'meta-llama/Llama-3.3-70B-Instruct', name: 'Llama 3.3 70B Instruct', description: 'Latest Meta flagship', contextLength: 128000, tier: 'flagship' },
-            { id: 'meta-llama/Llama-3.2-3B-Instruct', name: 'Llama 3.2 3B Instruct', description: 'Fast, compact Llama', contextLength: 128000, tier: 'fast' },
-            { id: 'meta-llama/Llama-3.2-1B-Instruct', name: 'Llama 3.2 1B Instruct', description: 'Ultra lightweight', contextLength: 128000, tier: 'fast' },
-            { id: 'meta-llama/Meta-Llama-3.1-8B-Instruct', name: 'Llama 3.1 8B Instruct', description: 'Balanced Meta model', contextLength: 128000 },
-            { id: 'meta-llama/Meta-Llama-3.1-70B-Instruct', name: 'Llama 3.1 70B Instruct', description: 'Large Llama model', contextLength: 128000, tier: 'flagship' },
-            // Google Gemma Series
-            { id: 'google/gemma-3-27b-it', name: 'Gemma 3 27B Instruct', description: 'Latest Google open model', contextLength: 128000 },
-            { id: 'google/gemma-3-12b-it', name: 'Gemma 3 12B Instruct', description: 'Balanced Gemma 3', contextLength: 128000 },
-            { id: 'google/gemma-3-4b-it', name: 'Gemma 3 4B Instruct', description: 'Fast Gemma 3', contextLength: 128000, tier: 'fast' },
-            { id: 'google/gemma-2-27b-it', name: 'Gemma 2 27B Instruct', description: 'High quality Gemma 2', contextLength: 8192 },
-            { id: 'google/gemma-2-9b-it', name: 'Gemma 2 9B Instruct', description: 'Balanced Gemma 2', contextLength: 8192 },
-            // Qwen Series
-            { id: 'Qwen/Qwen2.5-72B-Instruct', name: 'Qwen 2.5 72B Instruct', description: 'Best Qwen model', contextLength: 131072, tier: 'flagship' },
-            { id: 'Qwen/Qwen2.5-32B-Instruct', name: 'Qwen 2.5 32B Instruct', description: 'Strong Qwen model', contextLength: 131072 },
-            { id: 'Qwen/Qwen2.5-14B-Instruct', name: 'Qwen 2.5 14B Instruct', description: 'Balanced Qwen', contextLength: 131072 },
-            { id: 'Qwen/Qwen2.5-7B-Instruct', name: 'Qwen 2.5 7B Instruct', description: 'Fast Qwen model', contextLength: 131072, tier: 'fast' },
-            { id: 'Qwen/Qwen2.5-Coder-32B-Instruct', name: 'Qwen 2.5 Coder 32B', description: 'Coding specialist', contextLength: 131072 },
-            // Mistral Series
-            { id: 'mistralai/Mistral-Large-Instruct-2411', name: 'Mistral Large 123B', description: 'Most capable Mistral', contextLength: 128000, tier: 'flagship' },
-            { id: 'mistralai/Mistral-Small-24B-Instruct-2501', name: 'Mistral Small 24B', description: 'Efficient Mistral', contextLength: 32768 },
-            { id: 'mistralai/Mistral-7B-Instruct-v0.3', name: 'Mistral 7B Instruct', description: 'Fast and efficient', contextLength: 32768, tier: 'fast' },
-            { id: 'mistralai/Mixtral-8x7B-Instruct-v0.1', name: 'Mixtral 8x7B MoE', description: 'Mixture of experts', contextLength: 32768 },
-            { id: 'mistralai/Codestral-22B-v0.1', name: 'Codestral 22B', description: 'Code specialist', contextLength: 32768 },
-            // Microsoft Phi Series
-            { id: 'microsoft/Phi-4', name: 'Phi-4 14B', description: 'Latest Microsoft SLM', contextLength: 16384 },
-            { id: 'microsoft/Phi-3.5-mini-instruct', name: 'Phi-3.5 Mini', description: 'Compact and capable', contextLength: 128000, tier: 'fast' },
-            { id: 'microsoft/Phi-3-medium-4k-instruct', name: 'Phi-3 Medium 14B', description: 'Balanced Phi model', contextLength: 4096 },
-            // DeepSeek Series
-            { id: 'deepseek-ai/DeepSeek-V3', name: 'DeepSeek V3', description: 'Latest DeepSeek', contextLength: 128000, tier: 'flagship' },
-            { id: 'deepseek-ai/DeepSeek-R1', name: 'DeepSeek R1', description: 'Reasoning model', contextLength: 64000, tier: 'reasoning' },
-            { id: 'deepseek-ai/DeepSeek-Coder-V2-Instruct', name: 'DeepSeek Coder V2', description: 'Code specialist', contextLength: 128000 },
+            // =====================================================================
+            // CPU-FRIENDLY MODELS (1B-7B) - Recommended for CPU inference
+            // =====================================================================
+            // Phi Series (Microsoft) - Excellent for CPU
+            { id: 'microsoft/Phi-3.5-mini-instruct', name: 'Phi-3.5 Mini 3.8B', description: '🖥️ CPU-friendly, fast and capable', contextLength: 128000, tier: 'fast' },
+            { id: 'microsoft/Phi-3-mini-4k-instruct', name: 'Phi-3 Mini 3.8B', description: '🖥️ CPU-friendly, compact', contextLength: 4096, tier: 'fast' },
+            { id: 'microsoft/Phi-4', name: 'Phi-4 14B', description: 'Latest Microsoft SLM (needs more RAM)', contextLength: 16384 },
+
+            // Llama Small Models
+            { id: 'meta-llama/Llama-3.2-1B-Instruct', name: 'Llama 3.2 1B', description: '🖥️ Ultra lightweight, fastest', contextLength: 128000, tier: 'fast' },
+            { id: 'meta-llama/Llama-3.2-3B-Instruct', name: 'Llama 3.2 3B', description: '🖥️ CPU-friendly, compact', contextLength: 128000, tier: 'fast' },
+
+            // Gemma Small Models (Google)
+            { id: 'google/gemma-3-4b-it', name: 'Gemma 3 4B', description: '🖥️ CPU-friendly, fast', contextLength: 128000, tier: 'fast' },
+            { id: 'google/gemma-2-2b-it', name: 'Gemma 2 2B', description: '🖥️ Ultra compact Google model', contextLength: 8192, tier: 'fast' },
+
+            // Qwen Small Models
+            { id: 'Qwen/Qwen2.5-3B-Instruct', name: 'Qwen 2.5 3B', description: '🖥️ CPU-friendly, fast', contextLength: 32768, tier: 'fast' },
+            { id: 'Qwen/Qwen2.5-7B-Instruct', name: 'Qwen 2.5 7B', description: '🖥️ Good for 16GB+ RAM', contextLength: 131072, tier: 'fast' },
+            { id: 'Qwen/Qwen2.5-1.5B-Instruct', name: 'Qwen 2.5 1.5B', description: '🖥️ Ultra lightweight', contextLength: 32768, tier: 'fast' },
+
+            // Mistral Small
+            { id: 'mistralai/Mistral-7B-Instruct-v0.3', name: 'Mistral 7B', description: '🖥️ Fast and efficient', contextLength: 32768, tier: 'fast' },
+
+            // TinyLlama
+            { id: 'TinyLlama/TinyLlama-1.1B-Chat-v1.0', name: 'TinyLlama 1.1B', description: '🖥️ Ultra tiny, very fast', contextLength: 2048, tier: 'fast' },
+
+            // =====================================================================
+            // MEDIUM MODELS (8B-14B) - Need 16GB+ RAM on CPU
+            // =====================================================================
+            { id: 'meta-llama/Meta-Llama-3.1-8B-Instruct', name: 'Llama 3.1 8B', description: 'Balanced (16GB+ RAM)', contextLength: 128000 },
+            { id: 'google/gemma-3-12b-it', name: 'Gemma 3 12B', description: 'Balanced (24GB+ RAM)', contextLength: 128000 },
+            { id: 'Qwen/Qwen2.5-14B-Instruct', name: 'Qwen 2.5 14B', description: 'Strong (32GB+ RAM)', contextLength: 131072 },
+
+            // =====================================================================
+            // LARGE MODELS (24B+) - GPU RECOMMENDED
+            // =====================================================================
+            { id: 'google/gemma-3-27b-it', name: 'Gemma 3 27B', description: '🎮 GPU recommended', contextLength: 128000 },
+            { id: 'mistralai/Mistral-Small-24B-Instruct-2501', name: 'Mistral Small 24B', description: '🎮 GPU recommended', contextLength: 32768 },
+            { id: 'Qwen/Qwen2.5-32B-Instruct', name: 'Qwen 2.5 32B', description: '🎮 GPU recommended', contextLength: 131072 },
+            { id: 'Qwen/Qwen2.5-Coder-32B-Instruct', name: 'Qwen 2.5 Coder 32B', description: '🎮 GPU - Code specialist', contextLength: 131072 },
+
+            // =====================================================================
+            // FLAGSHIP (70B+) - GPU REQUIRED
+            // =====================================================================
+            { id: 'meta-llama/Llama-3.3-70B-Instruct', name: 'Llama 3.3 70B', description: '🎮 GPU required - Flagship', contextLength: 128000, tier: 'flagship' },
+            { id: 'meta-llama/Meta-Llama-3.1-70B-Instruct', name: 'Llama 3.1 70B', description: '🎮 GPU required', contextLength: 128000, tier: 'flagship' },
+            { id: 'Qwen/Qwen2.5-72B-Instruct', name: 'Qwen 2.5 72B', description: '🎮 GPU required - Best Qwen', contextLength: 131072, tier: 'flagship' },
+            { id: 'mistralai/Mistral-Large-Instruct-2411', name: 'Mistral Large 123B', description: '🎮 GPU required - Most capable', contextLength: 128000, tier: 'flagship' },
+            { id: 'mistralai/Mixtral-8x7B-Instruct-v0.1', name: 'Mixtral 8x7B MoE', description: '🎮 GPU - Mixture of experts', contextLength: 32768 },
+            { id: 'deepseek-ai/DeepSeek-V3', name: 'DeepSeek V3', description: '🎮 GPU required', contextLength: 128000, tier: 'flagship' },
+            { id: 'deepseek-ai/DeepSeek-R1', name: 'DeepSeek R1', description: '🎮 GPU - Reasoning model', contextLength: 64000, tier: 'reasoning' },
+
             // Custom model - enter any HuggingFace model path
             { id: 'custom', name: 'Custom Model Path', description: 'Enter any HuggingFace model (e.g., org/model-name)', contextLength: 4096 },
         ],
