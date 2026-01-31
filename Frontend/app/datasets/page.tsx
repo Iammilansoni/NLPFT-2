@@ -616,50 +616,74 @@ export default function DatasetGeneratorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950/50">
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
       <OnboardingTour tourId="datasets" />
-      <div className="p-6 lg:p-8 space-y-8 max-w-[1600px] mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground font-manrope">Datasets</h1>
-            <p className="text-muted-foreground flex items-center gap-2">
-              Manage your evaluation datasets and embeddings
-            </p>
-          </div>
-          <div className="hidden md:flex items-center gap-6 text-sm">
-            <div className="text-right">
-              <p className="text-2xl font-bold tabular-nums text-foreground">{persistentDatasets.length}</p>
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total</p>
+      
+      {/* Hero Section */}
+      <section className="relative overflow-hidden border-b border-border/40">
+        {/* Background Decorations */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl" />
+          <div className="absolute top-20 -left-20 w-60 h-60 bg-blue-500/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+        </div>
+
+        <div className="relative w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-14">
+          {/* Header */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/10">
+                  <Database className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h1 className="text-3xl lg:text-4xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                    Datasets
+                  </h1>
+                  <p className="text-muted-foreground mt-1">
+                    Manage your evaluation datasets and embeddings
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="h-8 w-px bg-border" />
-            <div className="text-right">
-              <p className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-                {persistentDatasets.filter(d => d.embedding_status === 'completed').length}
-              </p>
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Embedded</p>
+
+            <div className="flex items-center gap-3">
+              {/* Stats Pills */}
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-background/60 border border-border/50 backdrop-blur-sm">
+                <span className="text-2xl font-bold tabular-nums text-foreground">{persistentDatasets.length}</span>
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total</span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-sm">
+                <span className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                  {persistentDatasets.filter(d => d.embedding_status === 'completed').length}
+                </span>
+                <span className="text-xs text-emerald-600/80 dark:text-emerald-400/80 font-medium uppercase tracking-wider">Embedded</span>
+              </div>
             </div>
           </div>
         </div>
+      </section>
 
+      {/* Main Content */}
+      <main className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Active Tasks Panel - Shows running/recent generation tasks */}
         <ActiveTasksPanel 
           onTaskComplete={fetchAllTasks}
-          className="animate-in fade-in slide-in-from-top-2 duration-300"
+          className="animate-in fade-in slide-in-from-top-2 duration-300 mb-8"
         />
 
         <Tabs defaultValue="generate" className="w-full space-y-6" data-tour="dataset-tabs">
-          <TabsList className="grid w-full sm:w-[400px] grid-cols-2 p-1 bg-muted/50 rounded-lg" data-tour="generate-dataset">
+          <TabsList className="grid w-full sm:w-[400px] grid-cols-2 p-1 bg-muted/50 rounded-xl" data-tour="generate-dataset">
             <TabsTrigger
               value="generate"
-              className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md transition-all duration-200"
+              className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-xl transition-all duration-200"
             >
               <FileSpreadsheet className="w-4 h-4" />
               Generate
             </TabsTrigger>
             <TabsTrigger
               value="upload"
-              className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md transition-all duration-200"
+              className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-xl transition-all duration-200"
             >
               <Upload className="w-4 h-4" />
               Upload
@@ -1279,7 +1303,7 @@ export default function DatasetGeneratorPage() {
           </div>
         )}
 
-      </div>
+      </main>
     </div>
   )
 }
