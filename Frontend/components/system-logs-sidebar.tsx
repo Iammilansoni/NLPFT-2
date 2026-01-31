@@ -4,20 +4,33 @@ import { useState } from 'react'
 import {
   X, Play, Pause, Trash2, Terminal, Server,
   ChevronDown, ChevronRight, Filter,
-  CheckCircle2, AlertTriangle, XCircle, Info
+  CheckCircle2, AlertTriangle, XCircle, Info,
+  Bot, Database, FileText, Layers, KeyRound, Settings2, Globe, Eye, EyeOff
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useSidebar } from '@/contexts/sidebar-context'
-import { useSystemLogs, LogEntry, LogCategory } from '@/hooks/use-system-logs'
+import { useSystemLogs, LogEntry, LogCategory, ActivityType } from '@/hooks/use-system-logs'
 import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
+
+// Activity type configuration with icons
+const ACTIVITY_CONFIG: Record<ActivityType, { icon: typeof Bot; color: string; label: string }> = {
+  llm: { icon: Bot, color: 'text-purple-500', label: 'LLM' },
+  dataset: { icon: Database, color: 'text-blue-500', label: 'Dataset' },
+  template: { icon: FileText, color: 'text-emerald-500', label: 'Template' },
+  embedding: { icon: Layers, color: 'text-cyan-500', label: 'Embedding' },
+  auth: { icon: KeyRound, color: 'text-amber-500', label: 'Auth' },
+  system: { icon: Settings2, color: 'text-gray-500', label: 'System' },
+  api: { icon: Globe, color: 'text-indigo-500', label: 'API' },
+}
 
 // Command Center Category configuration
 const CATEGORY_CONFIG = {
@@ -94,6 +107,8 @@ function LogItem({
 }) {
   const category = log.category || 'info'
   const config = CATEGORY_CONFIG[category as keyof typeof CATEGORY_CONFIG] || CATEGORY_CONFIG.info
+  const activityConfig = log.activityType ? ACTIVITY_CONFIG[log.activityType] : null
+  const ActivityIcon = activityConfig?.icon
   const displayMessage = log.humanMessage || log.message
   const isCritical = log.severity === 'critical'
 
@@ -108,7 +123,12 @@ function LogItem({
       onClick={() => onToggle(index)}
     >
       {/* Compact row */}
-      <div className="flex items-start gap-2 p-2">
+      <div className="flex items-start gap-1.5 p-2">
+        {/* Activity type icon */}
+        {ActivityIcon && (
+          <ActivityIcon className={cn("h-3.5 w-3.5 flex-shrink-0 mt-0.5", activityConfig.color)} />
+        )}
+        
         {/* Severity indicator - single character */}
         <span className={cn(
           "font-mono text-[10px] font-bold w-4 text-center flex-shrink-0 mt-0.5",
@@ -194,17 +214,20 @@ export function SystemLogsSidebar() {
   const { isSystemLogsOpen, setIsSystemLogsOpen } = useSidebar()
   const {
     filteredLogs,
+    logs,
     isConnected,
     isPaused,
     filter,
     setFilter,
+    showNoise,
+    setShowNoise,
     clearLogs,
     togglePause,
     toggleExpanded
   } = useSystemLogs()
   const [isScrolled, setIsScrolled] = useState(false)
 
-  // Count logs by category
+  // Count logs by category (from filtered logs which excludes noise by default)
   const counts = {
     all: filteredLogs.length,
     info: filteredLogs.filter(l => l.category === 'info').length,
@@ -212,6 +235,8 @@ export function SystemLogsSidebar() {
     error: filteredLogs.filter(l => l.category === 'error').length,
     success: filteredLogs.filter(l => l.category === 'success').length,
   }
+  // Count hidden noise logs
+  const hiddenNoise = logs.filter(l => l.isNoise).length
 
   return (
     <>
@@ -219,7 +244,7 @@ export function SystemLogsSidebar() {
       {isSystemLogsOpen && (
         <div
           onClick={() => setIsSystemLogsOpen(false)}
-          className="lg:hidden fixed inset-0 bg-black/50 z-40 transition-opacity"
+          className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity"
           aria-hidden="true"
         />
       )}
@@ -229,23 +254,24 @@ export function SystemLogsSidebar() {
         <button
           onClick={() => setIsSystemLogsOpen(true)}
           className={cn(
-            "fixed right-0 z-40 flex items-center gap-2 rounded-l-lg",
-            "bg-card border border-r-0 border-border shadow-lg",
-            "px-3 py-3 hover:bg-accent hover:border-primary/30 transition-all duration-200",
-            "hover:translate-x-0 translate-x-0",
-            // Position: different on mobile vs desktop
-            "top-20 md:top-1/2 md:-translate-y-1/2"
+            "fixed right-0 z-40 flex items-center gap-2 rounded-l-xl",
+            "bg-card/95 backdrop-blur-md border border-r-0 border-border/60 shadow-xl",
+            "px-3 py-4 md:py-3 hover:bg-accent hover:border-primary/30 transition-all duration-200",
+            "active:scale-95",
+            // Position: different on mobile vs desktop, with safe area support
+            "top-20 md:top-1/3 lg:top-1/2 lg:-translate-y-1/2",
+            "mr-safe-right"
           )}
           aria-label="Open Activity Panel"
         >
-          <div className="flex flex-col items-center gap-1.5">
+          <div className="flex flex-col items-center gap-2">
             <Terminal className="h-5 w-5 text-primary" />
-            <span className="text-xs font-semibold tracking-wide uppercase">Activity</span>
+            <span className="text-xs font-semibold tracking-wide uppercase hidden md:block">Activity</span>
             {isConnected && (
               <span className="h-2 w-2 rounded-full bg-success animate-cc-pulse" />
             )}
             {counts.error > 0 && (
-              <span className="h-5 min-w-5 px-1 rounded-md bg-error text-[10px] text-white flex items-center justify-center font-mono font-bold shadow-sm">
+              <span className="h-6 min-w-6 px-1.5 rounded-lg bg-error text-[10px] text-white flex items-center justify-center font-mono font-bold shadow-sm">
                 {counts.error > 99 ? '99+' : counts.error}
               </span>
             )}
@@ -256,17 +282,21 @@ export function SystemLogsSidebar() {
       {/* Sidebar */}
       <div
         className={cn(
-          'fixed inset-y-0 right-0 z-50 flex flex-col bg-card border-l border-border transition-all duration-300 ease-out shadow-2xl',
-          // Responsive width: full on small, fixed on lg+
+          'fixed inset-y-0 right-0 z-50 flex flex-col',
+          'bg-card/95 backdrop-blur-md lg:bg-card lg:backdrop-blur-none',
+          'border-l border-border transition-all duration-300 ease-out shadow-2xl',
+          // Responsive width: full on mobile, 360px on sm, 380px on md, 400px on lg+
           isSystemLogsOpen 
-            ? 'w-full sm:w-[380px] lg:w-[400px]' 
-            : 'w-0 overflow-hidden pointer-events-none'
+            ? 'w-full sm:w-[360px] md:w-[380px] lg:w-[400px]' 
+            : 'w-0 overflow-hidden pointer-events-none',
+          // Safe area support for notched devices
+          'pt-safe-top pb-safe-bottom pr-safe-right'
         )}
       >
         {/* Header */}
         <div className={cn(
-          "flex items-center justify-between px-3 py-2 border-b border-border h-12",
-          isScrolled && "bg-card"
+          "flex items-center justify-between px-4 md:px-3 py-3 md:py-2 border-b border-border h-14 md:h-12",
+          isScrolled && "bg-card/80 backdrop-blur-sm"
         )}>
           <div className="flex items-center gap-2">
             <Terminal className="h-4 w-4 text-muted-foreground" />
@@ -288,7 +318,7 @@ export function SystemLogsSidebar() {
                   <Filter className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-32">
+              <DropdownMenuContent align="end" className="w-40">
                 <DropdownMenuItem onClick={() => setFilter('all')}>
                   <span className={filter === 'all' ? 'font-bold' : ''}>All ({counts.all})</span>
                 </DropdownMenuItem>
@@ -300,34 +330,45 @@ export function SystemLogsSidebar() {
                     </span>
                   </DropdownMenuItem>
                 ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setShowNoise(!showNoise)}>
+                  {showNoise ? (
+                    <EyeOff className="h-3 w-3 mr-2 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-3 w-3 mr-2 text-muted-foreground" />
+                  )}
+                  <span className={showNoise ? 'font-medium' : ''}>
+                    {showNoise ? 'Hide noise' : `Show noise (${hiddenNoise})`}
+                  </span>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6"
+              className="h-8 w-8 md:h-6 md:w-6"
               onClick={togglePause}
               title={isPaused ? "Resume" : "Pause"}
             >
-              {isPaused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
+              {isPaused ? <Play className="h-4 w-4 md:h-3 md:w-3" /> : <Pause className="h-4 w-4 md:h-3 md:w-3" />}
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6"
+              className="h-8 w-8 md:h-6 md:w-6"
               onClick={clearLogs}
               title="Clear Logs"
             >
-              <Trash2 className="h-3 w-3" />
+              <Trash2 className="h-4 w-4 md:h-3 md:w-3" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6"
+              className="h-8 w-8 md:h-6 md:w-6"
               onClick={() => setIsSystemLogsOpen(false)}
             >
-              <X className="h-3 w-3" />
+              <X className="h-4 w-4 md:h-3 md:w-3" />
             </Button>
           </div>
         </div>

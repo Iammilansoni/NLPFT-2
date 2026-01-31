@@ -66,12 +66,12 @@ export function Sidebar() {
   return (
     <>
       {/* Mobile Menu Button - Enhanced visibility */}
-      <div className="lg:hidden fixed top-3 left-3 z-50">
+      <div className="lg:hidden fixed top-3 left-3 z-50 safe-area-inset">
         <Button
           size="icon"
           variant="outline"
           onClick={() => setIsMobileOpen(!isMobileOpen)}
-          className="h-11 w-11 rounded-lg bg-background/95 backdrop-blur-sm border shadow-lg hover:shadow-xl transition-all"
+          className="h-12 w-12 md:h-11 md:w-11 rounded-xl bg-background/95 backdrop-blur-md border-border/60 shadow-lg hover:shadow-xl transition-all active:scale-95"
           aria-label={isMobileOpen ? 'Close menu' : 'Open menu'}
         >
           {isMobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -90,13 +90,15 @@ export function Sidebar() {
       <aside
         className={cn(
           'fixed inset-y-0 left-0 flex flex-col z-40',
-          'bg-card border-r border-border shadow-xl lg:shadow-none',
+          'bg-card/95 backdrop-blur-md border-r border-border shadow-2xl lg:shadow-none lg:bg-card lg:backdrop-blur-none',
           'transition-all duration-300 ease-out',
-          // Responsive widths: full width on small mobile, fixed on larger
+          // Responsive widths: optimized for each breakpoint
           isMobileOpen 
-            ? 'w-[280px] sm:w-[300px]' 
-            : isExpanded ? 'w-[240px]' : 'w-[48px]',
-          isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+            ? 'w-[85vw] max-w-[320px] sm:w-[300px] md:w-[280px]' 
+            : isExpanded ? 'w-[240px]' : 'w-[56px] md:w-[48px]',
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+          // Safe area support for notched devices
+          'pt-safe-top pb-safe-bottom pl-safe-left'
         )}
       >
         {/* Logo / Brand */}
@@ -158,11 +160,11 @@ export function Sidebar() {
               >
                 <div
                   className={cn(
-                    'flex items-center gap-3 rounded-sm font-medium transition-colors',
-                    isExpanded ? 'px-3 py-2.5 text-sm' : 'px-2 py-2 justify-center',
+                    'flex items-center gap-3 rounded-lg font-medium transition-colors',
+                    isExpanded ? 'px-3 py-3 md:py-2.5 text-sm' : 'px-2 py-3 md:py-2 justify-center',
                     isActive
                       ? 'bg-primary/10 text-primary border-l-2 border-l-primary ml-0 pl-[10px]'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent active:bg-accent/80'
                   )}
                 >
                   <Icon className={cn(
