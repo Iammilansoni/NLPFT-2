@@ -530,12 +530,13 @@ export default function DashboardPage() {
         {isLoadingStats ? (
           <MetricGridSkeleton count={4} />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" data-tour="metrics">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" data-tour="metrics">
             <MetricCard
               label="Total Embeddings"
               value={stats?.total_embeddings?.toLocaleString() || '0'}
               subtitle="Vectors in Redis"
-              icon={<Brain className="w-4 h-4" />}
+              icon={<Brain className="w-5 h-5 text-white" />}
+              gradient="from-violet-600 to-indigo-600"
             />
             <MetricCard
               label="Approved Templates"
@@ -545,22 +546,26 @@ export default function DashboardPage() {
                 total: templateStats?.total_templates || 1,
                 label: `${templateStats?.total_templates || 0} total declared`
               }}
-              icon={<CheckCircle2 className="w-4 h-4" />}
+              icon={<CheckCircle2 className="w-5 h-5 text-white" />}
+              gradient="from-emerald-600 to-teal-600"
             />
             <MetricCard
               label="Total Intents"
               value={stats?.total_intents || Object.keys(stats?.intents || {}).length}
               subtitle={`${stats?.unique_apis || 0} Unique APIs`}
-              icon={<Target className="w-4 h-4" />}
+              icon={<Target className="w-5 h-5 text-white" />}
+              gradient="from-amber-600 to-orange-600"
             />
             <MetricCard
               label="Embedding Model"
               value={getModelLabel(embeddingModel)}
               subtitle={`${getDimensionForModel(embeddingModel)}D vectors`}
-              icon={<Cpu className="w-4 h-4" />}
+              icon={<Cpu className="w-5 h-5 text-white" />}
+              gradient="from-pink-600 to-rose-600"
             />
           </div>
         )}
+
 
         {/* Search Results Display - Kept inline for now due to complexity, but restyled */}
 
