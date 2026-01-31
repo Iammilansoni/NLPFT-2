@@ -53,6 +53,7 @@ class HuggingFaceEndpointType(str, Enum):
     SERVERLESS = "serverless"  # api-inference.huggingface.co
     DEDICATED = "dedicated"    # Inference Endpoints
     TGI = "tgi"               # Text Generation Inference
+    ROUTER = "router"         # router.huggingface.co (OpenAI-compatible)
 
 
 # =============================================================================
@@ -90,96 +91,106 @@ class HuggingFaceProvider(BaseLLMProvider):
     """
     
     DEFAULT_MODELS = [
-        # Llama 3 Series
+        # ==========================================================================
+        # CPU-Friendly Models (Small, fast, work on serverless inference)
+        # ==========================================================================
+        
+        # Google Gemma (Smaller models, CPU-friendly)
         ProviderModel(
-            id="meta-llama/Meta-Llama-3.1-8B-Instruct",
-            name="Llama 3.1 8B Instruct",
-            description="Meta's latest open model",
-            context_length=128000,
+            id="google/gemma-2-2b-it",
+            name="Gemma 2 2B Instruct (CPU)",
+            description="Google's smallest Gemma - fast on CPU",
+            context_length=8192,
             supports_vision=False,
             supports_functions=False,
         ),
-        ProviderModel(
-            id="meta-llama/Meta-Llama-3.1-70B-Instruct",
-            name="Llama 3.1 70B Instruct",
-            description="Large Llama for complex tasks",
-            context_length=128000,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        ProviderModel(
-            id="meta-llama/Meta-Llama-3.3-70B-Instruct",
-            name="Llama 3.3 70B Instruct",
-            description="Latest Llama with improved capabilities",
-            context_length=128000,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        # Mistral Series
-        ProviderModel(
-            id="mistralai/Mistral-7B-Instruct-v0.3",
-            name="Mistral 7B Instruct v0.3",
-            description="Fast and efficient open model",
-            context_length=32768,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        ProviderModel(
-            id="mistralai/Mixtral-8x7B-Instruct-v0.1",
-            name="Mixtral 8x7B Instruct",
-            description="Mixture of experts model",
-            context_length=32768,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        ProviderModel(
-            id="mistralai/Mistral-Nemo-Instruct-2407",
-            name="Mistral Nemo Instruct",
-            description="12B parameter efficient model",
-            context_length=128000,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        # Qwen Series
-        ProviderModel(
-            id="Qwen/Qwen2.5-72B-Instruct",
-            name="Qwen 2.5 72B Instruct",
-            description="Alibaba's powerful model",
-            context_length=131072,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        ProviderModel(
-            id="Qwen/Qwen2.5-7B-Instruct",
-            name="Qwen 2.5 7B Instruct",
-            description="Smaller but capable Qwen model",
-            context_length=131072,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        # Microsoft Phi
+        
+        # Microsoft Phi (Small, efficient)
         ProviderModel(
             id="microsoft/Phi-3-mini-4k-instruct",
-            name="Phi-3 Mini 4K",
-            description="Small but capable model",
+            name="Phi-3 Mini 4K (CPU)",
+            description="3.8B params - excellent for CPU",
             context_length=4096,
             supports_vision=False,
             supports_functions=False,
         ),
         ProviderModel(
             id="microsoft/Phi-3.5-mini-instruct",
-            name="Phi-3.5 Mini",
-            description="Updated Phi model with better performance",
+            name="Phi-3.5 Mini (CPU)",
+            description="3.8B params - updated version",
             context_length=128000,
             supports_vision=False,
             supports_functions=False,
         ),
-        # Google Gemma
+        
+        # Qwen Small Models
         ProviderModel(
-            id="google/gemma-2-9b-it",
-            name="Gemma 2 9B Instruct",
-            description="Google's open model",
+            id="Qwen/Qwen2.5-1.5B-Instruct",
+            name="Qwen 2.5 1.5B Instruct (CPU)",
+            description="Alibaba's smallest Qwen - fast",
+            context_length=32768,
+            supports_vision=False,
+            supports_functions=False,
+        ),
+        ProviderModel(
+            id="Qwen/Qwen2.5-3B-Instruct",
+            name="Qwen 2.5 3B Instruct (CPU)",
+            description="Balanced size and capability",
+            context_length=32768,
+            supports_vision=False,
+            supports_functions=False,
+        ),
+        
+        # TinyLlama
+        ProviderModel(
+            id="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+            name="TinyLlama 1.1B Chat (CPU)",
+            description="Ultra-small, very fast",
+            context_length=2048,
+            supports_vision=False,
+            supports_functions=False,
+        ),
+        
+        # SmolLM (Hugging Face's own small models)
+        ProviderModel(
+            id="HuggingFaceTB/SmolLM2-1.7B-Instruct",
+            name="SmolLM2 1.7B Instruct (CPU)",
+            description="HuggingFace's efficient small model",
             context_length=8192,
+            supports_vision=False,
+            supports_functions=False,
+        ),
+        
+        # ==========================================================================
+        # GPU Recommended (Larger models, may timeout on CPU)
+        # ==========================================================================
+        
+        # Llama 3 (Medium)
+        ProviderModel(
+            id="meta-llama/Llama-3.2-3B-Instruct",
+            name="Llama 3.2 3B Instruct",
+            description="Meta's compact Llama - GPU recommended",
+            context_length=128000,
+            supports_vision=False,
+            supports_functions=False,
+        ),
+        
+        # Mistral (Medium)
+        ProviderModel(
+            id="mistralai/Mistral-7B-Instruct-v0.3",
+            name="Mistral 7B Instruct v0.3",
+            description="Efficient 7B model - GPU recommended",
+            context_length=32768,
+            supports_vision=False,
+            supports_functions=False,
+        ),
+        
+        # Qwen (Medium)
+        ProviderModel(
+            id="Qwen/Qwen2.5-7B-Instruct",
+            name="Qwen 2.5 7B Instruct",
+            description="Powerful 7B model - GPU recommended",
+            context_length=32768,
             supports_vision=False,
             supports_functions=False,
         ),
@@ -227,6 +238,8 @@ class HuggingFaceProvider(BaseLLMProvider):
     def _detect_endpoint_type(self) -> HuggingFaceEndpointType:
         """Detect the type of endpoint being used"""
         if self.base_url:
+            if "router.huggingface.co" in self.base_url:
+                return HuggingFaceEndpointType.ROUTER
             if "endpoints.huggingface.cloud" in self.base_url:
                 return HuggingFaceEndpointType.DEDICATED
             return HuggingFaceEndpointType.TGI
@@ -264,6 +277,9 @@ class HuggingFaceProvider(BaseLLMProvider):
         """Get the appropriate endpoint URL based on endpoint type"""
         if self.endpoint_type == HuggingFaceEndpointType.SERVERLESS:
             return f"/models/{self.model}"
+        elif self.endpoint_type == HuggingFaceEndpointType.ROUTER:
+            # Router uses OpenAI-compatible format
+            return "/v1/chat/completions"
         else:
             # TGI and dedicated endpoints
             return "/generate"
@@ -272,6 +288,9 @@ class HuggingFaceProvider(BaseLLMProvider):
         """Get the streaming endpoint URL"""
         if self.endpoint_type == HuggingFaceEndpointType.SERVERLESS:
             return f"/models/{self.model}"
+        elif self.endpoint_type == HuggingFaceEndpointType.ROUTER:
+            # Router uses OpenAI-compatible format
+            return "/v1/chat/completions"
         else:
             return "/generate_stream"
     
@@ -286,8 +305,29 @@ class HuggingFaceProvider(BaseLLMProvider):
         prompt: str,
         config: LLMConfig,
         stream: bool = False,
+        system_prompt: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Build request payload for HuggingFace API"""
+        # Router uses OpenAI-compatible format
+        if self.endpoint_type == HuggingFaceEndpointType.ROUTER:
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+            
+            payload = {
+                "model": self.model,
+                "messages": messages,
+                "max_tokens": config.max_tokens or DEFAULT_MAX_TOKENS,
+                "temperature": config.temperature,
+                "top_p": config.top_p,
+                "stream": stream,
+            }
+            if config.stop_sequences:
+                payload["stop"] = config.stop_sequences
+            return payload
+        
+        # Standard HuggingFace format for other endpoint types
         payload = {
             "inputs": prompt,
             "parameters": {
@@ -314,9 +354,20 @@ class HuggingFaceProvider(BaseLLMProvider):
         
         return payload
     
-    def _extract_content(self, data: Any) -> str:
+    def _extract_content(self, data: Any, is_router: bool = False) -> str:
         """Extract generated content from response"""
-        # Handle different response formats
+        # Router uses OpenAI-compatible format
+        if is_router:
+            try:
+                choices = data.get("choices", [])
+                if choices and len(choices) > 0:
+                    message = choices[0].get("message", {})
+                    return message.get("content", "")
+            except (AttributeError, KeyError, IndexError):
+                pass
+            return ""
+        
+        # Handle standard HuggingFace response formats
         if isinstance(data, list):
             if len(data) > 0:
                 if isinstance(data[0], dict):
@@ -349,11 +400,17 @@ class HuggingFaceProvider(BaseLLMProvider):
         config = config or LLMConfig()
         self._log_request(prompt, system_prompt)
         
-        # Build the full prompt
-        full_prompt = self._build_prompt(prompt, system_prompt)
+        is_router = self.endpoint_type == HuggingFaceEndpointType.ROUTER
         
-        # Build request payload
-        payload = self._build_payload(full_prompt, config, stream=False)
+        # Build the full prompt (for non-router types) or pass raw for router
+        if is_router:
+            # For Router, pass raw prompts - payload builder handles messages
+            full_prompt = prompt
+            payload = self._build_payload(prompt, config, stream=False, system_prompt=system_prompt)
+        else:
+            # For other types, concatenate prompts
+            full_prompt = self._build_prompt(prompt, system_prompt)
+            payload = self._build_payload(full_prompt, config, stream=False)
         
         retry_count = 0
         last_error = None
@@ -375,8 +432,8 @@ class HuggingFaceProvider(BaseLLMProvider):
                 if response.status_code == 200:
                     data = response.json()
                     
-                    # Extract content
-                    content = self._extract_content(data)
+                    # Extract content (use is_router flag for proper parsing)
+                    content = self._extract_content(data, is_router=is_router)
                     
                     # Estimate tokens
                     prompt_tokens = self._estimate_tokens(full_prompt)
@@ -400,7 +457,7 @@ class HuggingFaceProvider(BaseLLMProvider):
                     
                     return llm_response
                 else:
-                    self._handle_error_response(response)
+                    await self._handle_error_response(response)
             
             except RateLimitError as e:
                 last_error = e
@@ -498,7 +555,7 @@ class HuggingFaceProvider(BaseLLMProvider):
                         error_data = error_text.decode()
                     except Exception:
                         error_data = str(error_text)
-                    self._handle_error_response(response, error_data)
+                    await self._handle_error_response(response, error_data)
                 
                 async for line in response.aiter_lines():
                     if line.startswith("data:"):
