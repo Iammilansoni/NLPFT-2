@@ -38,6 +38,20 @@
 - [Contributing](#-contributing)
 - [License](#-license)
 
+---
+
+## 🆕 Recent Updates (February 2026)
+
+| Feature | Description |
+|:--------|:------------|
+| 🖥️ **HuggingFace CPU Models** | Reorganized model list with CPU-friendly options first (1B-7B models). Clear indicators for GPU requirements |
+| 📱 **Responsive Sidebars** | Improved mobile/tablet touch targets, backdrop blur, safe area support for notched devices |
+| 🔄 **User Flow Diagram** | New horizontal flowchart replacing step cards for cleaner visualization |
+| 💾 **Ollama Model Persistence** | Docker volume now persists pulled models across container restarts |
+| 📊 **Dashboard Improvements** | Fixed trend icons, division-by-zero protection, enhanced metric cards |
+| 🎨 **Datasets Page** | Wider layout (1600px), removed stat cards for cleaner UI |
+| 🔐 **Auth UX Polish** | Updated preview content, fixed "Remember me" label, disabled Coming Soon features |
+
 
 ---
 
