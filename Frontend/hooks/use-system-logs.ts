@@ -3,6 +3,7 @@ import { getApiBase, getWsUrl } from '../lib/runtime-config';
 
 export type LogCategory = 'info' | 'warning' | 'error' | 'success';
 export type LogSeverity = 'normal' | 'high' | 'critical';
+export type ActivityType = 'llm' | 'dataset' | 'template' | 'embedding' | 'auth' | 'system' | 'api';
 
 export interface LogEntry {
     timestamp: string;
@@ -12,28 +13,101 @@ export interface LogEntry {
     module: string;
     line: number;
     is_system?: boolean;
-    // New fields for user-friendly display
+    // Enhanced fields for user-friendly display
     humanMessage?: string;
     category?: LogCategory;
     severity?: LogSeverity;
+    activityType?: ActivityType;
     isExpanded?: boolean;
+    isNoise?: boolean; // Hidden from default view
 }
 
 const RAW_API_BASE = getApiBase();
 const WS_BASE_URL = getWsUrl();
+
+// Patterns to detect activity types from log messages
+function detectActivityType(message: string): ActivityType {
+    const msg = message.toLowerCase();
+    if (msg.includes('huggingface') || msg.includes('gemini') || msg.includes('ollama') ||
+        msg.includes('llm') || msg.includes('provider') || msg.includes('🤖')) return 'llm';
+    if (msg.includes('dataset') || msg.includes('generation') || msg.includes('batch') ||
+        msg.includes('test case')) return 'dataset';
+    if (msg.includes('template') || msg.includes('approved') || msg.includes('rejected')) return 'template';
+    if (msg.includes('embedding') || msg.includes('vector') || msg.includes('redis')) return 'embedding';
+    if (msg.includes('auth') || msg.includes('token') || msg.includes('login') ||
+        msg.includes('websocket')) return 'auth';
+    if (msg.includes('/api/')) return 'api';
+    return 'system';
+}
+
+// Patterns to identify noise logs that should be hidden by default
+function isNoiseLog(message: string): boolean {
+    const msg = message.toLowerCase();
+    // Health checks and routine polling
+    if (msg.includes('/health') || msg.includes('health →')) return true;
+    // Static asset requests
+    if (msg.includes('.js') || msg.includes('.css') || msg.includes('.ico')) return true;
+    // Frequent polling endpoints
+    if (msg.includes('/datasets/tasks') && msg.includes('→ 200')) return true;
+    if (msg.includes('/telemetry/metrics') && msg.includes('→ 200')) return true;
+    // OPTIONS preflight requests
+    if (msg.startsWith('options ')) return true;
+    return false;
+}
+
+// Generate human-readable message from log
+function getHumanMessage(message: string, activityType: ActivityType): string {
+    // Already has human-readable prefix
+    if (message.startsWith('🤖') || message.startsWith('🔗') || message.startsWith('✅') ||
+        message.startsWith('❌') || message.startsWith('📊')) return message;
+
+    // API responses - make more readable
+    const apiMatch = message.match(/^(GET|POST|PUT|DELETE|PATCH)\s+([^\s]+)\s+→\s+(\d+)/i);
+    if (apiMatch) {
+        const [, method, path, status] = apiMatch;
+        const statusNum = parseInt(status);
+        const endpoint = path.split('/').pop() || path;
+        if (statusNum >= 200 && statusNum < 300) {
+            return `${endpoint} ${method.toLowerCase()} successful`;
+        } else if (statusNum >= 400) {
+            return `${endpoint} ${method.toLowerCase()} failed (${status})`;
+        }
+    }
+
+    return message;
+}
+
+// Process incoming log entry 
+function processLog(log: LogEntry): LogEntry {
+    const activityType = detectActivityType(log.message);
+    const isNoise = isNoiseLog(log.message);
+    const humanMessage = log.humanMessage || getHumanMessage(log.message, activityType);
+
+    return {
+        ...log,
+        activityType,
+        isNoise,
+        humanMessage,
+    };
+}
 
 export function useSystemLogs() {
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [isConnected, setIsConnected] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
     const [filter, setFilter] = useState<LogCategory | 'all'>('all');
+    const [showNoise, setShowNoise] = useState(false);
     const wsRef = useRef<WebSocket | null>(null);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Filter logs by category
-    const filteredLogs = filter === 'all'
-        ? logs
-        : logs.filter(log => log.category === filter);
+    // Filter logs by category and noise
+    const filteredLogs = logs.filter(log => {
+        // Filter out noise unless showNoise is enabled
+        if (!showNoise && log.isNoise) return false;
+        // Filter by category
+        if (filter !== 'all' && log.category !== filter) return false;
+        return true;
+    });
 
     // Toggle expanded state for a log entry
     const toggleExpanded = useCallback((index: number) => {
@@ -97,8 +171,9 @@ export function useSystemLogs() {
             ws.onmessage = (event) => {
                 if (isPaused) return;
                 try {
-                    const log: LogEntry = JSON.parse(event.data);
-                    setLogs((prev) => [log, ...prev].slice(0, 1000)); // Keep last 1000 logs, newest first
+                    const rawLog: LogEntry = JSON.parse(event.data);
+                    const processedLog = processLog(rawLog);
+                    setLogs((prev) => [processedLog, ...prev].slice(0, 1000)); // Keep last 1000 logs, newest first
                 } catch (e) {
                     console.error('Failed to parse log message:', e);
                 }
@@ -130,6 +205,8 @@ export function useSystemLogs() {
         isPaused,
         filter,
         setFilter,
+        showNoise,
+        setShowNoise,
         clearLogs,
         togglePause,
         toggleExpanded,
