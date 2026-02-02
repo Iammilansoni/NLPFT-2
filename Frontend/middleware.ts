@@ -5,6 +5,7 @@ import type { NextRequest } from 'next/server'
 const publicRoutes = [
   '/', // Landing page
   '/about', // About us page
+  '/product', // Product page
   '/status', // Status page
   '/privacy', // Privacy policy
   '/terms', // Terms of service

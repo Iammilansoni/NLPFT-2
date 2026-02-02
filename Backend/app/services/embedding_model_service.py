@@ -466,9 +466,59 @@ class EmbeddingModelService:
         
         return None
     
+    # Known display names for better formatting
+    DISPLAY_NAME_OVERRIDES: Dict[str, str] = {
+        "bge-base": "BGE Base",
+        "bge-large": "BGE Large",
+        "bge-small": "BGE Small",
+        "bge-m3": "BGE M3 (Multilingual)",
+        "nomic-embed-text": "Nomic Embed Text",
+        "nomic-embed-text-v2-moe": "Nomic Embed Text v2",
+        "all-minilm": "All MiniLM",
+        "mxbai-embed-large": "MxBai Embed Large",
+        "snowflake-arctic-embed": "Snowflake Arctic Embed",
+        "snowflake-arctic-embed2": "Snowflake Arctic Embed 2",
+        "e5-large": "E5 Large",
+        "e5-base": "E5 Base",
+        "e5-small": "E5 Small",
+        "gte-large": "GTE Large",
+        "gte-base": "GTE Base",
+        "gte-small": "GTE Small",
+        "jina-embeddings-v2-base-en": "Jina Embeddings v2 Base",
+        "jina-embeddings-v2-small-en": "Jina Embeddings v2 Small",
+        "embeddinggemma": "Embedding Gemma",
+        "qwen3-embedding": "Qwen3 Embedding",
+        "paraphrase-multilingual": "Paraphrase Multilingual",
+        "granite-embedding": "Granite Embedding",
+    }
+    
     def _format_display_name(self, model_name: str) -> str:
-        """Format a model name for display."""
-        return model_name.replace("-", " ").replace("_", " ").title()
+        """Format a model name for display with proper capitalization."""
+        # Check for known display name override
+        base_name = model_name.split(":")[0]
+        if base_name in self.DISPLAY_NAME_OVERRIDES:
+            # Handle size variants like bge-base:latest
+            suffix = ""
+            if ":" in model_name:
+                variant = model_name.split(":")[1]
+                if variant != "latest":
+                    suffix = f" ({variant})"
+            return self.DISPLAY_NAME_OVERRIDES[base_name] + suffix
+        
+        # Fallback: Basic formatting with common abbreviation handling
+        name = model_name.replace("-", " ").replace("_", " ")
+        
+        # Handle common abbreviations that should be uppercase
+        abbreviations = ["bge", "gte", "e5", "mxbai", "llm", "nlp", "api"]
+        words = name.split()
+        formatted_words = []
+        for word in words:
+            if word.lower() in abbreviations:
+                formatted_words.append(word.upper())
+            else:
+                formatted_words.append(word.title())
+        
+        return " ".join(formatted_words)
     
     def _format_size(self, size_bytes: int) -> str:
         """Format size in bytes to human-readable string."""

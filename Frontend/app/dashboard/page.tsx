@@ -22,6 +22,7 @@ import { apiClient } from '@/lib/api'
 import { SemanticRetrieveResponse } from '@/lib/api-types'
 import { DEFAULT_EMBEDDING_MODEL, areModelsCompatible, formatModelName } from '@/lib/constants/embedding-models'
 import { useToast } from '@/hooks/use-toast'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Dialog,
   DialogContent,
@@ -99,6 +100,7 @@ export default function DashboardPage() {
   const [showStage2, setShowStage2] = useState(false)
   const [settingsModel, setSettingsModel] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [hasUserSelectedModel, setHasUserSelectedModel] = useState(false)
 
   // Model mismatch state
   const [showModelMismatchDialog, setShowModelMismatchDialog] = useState(false)
@@ -110,15 +112,9 @@ export default function DashboardPage() {
   } | null>(null)
   const [pendingQuery, setPendingQuery] = useState<string | null>(null)
 
-  // Available models from backend
-  const [availableModels, setAvailableModels] = useState<Array<{
-    model_id: string;
-    label?: string;
-    dimension?: number;
-  }>>([{ model_id: 'nomic-embed-text', label: 'Nomic Embed Text', dimension: 768 }])
-
   const { data: stats, isLoading, error } = useQueryStats()
   const { data: templateStats, isLoading: templatesLoading, error: templatesError } = useTemplateStats()
+  const queryClient = useQueryClient()
 
   // System Health Logic
   const backendHealthy = !error && !!stats
@@ -127,49 +123,69 @@ export default function DashboardPage() {
   const allHealthy = backendHealthy && databaseHealthy && templatesHealthy
   const isLoadingStats = isLoading || templatesLoading
 
+  // Fetch user settings with React Query for proper caching
+  const { data: userSettings } = useQuery({
+    queryKey: ['userSettings'],
+    queryFn: () => apiClient.getUserSettings(),
+    staleTime: 30000,
+  })
 
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const settings = await apiClient.getUserSettings()
-        if (settings?.default_embedding_model) {
-          setSettingsModel(settings.default_embedding_model)
-          setEmbeddingModel(settings.default_embedding_model)
-        }
-      } catch (err) {
-        console.debug('Failed to fetch user settings:', err)
+  // Fetch embedding models with React Query
+  const { data: modelsData } = useQuery({
+    queryKey: ['embedding-models-available'],
+    queryFn: () => apiClient.listEmbeddingModels(),
+    staleTime: 60000,
+  })
+
+  // Process available models - only show downloaded (is_local) models
+  const availableModels = useMemo(() => {
+    if (!modelsData?.models) {
+      return [{ model_id: 'nomic-embed-text', label: 'Nomic Embed Text', dimension: 768 }]
+    }
+    
+    // Filter to only show downloaded (is_local) models
+    const localModels = modelsData.models.filter((m: any) => m.is_local)
+    const formattedModels = localModels.map((m: any) => ({
+      model_id: m.name || m.model_id || m.id,
+      label: m.display_name || m.name || m.label || m.model_id,
+      dimension: m.dimension
+    }))
+    
+    // If no local models found, show a default placeholder
+    if (formattedModels.length === 0) {
+      return [{ model_id: 'nomic-embed-text', label: 'Nomic Embed Text (not installed)', dimension: 768 }]
+    }
+    
+    // Ensure the user's settings model is included even if not yet detected as local
+    // (handles race condition where model just finished downloading)
+    const settingsModelId = userSettings?.default_embedding_model
+    if (settingsModelId && !formattedModels.find((m: any) => m.model_id === settingsModelId)) {
+      // Find the model info from the full list
+      const settingsModelInfo = modelsData.models.find((m: any) => 
+        m.name === settingsModelId || m.model_id === settingsModelId
+      )
+      if (settingsModelInfo) {
+        formattedModels.unshift({
+          model_id: settingsModelId,
+          label: settingsModelInfo.display_name || settingsModelId,
+          dimension: settingsModelInfo.dimension
+        })
       }
     }
-    fetchSettings()
-  }, [])
+    
+    return formattedModels
+  }, [modelsData, userSettings])
 
-  // Fetch available embedding models from backend - only show downloaded (is_local) models
+  // Sync embedding model with user settings (only if user hasn't manually selected)
   useEffect(() => {
-    const fetchModels = async () => {
-      try {
-        // Use listEmbeddingModels which returns is_local status
-        const data = await apiClient.listEmbeddingModels()
-        if (data?.models && Array.isArray(data.models)) {
-          // Filter to only show downloaded (is_local) models
-          const localModels = data.models.filter((m: any) => m.is_local)
-          const formattedModels = localModels.map((m: any) => ({
-            model_id: m.name || m.model_id || m.id,
-            label: m.display_name || m.name || m.label || m.model_id,
-            dimension: m.dimension
-          }))
-          // If no local models found, show a default placeholder
-          if (formattedModels.length === 0) {
-            setAvailableModels([{ model_id: 'nomic-embed-text', label: 'Nomic Embed Text (not installed)', dimension: 768 }])
-          } else {
-            setAvailableModels(formattedModels)
-          }
-        }
-      } catch (err) {
-        console.debug('Failed to fetch available models:', err)
+    if (userSettings?.default_embedding_model) {
+      setSettingsModel(userSettings.default_embedding_model)
+      // Only update embeddingModel if user hasn't manually selected a different model
+      if (!hasUserSelectedModel) {
+        setEmbeddingModel(userSettings.default_embedding_model)
       }
     }
-    fetchModels()
-  }, [])
+  }, [userSettings, hasUserSelectedModel])
 
   // Helper functions to get model info from availableModels
   const getModelInfo = (modelId: string) => {
@@ -339,7 +355,10 @@ export default function DashboardPage() {
             query={query}
             setQuery={setQuery}
             model={embeddingModel}
-            setModel={setEmbeddingModel}
+            setModel={(model) => {
+              setHasUserSelectedModel(true)
+              setEmbeddingModel(model)
+            }}
             onSearch={handleSearch}
             isSearching={isSearching}
             settingsModel={settingsModel}

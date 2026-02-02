@@ -447,6 +447,7 @@ async def pull_embedding_model(
         model_name: Ollama model name to pull
     """
     from app.services.embedding_model_service import get_embedding_model_service
+    import httpx
     
     service = get_embedding_model_service()
     
@@ -461,10 +462,36 @@ async def pull_embedding_model(
             "redis_index": spec.redis_index_name,
             "status": "pulled_and_registered",
         }
-    except RuntimeError as e:
+    except httpx.ConnectError as e:
+        # Ollama server not reachable
+        logger.error(f"Cannot connect to Ollama server: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Ollama server is not available. Please ensure the Ollama service is running.",
+        )
+    except OSError as e:
+        # DNS resolution failures, network issues
+        if "name resolution" in str(e).lower() or "Errno -3" in str(e):
+            logger.error(f"Cannot resolve Ollama hostname: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Cannot connect to Ollama server. Please ensure the Ollama service is running.",
+            )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e),
+            detail=f"Network error: {str(e)}",
+        )
+    except RuntimeError as e:
+        error_msg = str(e)
+        # Provide clearer error messages
+        if "name resolution" in error_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Ollama server is not available. Please ensure the Ollama service is running.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=error_msg,
         )
 
 

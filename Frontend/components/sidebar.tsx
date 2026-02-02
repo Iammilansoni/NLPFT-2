@@ -47,7 +47,8 @@ export function Sidebar() {
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isAccountOpen, setIsAccountOpen] = useState(false)
 
-  const isExpanded = !isCollapsed
+  // On mobile when sidebar is open, always show expanded view with text labels
+  const isExpanded = !isCollapsed || isMobileOpen
 
   const handleLogout = () => {
     logout()

@@ -8,3 +8,22 @@
 @import '../styles/globals.css';
 
 /* App-specific overrides (if needed) */
+
+/* WCAG 2.4.7 compliant focus styles:
+   - Mouse/touch users see no ring (via :focus without :focus-visible)
+   - Keyboard users see a visible focus indicator (via :focus-visible)
+*/
+textarea:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Visible focus indicator for keyboard navigation */
+textarea:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}

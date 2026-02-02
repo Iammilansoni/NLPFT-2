@@ -145,7 +145,7 @@ function LogItem({
         {/* Message */}
         <div className="flex-1 min-w-0">
           <p className={cn(
-            "text-sm leading-tight truncate",
+            "text-sm leading-tight break-words",
             isCritical && "text-amber-500 font-medium"
           )}>
             {displayMessage}
@@ -285,9 +285,9 @@ export function SystemLogsSidebar() {
           'fixed inset-y-0 right-0 z-50 flex flex-col',
           'bg-card/95 backdrop-blur-md lg:bg-card lg:backdrop-blur-none',
           'border-l border-border transition-all duration-300 ease-out shadow-2xl',
-          // Responsive width: full on mobile, 360px on sm, 380px on md, 400px on lg+
+          // Responsive width: full on mobile, 360px on sm, 420px on md, 520px on lg+
           isSystemLogsOpen 
-            ? 'w-full sm:w-[360px] md:w-[380px] lg:w-[400px]' 
+            ? 'w-full sm:w-[360px] md:w-[420px] lg:w-[520px]' 
             : 'w-0 overflow-hidden pointer-events-none',
           // Safe area support for notched devices
           'pt-safe-top pb-safe-bottom pr-safe-right'

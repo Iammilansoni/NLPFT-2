@@ -388,7 +388,7 @@ async def update_draft_template(
         if template_data.assertions is not None:
             template.assertions = template_data.assertions
         
-        template.updated_at = datetime.now(timezone.utc)
+        template.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         
         # Update parameters if provided
         if template_data.parameters is not None:
@@ -784,7 +784,7 @@ async def update_template(
         if template_data.assertions is not None:
             template.assertions = template_data.assertions
         
-        template.updated_at = datetime.now(timezone.utc)
+        template.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         
         # Update parameters if provided
         if template_data.parameters:

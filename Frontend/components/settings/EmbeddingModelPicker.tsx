@@ -684,9 +684,18 @@ export const EmbeddingModelPicker = ({ onModelActivated }: EmbeddingModelPickerP
       }
     },
     onError: (err: any) => {
+      // Provide more helpful error messages based on status code
+      let title = 'Download Failed'
+      let description = err?.detail || err?.message || 'Could not download model'
+      
+      if (err?.status === 503 || description.toLowerCase().includes('ollama')) {
+        title = 'Ollama Not Available'
+        description = 'The Ollama service is not running. Please start Ollama and try again.'
+      }
+      
       toast({
-        title: 'Download Failed',
-        description: err?.detail || err?.message || 'Could not download model',
+        title,
+        description,
         variant: 'destructive',
       })
     },

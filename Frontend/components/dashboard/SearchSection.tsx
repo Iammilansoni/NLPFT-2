@@ -81,8 +81,9 @@ export function SearchSection({
                     'transition-all duration-300 ease-out',
                     'bg-muted/40 backdrop-blur-md',
                     'border border-border/40',
+                    'outline-none focus-within:outline-none',
                     isFocused
-                        ? 'bg-background shadow-xl shadow-black/10 dark:shadow-black/40'
+                        ? 'bg-background shadow-xl shadow-black/10 dark:shadow-black/40 border-border/60'
                         : 'hover:shadow-md'
                 )}
             >

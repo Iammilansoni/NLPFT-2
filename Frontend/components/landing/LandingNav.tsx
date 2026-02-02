@@ -26,6 +26,21 @@ const NAV_LINKS = [
 
 export function LandingNav() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true); // Prevent hydration flash
+
+  // Check if user is authenticated on mount (client-side only)
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem('nlpforge_access_token');
+      setIsAuthenticated(!!token);
+    } catch {
+      // localStorage not available (SSR, private browsing, etc.)
+      setIsAuthenticated(false);
+    } finally {
+      setIsAuthLoading(false);
+    }
+  }, []);
 
   // Close mobile menu on escape key
   useEffect(() => {
@@ -100,15 +115,28 @@ export function LandingNav() {
             {/* Desktop Actions */}
             <div className="hidden md:flex items-center gap-3">
               <ThemeToggle />
-              <Link
-                href="/auth/login"
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors rounded-md px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              >
-                Sign In
-              </Link>
-              <Button asChild size="sm" className="h-9 px-4">
-                <Link href="/dashboard">Get Started</Link>
-              </Button>
+              {isAuthLoading ? (
+                // Neutral loading state - show Get Started only to prevent flash
+                <Button asChild size="sm" className="h-9 px-4">
+                  <Link href="/getting-started">Get Started</Link>
+                </Button>
+              ) : isAuthenticated ? (
+                <Button asChild size="sm" className="h-9 px-4">
+                  <Link href="/dashboard">Dashboard</Link>
+                </Button>
+              ) : (
+                <>
+                  <Link
+                    href="/auth/login"
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors rounded-md px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  >
+                    Sign In
+                  </Link>
+                  <Button asChild size="sm" className="h-9 px-4">
+                    <Link href="/auth/register">Get Started</Link>
+                  </Button>
+                </>
+              )}
             </div>
 
             {/* Mobile Menu Button */}
@@ -171,18 +199,35 @@ export function LandingNav() {
           </ul>
 
           <div className="mt-4 pt-4 border-t border-border space-y-3">
-            <Link
-              href="/auth/login"
-              onClick={closeMobileMenu}
-              className="block px-3 py-3 text-base font-medium text-muted-foreground hover:text-foreground rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              Sign In
-            </Link>
-            <Button asChild className="w-full h-11">
-              <Link href="/dashboard" onClick={closeMobileMenu}>
-                Get Started
-              </Link>
-            </Button>
+            {isAuthLoading ? (
+              // Neutral loading state for mobile
+              <Button asChild className="w-full h-11">
+                <Link href="/getting-started" onClick={closeMobileMenu}>
+                  Get Started
+                </Link>
+              </Button>
+            ) : isAuthenticated ? (
+              <Button asChild className="w-full h-11">
+                <Link href="/dashboard" onClick={closeMobileMenu}>
+                  Dashboard
+                </Link>
+              </Button>
+            ) : (
+              <>
+                <Link
+                  href="/auth/login"
+                  onClick={closeMobileMenu}
+                  className="block px-3 py-3 text-base font-medium text-muted-foreground hover:text-foreground rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  Sign In
+                </Link>
+                <Button asChild className="w-full h-11">
+                  <Link href="/auth/register" onClick={closeMobileMenu}>
+                    Get Started
+                  </Link>
+                </Button>
+              </>
+            )}
           </div>
         </nav>
       </div>
