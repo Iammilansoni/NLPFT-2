@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
         postgres_connected = True
     except Exception as e:
         postgres_error = str(e)
-        logger.warning(f"PostgreSQL not available: {e}")
+        logger.warning(f"PostgreSQL not available ({type(e).__name__}): {e}")
         logger.warning("Running without PostgreSQL - Limited functionality available")
 
     # Check API key encryption configuration
@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
         else:
             logger.warning("SECRET_KEY_ENCRYPTION not set - LLM provider API keys cannot be stored securely")
     except Exception as e:
-        logger.warning(f"Encryption check failed: {e}")
+        logger.warning(f"Encryption check failed ({type(e).__name__}): {e}")
     
     app.state.encryption_configured = encryption_configured
 
@@ -65,7 +65,7 @@ async def lifespan(app: FastAPI):
         logger.info("Redis connected successfully")
     except Exception as e:
         redis_error = str(e)
-        logger.warning(f"Redis not available: {e}")
+        logger.warning(f"Redis not available ({type(e).__name__}): {e}")
         logger.warning("Running without Redis - Vector search features disabled")
 
     app.state.startup_time = datetime.now(timezone.utc)
@@ -82,7 +82,7 @@ async def lifespan(app: FastAPI):
         if registration_result.get("registered"):
             logger.info(f"Auto-registered {len(registration_result['registered'])} embedding model(s)")
     except Exception as e:
-        logger.warning(f"Could not auto-register embedding models: {e}")
+        logger.warning(f"Could not auto-register embedding models ({type(e).__name__}): {e}")
 
     logger.info("Application startup completed")
 

@@ -13,7 +13,10 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     # Build from individual components if DATABASE_URL not set
     pg_user = os.getenv("POSTGRES_USER", "nlpforge")
-    pg_pass = os.getenv("POSTGRES_PASSWORD", "nlpforge_password")
+    pg_pass = os.getenv("POSTGRES_PASSWORD")
+    if not pg_pass:
+        logger.warning("POSTGRES_PASSWORD not set — database connection may fail")
+        pg_pass = ""
     pg_host = os.getenv("POSTGRES_HOST", "localhost")
     pg_port = os.getenv("POSTGRES_PORT", "5432")
     pg_db = os.getenv("POSTGRES_DB", "nlpforge")

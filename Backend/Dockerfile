@@ -29,7 +29,7 @@ RUN useradd -m -u 1000 appuser
 RUN pip install --no-cache-dir --default-timeout=300 -r requirements.txt
 
 # Create necessary directories and set permissions
-RUN mkdir -p /app/storage /app/datasets /app/storage/faiss_index && \
+RUN mkdir -p /app/storage /app/datasets /app/storage/faiss_index /app/storage/flashrank_cache && \
     chown -R appuser:appuser /app
 
 # Switch to appuser
@@ -54,4 +54,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
 # Run the application with uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# Use exec so uvicorn replaces the shell and receives signals (SIGTERM, etc.) directly
+CMD exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WEB_CONCURRENCY:-2}
