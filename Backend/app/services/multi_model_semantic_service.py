@@ -73,14 +73,20 @@ class MultiModelSemanticRetrievalService:
     semantic search. All query endpoints should use this.
     """
     
+    # =========================================================================
+    # INITIALIZATION
+    # =========================================================================
+
     def __init__(self):
         self.registry = get_embedding_registry()
         self.settings_service = get_user_embedding_settings_service()
         self.redis_service = get_multi_model_redis_service()
         self.ollama_service = get_ollama_service()
         self.slot_extractor = get_slot_extraction_service()
-    
-    # --- Main Retrieval Method ---
+
+    # =========================================================================
+    # MAIN RETRIEVAL PIPELINE
+    # =========================================================================
     
     async def semantic_search(
         self,
@@ -467,7 +473,9 @@ class MultiModelSemanticRetrievalService:
         
         return response
     
-    # --- Helper Methods ---
+    # =========================================================================
+    # HELPER METHODS
+    # =========================================================================
     
     def _auto_detect_intent(self, query: str) -> str:
         """
@@ -714,7 +722,9 @@ class MultiModelSemanticRetrievalService:
         return alternatives
 
 
-# --- Singleton Accessor ---
+# =============================================================================
+# SINGLETON ACCESSOR
+# =============================================================================
 
 _service_instance: Optional[MultiModelSemanticRetrievalService] = None
 

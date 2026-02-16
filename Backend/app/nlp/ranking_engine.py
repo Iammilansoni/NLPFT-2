@@ -18,6 +18,7 @@ Stage 2: FlashRank reranking with ms-marco-MiniLM-L-12-v2
 """
 
 import warnings
+import os
 import numpy as np
 import json
 from typing import List, Dict, Any, Optional
@@ -72,6 +73,7 @@ def _get_embedding_model():
     return _embedding_model
 
 
+FLASHRANK_CACHE_DIR = os.getenv("FLASHRANK_CACHE_DIR", "/app/storage/flashrank_cache")
 def _get_reranker():
     """Lazy load FlashRank reranker for Stage 2"""
     global _reranker
@@ -79,7 +81,7 @@ def _get_reranker():
         try:
             from flashrank import Ranker, RerankRequest
             logger.info(f"Initializing FlashRank reranker: {RERANKER_MODEL}...")
-            _reranker = Ranker(model_name=RERANKER_MODEL, cache_dir="/tmp/flashrank_cache")
+            _reranker = Ranker(model_name=RERANKER_MODEL, cache_dir=FLASHRANK_CACHE_DIR)
             logger.info(f"FlashRank reranker ready: {RERANKER_MODEL}")
         except ImportError as e:
             logger.error(f"FlashRank not installed. Install with: pip install flashrank")

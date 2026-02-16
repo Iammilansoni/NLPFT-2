@@ -42,6 +42,13 @@ from app.models.schemas.embedding_schemas import (
     ErrorCode,
 )
 
+import warnings
+warnings.warn(
+    "embedding_service.py is deprecated. Use multi_model_embedding_service.py instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
+
 
 def escape_redis_tag(value: str) -> str:
     """Escape special characters in Redis TAG field values (like hyphens in UUIDs)"""

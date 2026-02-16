@@ -591,22 +591,23 @@ Return ONLY the JSON array, nothing else."""
         
         return csv_rows
     
-    async def _get_llm_provider(self, user_id: Optional[str] = None) -> Optional["BaseLLMProvider"]:
+    async def _get_llm_provider(self, user_id: Optional[str] = None, db: Optional[Any] = None) -> Optional["BaseLLMProvider"]:
         """
         Get the configured LLM provider for the user from database.
-        
+
         Priority:
         1. User's default configured provider from database
         2. Returns None (caller should fallback to Gemini or raise error)
-        
+
         Args:
             user_id: User ID to load provider for
-            
+            db: Optional async database session (avoids creating sync sessions)
+
         Returns:
             BaseLLMProvider instance or None
         """
         target_user_id = user_id or self.user_id
-        
+
         # Use lock to prevent race conditions during provider initialization
         # Entire check-then-create logic must be synchronized
         async with self._provider_lock:
@@ -614,108 +615,101 @@ Return ONLY the JSON array, nothing else."""
             if self._provider_initialized and self._llm_provider:
                 if self._provider_user_id == target_user_id:
                     return self._llm_provider
-                # Different user - need to create new provider
+                # Different user - close old provider and create new one
+                try:
+                    if hasattr(self._llm_provider, 'close'):
+                        await self._llm_provider.close()
+                except Exception:
+                    pass  # Best effort cleanup
                 self._provider_initialized = False
                 self._llm_provider = None
                 self._provider_user_id = None
-            
+
             if not target_user_id:
                 logger.debug("No user_id provided for provider lookup")
                 return None
-            
+
             try:
-                import asyncio
-                
-                def _load_user_llm_provider_sync(user_uuid_str, t_user_id):
-                    """Synchronous helper to load LLM provider from database."""
-                    from sqlalchemy import create_engine, select, and_
-                    from sqlalchemy.engine import make_url
-                    from sqlalchemy.orm import sessionmaker
-                    from app.llm.provider_factory import LLMProviderFactory
-                    from app.core.encryption import decrypt_api_key
-                    from app.models.database_models import LLMProviderConfig
-                    from app.core.config import settings
-                    from uuid import UUID
-                    
-                    # Create synchronous database connection using proper URL parsing
-                    parsed_url = make_url(settings.database_url)
-                    # Strip async driver suffix (e.g., postgresql+asyncpg -> postgresql)
-                    sync_drivername = parsed_url.drivername.split("+")[0]
-                    sync_url = parsed_url.set(drivername=sync_drivername)
-                    engine = create_engine(sync_url)
-                    SyncSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-                    
-                    db = SyncSessionLocal()
-                    try:
-                        user_uuid = UUID(user_uuid_str) if isinstance(user_uuid_str, str) else user_uuid_str
-                        
-                        # Query for user's default provider config directly
-                        result = db.execute(
-                            select(LLMProviderConfig).where(
-                                and_(
-                                    LLMProviderConfig.u_id == user_uuid,
-                                    LLMProviderConfig.is_default == 1,
-                                    LLMProviderConfig.is_active == 1,
-                                )
-                            )
-                        )
-                        default_config = result.scalar_one_or_none()
-                        
-                        if default_config:
-                            # Decrypt API key if present
-                            decrypted_key = None
-                            if default_config.api_key_encrypted:
-                                try:
-                                    decrypted_key = decrypt_api_key(default_config.api_key_encrypted)
-                                except Exception as decrypt_error:
-                                    logger.error(f"Failed to decrypt API key: {decrypt_error}")
-                                    return None
-                            
-                            # Create provider using factory
-                            provider = LLMProviderFactory.create_from_db_config(
-                                default_config, 
-                                decrypted_api_key=decrypted_key
-                            )
-                            
-                            return {
-                                "provider": provider,
-                                "provider_type": default_config.provider,
-                                "model_name": default_config.model_name,
-                                "user_id": t_user_id
-                            }
-                        else:
-                            return None
-                    finally:
-                        db.close()
-                        engine.dispose()
-                
-                # Run the synchronous DB operations in a thread pool
-                result = await asyncio.to_thread(
-                    _load_user_llm_provider_sync,
-                    target_user_id,
-                    target_user_id
-                )
-                
+                result = None
+
+                if db is not None:
+                    # Use the provided async session directly
+                    result = await self._load_provider_async(db, target_user_id)
+                else:
+                    # Fallback: create a one-off async session
+                    result = await self._load_provider_new_session(target_user_id)
+
                 if result:
                     self._llm_provider = result["provider"]
                     self._provider_initialized = True
                     self._provider_user_id = result["user_id"]
                     self.provider = result["provider_type"]
                     self.model_name = result["model_name"]
-                    
+
                     logger.info(f"Loaded user's configured LLM provider: {result['provider_type']}/{result['model_name']}")
                     return self._llm_provider
                 else:
                     logger.debug(f"No default LLM config found for user {target_user_id}")
-                    
+
             except Exception as e:
                 logger.warning(f"Failed to load configured LLM provider: {e}")
                 import traceback
                 logger.debug(f"Provider load traceback: {traceback.format_exc()}")
-            
+
             return None
+
+    async def _load_provider_async(self, db, user_id: str) -> Optional[Dict[str, Any]]:
+        """Load LLM provider using an existing async database session."""
+        from sqlalchemy import select, and_
+        from app.llm.provider_factory import LLMProviderFactory
+        from app.core.encryption import decrypt_api_key
+        from app.models.database_models import LLMProviderConfig
+        from uuid import UUID
+
+        user_uuid = UUID(user_id) if isinstance(user_id, str) else user_id
+
+        result = await db.execute(
+            select(LLMProviderConfig).where(
+                and_(
+                    LLMProviderConfig.u_id == user_uuid,
+                    LLMProviderConfig.is_default == 1,
+                    LLMProviderConfig.is_active == 1,
+                )
+            )
+        )
+        default_config = result.scalar_one_or_none()
+
+        if not default_config:
+            return None
+
+        decrypted_key = None
+        if default_config.api_key_encrypted:
+            try:
+                decrypted_key = decrypt_api_key(default_config.api_key_encrypted)
+            except Exception as decrypt_error:
+                logger.error(f"Failed to decrypt API key: {decrypt_error}")
+                return None
+
+        provider = LLMProviderFactory.create_from_db_config(
+            default_config,
+            decrypted_api_key=decrypted_key
+        )
+
+        return {
+            "provider": provider,
+            "provider_type": default_config.provider,
+            "model_name": default_config.model_name,
+            "user_id": user_id
+        }
+
+    async def _load_provider_new_session(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Load LLM provider by creating a new async session (when no session provided)."""
+        from app.core.postgres import AsyncSessionLocal
+
+        async with AsyncSessionLocal() as db:
+            return await self._load_provider_async(db, user_id)
     
-    async def _call_llm_api(self, system_prompt: str, user_prompt: str, num_examples: int, user_id: Optional[str] = None) -> str:
+    async def _call_llm_api(self, system_prompt: str, user_prompt: str, num_examples: int, user_id: Optional[str] = None, db: Optional[Any] = None) -> str:
         """
         Call LLM API using configured provider (priority) or fallback to Gemini.
         
@@ -737,7 +731,7 @@ Return ONLY the JSON array, nothing else."""
             ValueError: If no LLM provider is available
         """
         # Try to get configured provider
-        provider = await self._get_llm_provider(user_id)
+        provider = await self._get_llm_provider(user_id, db=db)
         
         if provider:
             try:
@@ -764,7 +758,12 @@ Return ONLY the JSON array, nothing else."""
                 
             except Exception as e:
                 logger.warning(f"Configured provider failed: {e}")
-                # Reset provider so we can try fallback
+                # Close and reset provider so we can try fallback
+                try:
+                    if hasattr(provider, 'close'):
+                        await provider.close()
+                except Exception:
+                    pass
                 self._llm_provider = None
                 self._provider_initialized = False
                 
@@ -864,7 +863,8 @@ Return ONLY the JSON array, nothing else."""
         focus_areas: Optional[List[str]] = None,
         scenario_distribution: Optional[Dict[str, float]] = None,
         task_id: Optional[str] = None,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        db: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
         Generate comprehensive, embedding-ready CSV dataset from approved template
@@ -903,7 +903,7 @@ Return ONLY the JSON array, nothing else."""
         has_configured_provider = False
         if self.user_id:
             try:
-                test_provider = await self._get_llm_provider(self.user_id)
+                test_provider = await self._get_llm_provider(self.user_id, db=db)
                 has_configured_provider = test_provider is not None
                 if has_configured_provider:
                     logger.info(f"Using configured provider: {self.provider}/{self.model_name}")
@@ -970,7 +970,7 @@ Return ONLY the JSON array, nothing else."""
                 
                 response_text = None
                 try:
-                    response_text = await self._call_llm_api(system_prompt, user_prompt_msg, batch_count, self.user_id)
+                    response_text = await self._call_llm_api(system_prompt, user_prompt_msg, batch_count, self.user_id, db=db)
                 except Exception as api_error:
                     logger.error(f"API call failed for batch {batch_num + 1}: {type(api_error).__name__}: {api_error}")
                     
@@ -1144,8 +1144,11 @@ _enterprise_generator = None
 
 
 def get_enterprise_dataset_generator() -> EnterpriseDatasetGenerator:
-    """Get or create global EnterpriseDatasetGenerator instance"""
-    global _enterprise_generator
-    if _enterprise_generator is None:
-        _enterprise_generator = EnterpriseDatasetGenerator()
-    return _enterprise_generator
+    """Create a new EnterpriseDatasetGenerator instance per request.
+
+    Each request gets its own generator to avoid shared mutable state
+    (cached provider, model_name) racing between concurrent users.
+    The generator is lightweight — expensive state (LLM provider) is
+    lazily initialized and cached per user_id within the request.
+    """
+    return EnterpriseDatasetGenerator()
