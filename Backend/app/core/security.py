@@ -17,7 +17,8 @@ from app.models.schemas.auth_schemas import TokenData
 # Security configuration
 SECRET_KEY = settings.secret_key
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+ACCESS_TOKEN_EXPIRE_MINUTES = 30  # 30 minutes (short-lived)
+REFRESH_TOKEN_EXPIRE_DAYS = 7  # 7 days for refresh tokens
 RESET_TOKEN_EXPIRE_MINUTES = 30
 VERIFICATION_TOKEN_EXPIRE_HOURS = 24
 
@@ -33,14 +34,14 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """Create a JWT access token"""
+    """Create a JWT access token with type='access' claim"""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "type": "access"})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -51,6 +52,13 @@ def create_reset_token() -> str:
 def create_verification_token() -> str:
     """Create a secure random token for email verification"""
     return secrets.token_urlsafe(32)
+
+def create_refresh_token(data: dict) -> str:
+    """Create a long-lived JWT refresh token"""
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode.update({"exp": expire, "type": "refresh"})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def verify_token(token: str) -> dict:
     """Verify and decode a JWT token, returning the payload
@@ -84,6 +92,12 @@ async def get_current_user(
     
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        
+        # Reject non-access tokens (e.g. refresh tokens) used as access tokens
+        token_type = payload.get("type")
+        if token_type != "access":
+            raise credentials_exception
+        
         email: str = payload.get("sub")
         user_id: int = payload.get("user_id")
         
@@ -96,7 +110,7 @@ async def get_current_user(
     
     # Get user from database
     from sqlalchemy import select
-    result = await db.execute(select(User).where(User.id == token_data.user_id))
+    result = await db.execute(select(User).where(User.u_id == token_data.user_id))
     user = result.scalar_one_or_none()
     
     if user is None:

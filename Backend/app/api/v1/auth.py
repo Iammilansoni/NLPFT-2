@@ -9,18 +9,22 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.core.postgres import get_db
 from app.services.auth_service import get_auth_service, AuthService, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.models.schemas.auth_schemas import (
     UserCreate, UserLogin, UserResponse, Token, ChangePasswordRequest,
-    ForgotPasswordRequest, ResetPasswordRequest
+    ForgotPasswordRequest, ResetPasswordRequest, RefreshTokenRequest
 )
 from app.models.schemas.common_schemas import MessageResponse
 from app.models.database_models import User
 from app.core.logger import logger
+from app.services.audit_service import log_audit_event
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
@@ -39,6 +43,11 @@ async def get_current_user(
     
     payload = auth_service.decode_token(token)
     if payload is None:
+        raise credentials_exception
+    
+    # Reject non-access tokens (e.g. refresh tokens used as access tokens)
+    token_type = payload.get("type")
+    if token_type != "access":
         raise credentials_exception
     
     user_id: str = payload.get("sub")
@@ -65,6 +74,7 @@ async def get_current_user(
 
 
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/minute")
 async def register(
     request: Request,
     user_data: UserCreate,
@@ -165,15 +175,20 @@ async def register(
         data={"sub": str(user.u_id)},
         expires_delta=access_token_expires
     )
-    
+    refresh_token = auth_service.create_refresh_token(
+        data={"sub": str(user.u_id)}
+    )
+
     return Token(
         access_token=access_token,
+        refresh_token=refresh_token,
         token_type="bearer",
         user=UserResponse.model_validate(user)
     )
 
 
 @router.post("/login", response_model=Token)
+@limiter.limit("10/minute")
 async def login(
     request: Request,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
@@ -217,15 +232,27 @@ async def login(
     )
     
     logger.info(f"User logged in: {user.email}")
-    
+
+    await log_audit_event(
+        db, action="login", user_id=user.u_id,
+        ip_address=request.client.host if request.client else None,
+        resource_type="user", resource_id=str(user.u_id),
+    )
+
+    refresh_token = auth_service.create_refresh_token(
+        data={"sub": str(user.u_id)}
+    )
+
     return Token(
         access_token=access_token,
+        refresh_token=refresh_token,
         token_type="bearer",
         user=UserResponse.model_validate(user)
     )
 
 
 @router.post("/login/json", response_model=Token)
+@limiter.limit("10/minute")
 async def login_json(
     request: Request,
     user_data: UserLogin,
@@ -269,9 +296,20 @@ async def login_json(
     )
     
     logger.info(f"User logged in: {user.email}")
-    
+
+    await log_audit_event(
+        db, action="login_json", user_id=user.u_id,
+        ip_address=request.client.host if request.client else None,
+        resource_type="user", resource_id=str(user.u_id),
+    )
+
+    refresh_token = auth_service.create_refresh_token(
+        data={"sub": str(user.u_id)}
+    )
+
     return Token(
         access_token=access_token,
+        refresh_token=refresh_token,
         token_type="bearer",
         user=UserResponse.model_validate(user)
     )
@@ -311,12 +349,20 @@ async def promote_to_expert(
     await db.refresh(current_user)
     
     logger.info(f"User promoted to expert: {current_user.email}")
-    
+
+    await log_audit_event(
+        db, action="promote_to_expert", user_id=current_user.u_id,
+        resource_type="user",
+        resource_id=str(current_user.u_id),
+    )
+
     return UserResponse.model_validate(current_user)
 
 
 @router.post("/change-password", response_model=MessageResponse)
+@limiter.limit("5/minute")
 async def change_password(
+    request: Request,
     password_data: ChangePasswordRequest,
     current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),
@@ -356,7 +402,13 @@ async def change_password(
     await db.commit()
     
     logger.info(f"Password changed for user: {current_user.email}")
-    
+
+    await log_audit_event(
+        db, action="password_change", user_id=current_user.u_id,
+        ip_address=request.client.host if request.client else None,
+        resource_type="user", resource_id=str(current_user.u_id),
+    )
+
     return MessageResponse(message="Password changed successfully")
 
 
@@ -371,6 +423,7 @@ async def auth_health():
 
 
 @router.post("/forgot-password", response_model=MessageResponse)
+@limiter.limit("5/minute")
 async def forgot_password(
     request: Request,
     forgot_data: ForgotPasswordRequest,
@@ -473,6 +526,7 @@ async def forgot_password(
 
 
 @router.post("/reset-password", response_model=MessageResponse)
+@limiter.limit("5/minute")
 async def reset_password(
     request: Request,
     reset_data: ResetPasswordRequest,
@@ -592,4 +646,105 @@ async def verify_reset_token(
         return {"valid": False, "message": "Reset token has expired"}
     
     return {"valid": True, "email": reset_record.email}
+
+
+@router.post("/refresh", response_model=Token)
+@limiter.limit("30/minute")
+async def refresh_access_token(
+    request: Request,
+    refresh_data: RefreshTokenRequest,
+    db: AsyncSession = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """
+    Refresh access token using a refresh token
+
+    RATE LIMIT: 30 refreshes per minute per IP
+
+    - **refresh_token**: Valid refresh token from login/register
+
+    Returns new access token and refresh token pair
+    """
+    # Decode refresh token
+    payload = auth_service.decode_token(refresh_data.refresh_token)
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Verify it's a refresh token
+    if payload.get("type") != "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token type",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_id = payload.get("sub")
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    import uuid
+    try:
+        user_uuid = uuid.UUID(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token format",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Get user
+    user = await auth_service.get_user_by_id(db, user_uuid)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Issue new tokens
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    new_access_token = auth_service.create_access_token(
+        data={"sub": str(user.u_id)},
+        expires_delta=access_token_expires
+    )
+    new_refresh_token = auth_service.create_refresh_token(
+        data={"sub": str(user.u_id)}
+    )
+
+    logger.info(f"Token refreshed for user: {user.email}")
+
+    return Token(
+        access_token=new_access_token,
+        refresh_token=new_refresh_token,
+        token_type="bearer",
+        user=UserResponse.model_validate(user)
+    )
+
+
+@router.post("/logout", response_model=MessageResponse)
+async def revoke_token(
+    current_user: Annotated[User, Depends(get_current_user)]
+):
+    """
+    Logout endpoint — signals the client to discard all tokens.
+
+    Note: JWTs are stateless, so this endpoint does NOT revoke or blacklist
+    tokens. Tokens remain valid until they expire. The client should delete
+    stored tokens upon receiving the response.
+    """
+    # TODO: Implement a token blacklist (e.g., store invalidated JTIs in Redis
+    # with TTL matching the token's remaining lifetime) for true revocation.
+    logger.info(f"Token revoked for user: {current_user.email}")
+    return MessageResponse(
+        message="Logout successful \u2014 please discard your tokens. "
+        "Tokens remain valid until expiration unless a server-side blacklist is implemented."
+    )
 

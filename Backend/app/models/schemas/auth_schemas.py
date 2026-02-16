@@ -75,6 +75,7 @@ class UserResponse(BaseModel):
 class Token(BaseModel):
     """JWT token response"""
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str = "bearer"
     user: UserResponse
 
@@ -119,3 +120,8 @@ class ChangePasswordRequest(BaseModel):
 class VerifyEmailRequest(BaseModel):
     """Email verification request"""
     token: str
+
+
+class RefreshTokenRequest(BaseModel):
+    """Refresh token request"""
+    refresh_token: str
