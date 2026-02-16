@@ -17,6 +17,7 @@ Features:
 
 import time
 import asyncio
+import threading
 from typing import Optional, List, Dict, Any
 from enum import Enum
 
@@ -60,6 +61,11 @@ class HarmCategory(str, Enum):
 
 DEFAULT_MAX_TOKENS = 8192
 DEFAULT_SAFETY_THRESHOLD = SafetyThreshold.BLOCK_MEDIUM_AND_ABOVE
+
+# Thread lock for genai.configure() which sets process-wide global state.
+# Without this, concurrent GoogleProvider instances with different API keys
+# would race on the global configuration.
+_genai_configure_lock = threading.Lock()
 
 
 # =============================================================================
@@ -238,26 +244,23 @@ class GoogleProvider(BaseLLMProvider):
         """Initialize Google AI SDK on first use"""
         if self._initialized:
             return
-        
+
         if not self.api_key:
             raise AuthenticationError("Google API key is required")
-        
+
         try:
             import google.generativeai as genai
             self._genai = genai
-            
-            # IMPORTANT: Avoid global genai.configure() which sets process-wide state.
-            # Instead, create the model with api_key directly if supported by SDK version.
-            # The current SDK (google-generativeai) uses genai.configure() for global config,
-            # but we can pass api_key when creating specific model instances.
-            # Note: If multiple GoogleProvider instances use different keys concurrently,
-            # they may conflict. Consider using separate processes for different API keys.
-            genai.configure(api_key=self.api_key)
-            
-            # Create model client with the current API key context
-            self._model_client = genai.GenerativeModel(self.model)
+
+            # Use lock around genai.configure() which sets process-wide state.
+            # Each call to _ensure_initialized re-configures with this instance's key.
+            # For truly concurrent different-key usage, separate processes are needed.
+            with _genai_configure_lock:
+                genai.configure(api_key=self.api_key)
+                self._model_client = genai.GenerativeModel(self.model)
+
             self._initialized = True
-            
+
             logger.info(f"Google Gemini provider initialized with model: {self.model}")
             
         except ImportError:
@@ -454,23 +457,36 @@ class GoogleProvider(BaseLLMProvider):
         while retry_count <= self.max_retries:
             try:
                 start_time = time.time()
-                
-                # Generation with optional tools
-                if gemini_tools:
-                    response = await asyncio.to_thread(
-                        self._model_client.generate_content,
-                        full_prompt,
-                        generation_config=generation_config,
-                        safety_settings=safety_settings,
-                        tools=gemini_tools,
-                    )
-                else:
-                    response = await asyncio.to_thread(
-                        self._model_client.generate_content,
-                        full_prompt,
-                        generation_config=generation_config,
-                        safety_settings=safety_settings,
-                    )
+
+                # Ensure correct API key and get a client for this key.
+                # Only hold the lock during configure+client creation, NOT the network call.
+                def _get_configured_client():
+                    with _genai_configure_lock:
+                        self._genai.configure(api_key=self.api_key)
+                        # Re-create model client each time under lock to ensure
+                        # it's bound to the correct api_key configuration.
+                        return self._genai.GenerativeModel(self.model)
+
+                client = await asyncio.to_thread(_get_configured_client)
+
+                # Network call happens outside the lock so other providers
+                # with different API keys can proceed concurrently.
+                def _call_generate(c):
+                    if gemini_tools:
+                        return c.generate_content(
+                            full_prompt,
+                            generation_config=generation_config,
+                            safety_settings=safety_settings,
+                            tools=gemini_tools,
+                        )
+                    else:
+                        return c.generate_content(
+                            full_prompt,
+                            generation_config=generation_config,
+                            safety_settings=safety_settings,
+                        )
+
+                response = await asyncio.to_thread(_call_generate, client)
                 
                 latency_ms = (time.time() - start_time) * 1000
                 
@@ -505,9 +521,9 @@ class GoogleProvider(BaseLLMProvider):
                                 usage=self._extract_usage(response),
                                 finish_reason="function_call",
                                 raw_response=None,
+                                tool_calls=tool_calls,
                             )
-                            llm_response.tool_calls = tool_calls
-                            
+
                             self._log_response(llm_response)
                             logger.debug(f"Gemini {len(tool_calls)} function call(s) in {latency_ms:.0f}ms: {[tc['function']['name'] for tc in tool_calls]}")
                             
@@ -632,9 +648,16 @@ class GoogleProvider(BaseLLMProvider):
         full_prompt = self._build_prompt(prompt, system_prompt)
         
         try:
-            # Stream generation in thread pool
+            # Configure + create client under lock, then stream outside the lock
+            def _get_configured_client():
+                with _genai_configure_lock:
+                    self._genai.configure(api_key=self.api_key)
+                    return self._genai.GenerativeModel(self.model)
+
+            client = await asyncio.to_thread(_get_configured_client)
+
             def _stream_sync():
-                return self._model_client.generate_content(
+                return client.generate_content(
                     full_prompt,
                     generation_config=generation_config,
                     safety_settings=safety_settings,

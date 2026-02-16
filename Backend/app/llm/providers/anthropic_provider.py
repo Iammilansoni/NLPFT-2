@@ -324,12 +324,9 @@ class AnthropicProvider(BaseLLMProvider):
                         },
                         finish_reason=data.get("stop_reason"),
                         raw_response=data,
+                        tool_calls=tool_calls if tool_calls else None,
                     )
-                    
-                    # Add tool calls if present
-                    if tool_calls:
-                        llm_response.tool_calls = tool_calls
-                    
+
                     self._log_response(llm_response)
                     logger.debug(f"Anthropic request completed in {latency_ms:.0f}ms")
                     
@@ -375,7 +372,11 @@ class AnthropicProvider(BaseLLMProvider):
                     await self._async_sleep(min(2 ** retry_count, 30))
                 else:
                     raise last_error
-        
+
+            except (AuthenticationError, InvalidRequestError, ModelNotFoundError, ContextLengthError, ProviderError):
+                # Don't retry permanent errors
+                raise
+
         # Should not reach here, but just in case
         if last_error:
             raise last_error

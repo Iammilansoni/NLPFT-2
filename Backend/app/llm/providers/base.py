@@ -122,6 +122,7 @@ class LLMResponse:
     usage: Dict[str, int] = field(default_factory=dict)
     finish_reason: Optional[str] = None
     raw_response: Optional[Dict[str, Any]] = None
+    tool_calls: Optional[List[Dict[str, Any]]] = None
     
     @property
     def prompt_tokens(self) -> int:

@@ -397,7 +397,6 @@ class OpenAIProvider(BaseLLMProvider):
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(
                 base_url=self.effective_base_url,
-                headers=self._get_headers(),
                 timeout=httpx.Timeout(self.timeout),
             )
         return self._client
@@ -455,7 +454,11 @@ class OpenAIProvider(BaseLLMProvider):
                 client = await self._get_client()
                 start_time = time.time()
                 
-                response = await client.post("/chat/completions", json=payload)
+                response = await client.post(
+                    "/chat/completions",
+                    json=payload,
+                    headers=self._get_headers(),
+                )
                 latency_ms = (time.time() - start_time) * 1000
                 
                 if response.status_code == 200:
@@ -651,7 +654,7 @@ class OpenAIProvider(BaseLLMProvider):
         # Try to fetch models from custom endpoint
         try:
             client = await self._get_client()
-            response = await client.get("/models")
+            response = await client.get("/models", headers=self._get_headers())
             
             if response.status_code == 200:
                 data = response.json()
@@ -674,7 +677,15 @@ class OpenAIProvider(BaseLLMProvider):
         if self._client and not self._client.is_closed:
             await self._client.aclose()
             self._client = None
-    
+
+    async def __aenter__(self):
+        """Async context manager entry"""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit"""
+        await self.close()
+
     def __del__(self):
         """Cleanup on deletion - best effort, no guarantees"""
         # Note: __del__ is unreliable for async cleanup

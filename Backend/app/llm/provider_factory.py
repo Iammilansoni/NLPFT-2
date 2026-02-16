@@ -231,7 +231,7 @@ class LLMProviderFactory:
                 "description": "Claude 4 Opus/Sonnet, Claude 3.5 Sonnet/Haiku, Claude 3 Opus",
                 "requires_api_key": True,
                 "supports_custom_base_url": False,
-                "default_models": ["claude-sonnet-4-20250514", "claude-opus-4-20250514", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"],
+                "default_models": ["claude-sonnet-4-5-20250929", "claude-opus-4-5-20251101", "claude-haiku-4-5-20251001", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"],
                 "implemented": True,
             },
             ProviderType.HUGGINGFACE.value: {
