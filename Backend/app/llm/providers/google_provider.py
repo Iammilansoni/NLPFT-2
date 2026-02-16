@@ -611,6 +611,8 @@ class GoogleProvider(BaseLLMProvider):
                     raise ModelNotFoundError(f"Model not found: {self.model}")
                 elif "context" in error_str or "too long" in error_str:
                     raise ContextLengthError(f"Context too long: {e}")
+                elif "finish_reason" in error_str or "safety" in error_str or "blocked" in error_str:
+                    raise InvalidRequestError(f"Content blocked by safety filters: {e}")
                 else:
                     raise ProviderError(f"Gemini error: {e}")
         

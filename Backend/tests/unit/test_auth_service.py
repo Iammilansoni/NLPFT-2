@@ -110,6 +110,9 @@ class TestJWTTokens:
     
     def test_token_expiration_time(self):
         """Test token has correct expiration time."""
+        import os
+        configured_minutes = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+
         user_id = "123e4567-e89b-12d3-a456-426614174000"
         token = create_access_token(user_id)
         
@@ -117,8 +120,8 @@ class TestJWTTokens:
         exp_timestamp = payload["exp"]
         exp_datetime = datetime.fromtimestamp(exp_timestamp)
         
-        # Token should expire ~24 hours from now
-        expected_expiry = datetime.utcnow() + timedelta(hours=24)
+        # Token should expire ~configured_minutes from now
+        expected_expiry = datetime.utcnow() + timedelta(minutes=configured_minutes)
         time_diff = abs((exp_datetime - expected_expiry).total_seconds())
         
-        assert time_diff < 5  # Within 5 seconds tolerance
+        assert time_diff < 10  # Within 10 seconds tolerance

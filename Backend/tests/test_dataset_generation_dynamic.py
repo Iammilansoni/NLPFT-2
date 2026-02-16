@@ -10,8 +10,8 @@ from app.nlp.dataset_generator import EnterpriseDatasetGenerator
 
 @pytest.mark.asyncio
 async def test_dynamic_dataset_generation():
-    # Mock Ollama response (dataset_generator uses Ollama for local inference)
-    with patch('app.nlp.dataset_generator._genai_client') as mock_client:
+    # Mock Gemini response (dataset_generator uses Gemini for fallback inference)
+    with patch('app.nlp.dataset_generator._gemini_client') as mock_client:
         # Setup mock response
         mock_response = MagicMock()
         mock_response.text = """

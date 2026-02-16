@@ -149,8 +149,9 @@ class TestOpenAIProvider:
             mock_client.post = AsyncMock(return_value=mock_response)
             mock_get_client.return_value = mock_client
             
-            with pytest.raises(RateLimitError):
-                await provider.generate(prompt="Hello")
+            with patch('asyncio.sleep', new_callable=AsyncMock):
+                with pytest.raises(RateLimitError):
+                    await provider.generate(prompt="Hello")
     
     async def test_model_not_found_error(self):
         """Test 404 model not found error handling"""
@@ -274,6 +275,7 @@ class TestGoogleProvider:
                 mock_model = MagicMock()
                 mock_response = MagicMock()
                 mock_response.text = "Hello! How can I help you?"
+                mock_response.prompt_feedback.block_reason = None
                 mock_response.candidates = [MagicMock(finish_reason="STOP")]
                 mock_response.usage_metadata = MagicMock(
                     prompt_token_count=10,
@@ -548,10 +550,11 @@ class TestHuggingFaceProvider:
             mock_client.post = AsyncMock(return_value=mock_response)
             mock_get_client.return_value = mock_client
             
-            with pytest.raises(TransientError) as exc_info:
-                await provider.generate(prompt="Hello")
-            
-            assert "loading" in str(exc_info.value).lower() or "retry" in str(exc_info.value).lower()
+            with patch.object(provider, '_async_sleep', new_callable=AsyncMock):
+                with pytest.raises(TransientError) as exc_info:
+                    await provider.generate(prompt="Hello")
+                
+                assert "loading" in str(exc_info.value).lower() or "retry" in str(exc_info.value).lower()
 
 
 # =============================================================================
