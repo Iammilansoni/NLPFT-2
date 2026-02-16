@@ -52,7 +52,7 @@ async def test_dynamic_dataset_generation():
         result = await generator.generate_dataset_from_template(
             template_data=template_data,
             num_examples=None,
-            custom_prompt="Generate some test cases"
+            user_prompt="Generate some test cases"
         )
         
         assert result["success"] is True
@@ -69,7 +69,7 @@ async def test_dynamic_dataset_generation():
         result_fixed = await generator.generate_dataset_from_template(
             template_data=template_data,
             num_examples=50,
-            custom_prompt="Generate 50 cases"
+            user_prompt="Generate 50 cases"
         )
         
         assert result_fixed["success"] is True
