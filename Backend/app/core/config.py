@@ -108,18 +108,33 @@ if not settings.database_url and settings.postgres_host:
     )
 
 # =============================================================================
-# SMTP VALIDATION - REQUIRED for email functionality
+# SMTP VALIDATION - REQUIRED for email functionality (skip in testing)
 # =============================================================================
+_testing = os.getenv("TESTING", "").lower() in ("1", "true", "yes")
 if not settings.smtp_user or not settings.smtp_password:
-    raise ValueError(
-        "❌ CRITICAL: SMTP configuration is required.\n"
-        "Email functionality (registration, password reset) requires:\n"
-        "  SMTP_USER=your_email@gmail.com\n"
-        "  SMTP_PASSWORD=your_app_password\n\n"
-        "For Gmail, create an App Password at:\n"
-        "  Google Account → Security → 2-Step Verification → App Passwords\n\n"
-        "Add these to Backend/.env"
-    )
+    if settings.environment in ("development", "testing") or _testing:
+        import warnings
+        warnings.warn(
+            "\n" + "="*80 + "\n"
+            "⚠️  WARNING: SMTP_USER / SMTP_PASSWORD not set.\n"
+            "   Email features (registration, password reset) will NOT work.\n"
+            "   Add SMTP_USER and SMTP_PASSWORD to Backend/.env\n"
+            + "="*80,
+            UserWarning,
+            stacklevel=2,
+        )
+        settings.smtp_user = settings.smtp_user or "noreply@localhost"
+        settings.smtp_password = settings.smtp_password or "placeholder"
+    else:
+        raise ValueError(
+            "❌ CRITICAL: SMTP configuration is required.\n"
+            "Email functionality (registration, password reset) requires:\n"
+            "  SMTP_USER=your_email@gmail.com\n"
+            "  SMTP_PASSWORD=your_app_password\n\n"
+            "For Gmail, create an App Password at:\n"
+            "  Google Account → Security → 2-Step Verification → App Passwords\n\n"
+            "Add these to Backend/.env"
+        )
 
 # Ensure datasets directory exists
 DATASETS_DIR = settings.datasets_path

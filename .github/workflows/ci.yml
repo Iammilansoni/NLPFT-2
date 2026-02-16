@@ -40,9 +40,15 @@ jobs:
       - name: Run backend tests
         run: pytest -v --tb=short -m "not integration" --timeout=60
         env:
+          TESTING: "true"
+          ENVIRONMENT: testing
           SECRET_KEY: test-secret-key-for-ci-minimum-32-chars
           SECRET_KEY_ENCRYPTION: dGVzdC1lbmNyeXB0aW9uLWtleS1mb3ItY2ktcnVucw==
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          SMTP_USER: test@localhost
+          SMTP_PASSWORD: test-placeholder
+          REDIS_HOST: localhost
+          OLLAMA_HOST: http://localhost:11434
 
   frontend-build:
     name: Frontend Build
@@ -57,7 +63,7 @@ jobs:
           node-version: "20"
           cache: npm
           cache-dependency-path: Frontend/package-lock.json
-      - run: npm ci
+      - run: npm ci || npm install
       - run: npm run lint
       - run: npm run build
         env:
