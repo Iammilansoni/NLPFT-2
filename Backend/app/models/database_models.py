@@ -52,7 +52,14 @@ from app.core.postgres import Base
 
 
 def utc_now():
-    """Returns current UTC time as timezone-naive for PostgreSQL TIMESTAMP WITHOUT TIME ZONE columns"""
+    """Returns current UTC time as timezone-naive for PostgreSQL TIMESTAMP WITHOUT TIME ZONE columns.
+
+    This is intentionally timezone-naive because all TIMESTAMP columns in this schema
+    use WITHOUT TIME ZONE. SQLAlchemy stores these as naive datetimes in UTC by convention.
+
+    For timezone-aware UTC datetimes (e.g., JWT expiry comparisons), use:
+        from app.core.time_utils import utc_now_aware
+    """
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
