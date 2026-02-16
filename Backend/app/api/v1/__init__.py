@@ -32,6 +32,7 @@ from app.api.v1 import (
     multi_model_query,  # Semantic search with model governance
     # LLM Provider Configuration
     llm_config,  # Dynamic LLM provider management
+    admin,  # Admin operations (key rotation)
 )
 from app.core.postgres import get_db
 from app.api.v1.auth import get_current_user
@@ -81,6 +82,10 @@ router.include_router(multi_model_query.router, tags=["Multi-Model Query"])
 # === Performance Telemetry ===
 # telemetry.py already has prefix="/telemetry"
 router.include_router(telemetry.router, tags=["Performance Telemetry"])
+
+# === Admin ===
+# admin.py has prefix="/admin"
+router.include_router(admin.router, tags=["Admin"])
 
 
 # === Root Level Stats Endpoint ===
