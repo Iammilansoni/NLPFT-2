@@ -2,6 +2,7 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import StaticPool
 import os
 from dotenv import load_dotenv
 from app.core.logger import logger
@@ -22,15 +23,26 @@ if not DATABASE_URL:
     pg_db = os.getenv("POSTGRES_DB", "nlpforge")
     DATABASE_URL = f"postgresql+asyncpg://{pg_user}:{pg_pass}@{pg_host}:{pg_port}/{pg_db}"
 
-engine = create_async_engine(
-    DATABASE_URL,
-    echo=False,
-    pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=10,
-    pool_timeout=30,
-    connect_args={"timeout": 10, "command_timeout": 60, "server_settings": {"application_name": "nlpforge_enterprise"}}
-)
+# SQLite (used in CI/testing) doesn't support PostgreSQL pool/connect args
+_is_sqlite = DATABASE_URL.startswith("sqlite")
+
+if _is_sqlite:
+    engine = create_async_engine(
+        DATABASE_URL,
+        echo=False,
+        poolclass=StaticPool,
+        connect_args={"check_same_thread": False},
+    )
+else:
+    engine = create_async_engine(
+        DATABASE_URL,
+        echo=False,
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=10,
+        pool_timeout=30,
+        connect_args={"timeout": 10, "command_timeout": 60, "server_settings": {"application_name": "nlpforge_enterprise"}},
+    )
 
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
