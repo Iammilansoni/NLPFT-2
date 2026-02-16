@@ -30,7 +30,6 @@ from uuid import UUID
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, and_
-from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 
 from app.core.logger import logger
@@ -43,8 +42,6 @@ from app.core.encryption import (
 from app.models.database_models import LLMProviderConfig, UserSettings
 from app.llm.provider_factory import LLMProviderFactory
 from app.llm.providers.base import (
-    LLMConfig,
-    ProviderError,
     ConnectionTestResult,
 )
 

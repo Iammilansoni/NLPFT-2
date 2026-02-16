@@ -41,7 +41,6 @@ from app.api.v1.auth import get_current_user
 from app.models.schemas import UserResponse
 from app.core.embedding_model_registry import get_embedding_registry
 from app.services.user_embedding_settings_service import get_user_embedding_settings_service
-from app.services.multi_model_embedding_service import get_multi_model_embedding_service
 from app.models.database_models import Dataset
 from app.core.logger import logger
 from sqlalchemy import select

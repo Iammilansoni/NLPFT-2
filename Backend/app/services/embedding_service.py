@@ -22,17 +22,15 @@ Key Design: One Embedding Model Per Dataset
 import uuid
 import asyncio
 import pandas as pd
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import numpy as np
 
 from app.core.logger import logger
-from app.core.postgres import get_db
-from app.models.database_models import Template, Metadata, UserSettings, User, Dataset, CSVData
+from app.models.database_models import Template, Metadata, UserSettings, Dataset
 from app.services.redis_vector_service import RedisVectorService
 from app.services.ollama_embedding_service import get_ollama_service
 from app.core.models_config import get_embedding_model_info, DEFAULT_EMBEDDING_MODEL
@@ -183,7 +181,7 @@ class EnhancedEmbeddingService:
             )
             
             definition = IndexDefinition(
-                prefix=[f"embedding:"],
+                prefix=["embedding:"],
                 index_type=IndexType.JSON
             )
             
@@ -244,7 +242,7 @@ class EnhancedEmbeddingService:
             logger.info(f"Template: {template_api_name} ({template_method} {template_endpoint})", extra={"user_id": user_id})
             
             # Read CSV
-            logger.info(f"Reading CSV dataset...", extra={"user_id": user_id})
+            logger.info("Reading CSV dataset...", extra={"user_id": user_id})
             df = pd.read_csv(csv_path)
             total_rows = len(df)
             logger.info(f"Found {total_rows} rows to embed", extra={"user_id": user_id})
@@ -360,7 +358,7 @@ class EnhancedEmbeddingService:
                     metadata.remarks['embedding_info'] = embedding_metadata
                 
                 db.commit()
-                logger.info(f"Updated template metadata with embedding info", extra={"user_id": user_id})
+                logger.info("Updated template metadata with embedding info", extra={"user_id": user_id})
             
             logger.info(f"Automatic embedding completed: {embedded_count} vectors stored", extra={"user_id": user_id})
             logger.info(f"Redis namespace: {redis_namespace}", extra={"user_id": user_id})
@@ -818,23 +816,20 @@ def create_embedding_task(csv_path: str, user_id: str, template_id: str, model_n
     Creates embeddings for a CSV dataset using Ollama embedding models.
     Runs synchronously within a FastAPI BackgroundTask context.
     """
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.engine import make_url
     from app.core.config import settings
-    from app.services.ollama_embedding_service import get_ollama_service
     from app.services.redis_vector_service import RedisVectorService
-    
+
     try:
         logger.info(f"Starting background embedding task: {template_id}")
-        
-        # 1. Create Synchronous DB Connection
+
+        # 1. Validate DB Connection URL
         sync_db_url = settings.database_url.replace("+asyncpg", "")
-        engine = create_engine(sync_db_url)
-        SyncSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-        
+        make_url(sync_db_url)  # Lightweight URL validation without creating a connection pool
+
         # 2. Parse and validate IDs
         try:
-            parsed_user_id = uuid.UUID(user_id)
+            uuid.UUID(user_id)
         except (ValueError, TypeError):
             logger.error(f"Invalid user_id (not a UUID): {user_id}")
             return {
@@ -860,11 +855,9 @@ def create_embedding_task(csv_path: str, user_id: str, template_id: str, model_n
         
         # Get embedding model
         model_id = model_name or "nomic-embed-text"
-        dimension = 768  # nomic-embed-text dimension
-        
+
         # Initialize services
         redis_service = RedisVectorService()
-        ollama_service = get_ollama_service()
         
         # Generate task ID
         import secrets
@@ -872,11 +865,11 @@ def create_embedding_task(csv_path: str, user_id: str, template_id: str, model_n
         
         # Prepare texts from CSV rows
         texts = []
-        for _, row in df.iterrows():
+        for row_idx, row in df.iterrows():
             query = row.get('query', '')
             api = row.get('api', '')
             notes = row.get('notes', '')
-            text = f"{query} {api} {notes}".strip() or f"API test case"
+            text = f"{query} {api} {notes}".strip() or f"API test case (row_id: {row_idx})"
             texts.append(text)
         
         # Generate embeddings using PARALLEL async HTTP calls for speed
@@ -1020,7 +1013,7 @@ def reembed_dataset_sync(
         total_rows = len(df)
         
         if total_rows == 0:
-            logger.warning(f"CSV is empty, nothing to embed")
+            logger.warning("CSV is empty, nothing to embed")
             # Update status to completed with 0 rows
             db = SyncSessionLocal()
             try:

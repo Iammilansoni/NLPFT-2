@@ -187,7 +187,7 @@ def compare_approaches(test_query: str, top_k: int = 10):
         if results_text_only[0]['api'] == results_with_metadata[0]['api']:
             print(f"   ✅ Both approaches agree on #1: {results_text_only[0]['api']}")
         else:
-            print(f"   ⚠️  Different #1 results:")
+            print("   ⚠️  Different #1 results:")
             print(f"      Text-only: {results_text_only[0]['api']}")
             print(f"      With metadata: {results_with_metadata[0]['api']}")
         

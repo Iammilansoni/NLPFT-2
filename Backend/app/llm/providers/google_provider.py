@@ -599,7 +599,7 @@ class GoogleProvider(BaseLLMProvider):
                     last_error = TransientError(f"Gemini service unavailable: {e}")
                     retry_count += 1
                     if retry_count <= self.max_retries:
-                        logger.warning(f"Service unavailable, retrying")
+                        logger.warning("Service unavailable, retrying")
                         await asyncio.sleep(min(2 ** retry_count, 30))
                         continue
                     raise last_error
@@ -719,8 +719,8 @@ class GoogleProvider(BaseLLMProvider):
         """
         try:
             start_time = time.time()
-            
-            response = await self.generate(
+
+            await self.generate(
                 prompt="Respond with the single word: Hello",
                 system_prompt="You are a helpful assistant. Reply with one word only.",
                 config=LLMConfig(max_tokens=10, temperature=0),
@@ -757,7 +757,7 @@ class GoogleProvider(BaseLLMProvider):
                 message=f"Safety filter triggered: {e}",
                 error_code="SAFETY_BLOCK",
             )
-        except RateLimitError as e:
+        except RateLimitError:
             return ConnectionTestResult(
                 success=False,
                 message="Gemini API quota exceeded. Please check your Google Cloud billing or wait for quota reset.",

@@ -17,7 +17,7 @@ Categories:
 """
 
 import re
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Tuple
 from enum import Enum
 
 

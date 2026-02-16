@@ -17,7 +17,7 @@ Features:
 """
 
 import time
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict
 
 import httpx
 

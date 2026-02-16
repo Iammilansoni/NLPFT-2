@@ -19,7 +19,6 @@ Features:
 """
 
 import time
-import json
 from typing import Optional, List, Dict, Any
 
 import httpx
@@ -437,11 +436,9 @@ class GrokProvider(BaseLLMProvider):
         try:
             error_data = response.json()
             error_msg = error_data.get("error", {}).get("message", str(error_data))
-            error_type = error_data.get("error", {}).get("type", "unknown")
             error_code = error_data.get("error", {}).get("code", "unknown")
         except Exception:
             error_msg = response.text or f"HTTP {response.status_code}"
-            error_type = "unknown"
             error_code = "unknown"
         
         status_code = response.status_code

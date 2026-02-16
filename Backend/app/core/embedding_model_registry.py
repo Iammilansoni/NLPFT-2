@@ -23,7 +23,6 @@ Thread-safe singleton pattern for production use.
 """
 
 from typing import Dict, List, Optional, Any
-from pydantic import BaseModel, Field
 from enum import Enum
 from dataclasses import dataclass
 from functools import lru_cache

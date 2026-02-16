@@ -15,15 +15,13 @@ import os
 import json
 import math
 import csv
-import random
-import string
 import asyncio
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Tuple, TYPE_CHECKING
+from typing import Dict, List, Optional, Any, TYPE_CHECKING
 from uuid import UUID
 import pandas as pd
 
-from app.core.config import settings, DATASETS_DIR
+from app.core.config import DATASETS_DIR
 from app.core.logger import logger
 
 if TYPE_CHECKING:
@@ -128,7 +126,6 @@ class EnterpriseDatasetGenerator:
         method = template_data.get("method", "POST") if isinstance(template_data, dict) else "POST"
         parameters = template_data.get("parameters", []) if isinstance(template_data, dict) else []
         sample_requests = template_data.get("sample_requests", []) if isinstance(template_data, dict) else []
-        sample_responses = template_data.get("sample_responses", []) if isinstance(template_data, dict) else []
         json_schema = template_data.get("json_schema", {}) if isinstance(template_data, dict) else {}
         domain_tags = template_data.get("domain_tags", []) if isinstance(template_data, dict) else []
         security_classification = template_data.get("security_classification", "internal") if isinstance(template_data, dict) else "internal"
@@ -143,7 +140,6 @@ class EnterpriseDatasetGenerator:
         parameters_json = safe_json_dumps(parameters, "[]")
         json_schema_json = safe_json_dumps(json_schema, "{}")
         sample_requests_json = safe_json_dumps(sample_requests, "[]")
-        sample_responses_json = safe_json_dumps(sample_responses, "[]")
         domain_tags_str = ', '.join(str(t) for t in domain_tags) if domain_tags else 'general'
         
         system_prompt = f"""You are an API Test Dataset Generator used for safe software testing.
@@ -398,7 +394,7 @@ Return ONLY the JSON array, nothing else."""
             
             try:
                 data = json.loads(fixed_text)
-                logger.info(f"Fixed trailing commas and parsed JSON")
+                logger.info("Fixed trailing commas and parsed JSON")
                 return self._process_parsed_json(data)
             except json.JSONDecodeError:
                 pass
@@ -439,14 +435,14 @@ Return ONLY the JSON array, nothing else."""
             try:
                 fixed_text = response_text.replace("'", '"')
                 data = json.loads(fixed_text)
-                logger.info(f"Fixed quotes and parsed JSON")
+                logger.info("Fixed quotes and parsed JSON")
                 return self._process_parsed_json(data)
             except json.JSONDecodeError:
                 pass
             except Exception as e:
                 logger.error(f"Unexpected error after fixing quotes: {type(e).__name__}: {e}")
             
-            logger.error(f"All JSON extraction strategies failed")
+            logger.error("All JSON extraction strategies failed")
             logger.error(f"Response text sample: {original_text[:500]}...")
             return []
             
@@ -469,7 +465,7 @@ Return ONLY the JSON array, nothing else."""
                         logger.info(f"Extracted {len(data[key])} test cases from '{key}' key")
                         return data[key]
                 if "query" in data:
-                    logger.info(f"Extracted 1 test case (single object)")
+                    logger.info("Extracted 1 test case (single object)")
                     return [data]
             
             logger.warning(f"Unexpected JSON structure: {type(data)}")
@@ -493,7 +489,7 @@ Return ONLY the JSON array, nothing else."""
             logger.warning(f"Test case is not a dict: {type(test_case)}")
             return False
         if "query" not in test_case or not test_case.get("query"):
-            logger.warning(f"Missing required field: query")
+            logger.warning("Missing required field: query")
             return False
         
         if "api" not in test_case:
@@ -664,7 +660,6 @@ Return ONLY the JSON array, nothing else."""
         from app.llm.provider_factory import LLMProviderFactory
         from app.core.encryption import decrypt_api_key
         from app.models.database_models import LLMProviderConfig
-        from uuid import UUID
 
         user_uuid = UUID(user_id) if isinstance(user_id, str) else user_id
 
@@ -837,7 +832,7 @@ Return ONLY the JSON array, nothing else."""
                 error_str = str(e).lower()
                 
                 if "quota" in error_str or "rate" in error_str:
-                    logger.warning(f"Gemini rate limit hit, waiting before retry...")
+                    logger.warning("Gemini rate limit hit, waiting before retry...")
                     await asyncio.sleep(5 * (attempt + 1))
                     continue
                     
@@ -1080,7 +1075,7 @@ Return ONLY the JSON array, nothing else."""
             logger.info(f"Distribution: valid={scenario_stats['valid']}, edge={scenario_stats['edge']}, extreme={scenario_stats['extreme']}")
             
             update_progress(100, f"Generated {len(valid_test_cases)} test cases successfully!", "complete")
-            logger.info(f"Dataset generation completed successfully!")
+            logger.info("Dataset generation completed successfully!")
             
             return {
                 "success": True,

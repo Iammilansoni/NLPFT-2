@@ -14,7 +14,7 @@ Features:
 """
 
 import time
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict
 
 import httpx
 
@@ -561,10 +561,8 @@ class OpenAIProvider(BaseLLMProvider):
         try:
             error_data = response.json()
             error_msg = error_data.get("error", {}).get("message", str(error_data))
-            error_type = error_data.get("error", {}).get("type", "unknown")
         except Exception:
             error_msg = response.text
-            error_type = "unknown"
         
         status_code = response.status_code
         

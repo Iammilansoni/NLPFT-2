@@ -11,7 +11,6 @@ from sqlalchemy import select
 from app.core.postgres import get_db
 from app.api.v1.auth import get_current_user
 from app.models.database_models import User, LLMProviderConfig
-from app.models.schemas.common_schemas import MessageResponse
 from app.core.encryption import get_encryption_service, APIKeyEncryption
 from app.core.logger import logger
 

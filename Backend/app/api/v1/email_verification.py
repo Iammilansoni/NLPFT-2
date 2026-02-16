@@ -7,7 +7,6 @@ Endpoints:
 - POST /api/v1/auth/resend-otp - Resend OTP
 """
 
-from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
@@ -92,7 +91,7 @@ async def send_verification_otp(
         existing_otps = select(EmailVerification).where(
             and_(
                 EmailVerification.email == email,
-                EmailVerification.is_verified == False
+                EmailVerification.is_verified.is_(False)
             )
         )
         result = await db.execute(existing_otps)
@@ -181,7 +180,7 @@ async def verify_otp(
         otp_query = select(EmailVerification).where(
             and_(
                 EmailVerification.email == email,
-                EmailVerification.is_verified == False
+                EmailVerification.is_verified.is_(False)
             )
         ).order_by(EmailVerification.created_at.desc())
         
@@ -299,7 +298,7 @@ async def resend_otp(
         existing_otps = select(EmailVerification).where(
             and_(
                 EmailVerification.email == email,
-                EmailVerification.is_verified == False
+                EmailVerification.is_verified.is_(False)
             )
         )
         result = await db.execute(existing_otps)
@@ -322,7 +321,10 @@ async def resend_otp(
         # Send email
         username = user.user_name or email.split('@')[0]
         sent = email_service.send_resend_otp_email(email, otp, username)
-        
+
+        if not sent:
+            logger.warning(f"Email not sent, OTP created for {email}")
+
         logger.info(f"OTP resent to {email}")
         
         return OTPResponse(

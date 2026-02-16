@@ -23,7 +23,7 @@ Query Flow:
 """
 
 from typing import Annotated, Optional, List
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 import uuid
@@ -34,7 +34,6 @@ from app.models.schemas import UserResponse
 from app.services.multi_model_semantic_service import get_multi_model_semantic_service
 from app.services.multi_model_embedding_service import get_multi_model_embedding_service
 from app.core.embedding_model_registry import get_embedding_registry
-from app.core.logger import logger
 
 
 router = APIRouter(prefix="/query", tags=["multi-model-query"])

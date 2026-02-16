@@ -5,7 +5,7 @@ Endpoints:
 - GET /api/v1/embeddings/validate/{template_id} - Check if dataset embeddings match user's current model
 """
 
-from typing import Annotated, Dict, Any
+from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
@@ -211,7 +211,7 @@ async def reembed_dataset(
             logger.info(f"Deleted {len(keys)} old embeddings")
         
         # Re-embed with current model
-        logger.info(f"Re-embedding dataset with user's current model")
+        logger.info("Re-embedding dataset with user's current model")
         task_id = await embedding_service.auto_embed_generated_dataset(
             user_id=current_user.u_id,
             template_id=UUID(request.template_id),

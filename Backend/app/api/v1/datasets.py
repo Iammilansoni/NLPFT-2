@@ -36,17 +36,12 @@ from app.services.embedding_service import get_enhanced_embedding_service
 from app.core.models_config import (
     get_all_embedding_models,
     get_all_llms,
-    get_embedding_model_info,
-    EMBEDDING_TOOLTIP,
-    MODEL_MISMATCH_WARNING
+    EMBEDDING_TOOLTIP
 )
 from app.models.schemas.embedding_schemas import (
     ReembedDatasetRequest,
     ReembedDatasetResponse,
     SearchDatasetRequest,
-    SearchDatasetResponse,
-    DatasetEmbeddingStatus,
-    EmbeddingStatus,
 )
 
 router = APIRouter(prefix="/datasets", tags=["Datasets"])
@@ -114,14 +109,6 @@ class EmbedDatasetResponse(BaseModel):
     message: str
     model: str
     is_reembed: bool
-
-
-class SearchDatasetRequest(BaseModel):
-    """Request to search dataset vectors"""
-    dataset_id: str
-    query: str
-    model: str  # REQUIRED: Must match dataset's embedded_with_model
-    top_k: Optional[int] = 5
 
 
 class SearchSimilarTestCasesRequest(BaseModel):
@@ -250,8 +237,6 @@ async def store_csv_to_postgresql(
     
     logger.info(f"Stored {total_rows} rows in PostgreSQL (dataset_id={dataset.dataset_id})")
     return dataset
-    statistics: Optional[dict] = None
-    error: Optional[str] = None
 
 
 # ============= BACKGROUND TASKS =============

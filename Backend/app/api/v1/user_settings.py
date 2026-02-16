@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from app.core.postgres import get_db
 from app.api.v1.auth import get_current_user
-from app.models.database_models import UserSettings, User
+from app.models.database_models import UserSettings
 from app.models.schemas import UserResponse
 from app.services.model_service import get_model_service, ModelService
 from app.services.audit_service import get_audit_service

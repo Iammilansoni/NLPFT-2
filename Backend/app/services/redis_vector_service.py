@@ -14,15 +14,15 @@ This service is retained for backward compatibility only.
 import warnings
 import redis
 import numpy as np
-from typing import List, Dict, Optional, Tuple, Union
+from typing import List, Dict, Optional, Tuple
 import uuid
 from datetime import datetime, timezone
 
-from redis.commands.search.field import VectorField, TextField, NumericField
+from redis.commands.search.field import VectorField, TextField
 from redis.commands.search.indexDefinition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 
-from app.core.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD, MODEL_NAME
+from app.core.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
 from app.core.logger import logger
 from app.core.redis_security import (
     RedisKeyValidator, 
@@ -119,7 +119,7 @@ class RedisVectorService:
             )
             
             definition = IndexDefinition(
-                prefix=[f"embedding:"],
+                prefix=["embedding:"],
                 index_type=IndexType.JSON
             )
             

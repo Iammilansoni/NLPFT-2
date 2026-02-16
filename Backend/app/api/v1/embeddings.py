@@ -6,7 +6,7 @@ Handles vector embeddings stored in Redis with metadata in PostgreSQL
 from typing import Annotated, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel
+from sqlalchemy import select
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 import uuid
@@ -16,6 +16,7 @@ from app.services.enterprise_service import get_enterprise_service, EnterpriseSe
 from app.services.redis_vector_service import get_redis_vector_service, RedisVectorService
 from app.api.v1.auth import get_current_user
 from app.models.schemas import UserResponse, EmbeddingCreate, EmbeddingResponse, VectorSearchRequest, VectorSearchResult
+from app.models.database_models import UserSettings
 from app.core.logger import logger
 
 router = APIRouter()
@@ -667,7 +668,7 @@ async def check_reembedding_impact(
     
     This is used to show warnings before model changes.
     """
-    from sqlalchemy import select, func
+    from sqlalchemy import select
     from app.models.database_models import Dataset, UserSettings
     from app.core.embedding_model_registry import get_embedding_registry
     

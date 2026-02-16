@@ -12,8 +12,9 @@ Features:
 - Dataset generation ONLY for approved templates
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, delete
 from typing import List, Optional
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
@@ -34,8 +35,6 @@ from app.models.schemas.template_schemas import (
     TemplateValidationResponse,
     TemplateValidationError,
     TemplateStatus,
-    DomainTag,
-    ParameterSchema,
     TemplateDraftCreate,
     TemplateDraftUpdate
 )
@@ -46,8 +45,6 @@ from slowapi.util import get_remote_address
 
 # Initialize rate limiter for template operations
 limiter = Limiter(key_func=get_remote_address)
-from sqlalchemy import select, update, delete
-from fastapi import Request
 
 router = APIRouter(prefix="/templates", tags=["Template Builder"])
 

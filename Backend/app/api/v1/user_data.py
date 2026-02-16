@@ -15,7 +15,6 @@ from app.models.schemas import (
     UserResponse, TemplateCreate, TemplateResponse,
     CSVDataCreate, CSVDataResponse
 )
-from app.core.logger import logger
 
 router = APIRouter()
 

@@ -15,7 +15,6 @@ Features:
 """
 
 import time
-import asyncio
 from typing import Optional, List, Dict, Any, Callable
 
 import httpx
@@ -29,8 +28,6 @@ from app.llm.providers.base import (
     ProviderModel,
     ConnectionTestResult,
     ProviderError,
-    AuthenticationError,
-    RateLimitError,
     TransientError,
     ModelNotFoundError,
     InvalidRequestError,

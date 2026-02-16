@@ -7,13 +7,10 @@ Supports multiple email providers:
 - AWS SES (future)
 """
 
-import os
 import smtplib
 import random
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime, timedelta
-from typing import Optional
 
 from app.core.logger import logger
 

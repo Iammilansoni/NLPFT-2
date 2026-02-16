@@ -258,8 +258,7 @@ class ModelService:
         
         # Get all existing DB models
         db_models = await ModelService.get_all_models(db, status=None)  # Get all statuses
-        db_model_ids = {m.model_id for m in db_models}
-        
+
         # Add or update models from config
         for config_model in config_models:
             existing = await ModelService.get_model_by_id(db, config_model['model_id'])

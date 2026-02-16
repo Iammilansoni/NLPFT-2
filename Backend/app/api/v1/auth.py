@@ -549,7 +549,7 @@ async def reset_password(
         select(PasswordReset).where(
             and_(
                 PasswordReset.token == reset_data.token,
-                PasswordReset.is_used == False
+                PasswordReset.is_used.is_(False)
             )
         )
     )
@@ -633,7 +633,7 @@ async def verify_reset_token(
         select(PasswordReset).where(
             and_(
                 PasswordReset.token == token,
-                PasswordReset.is_used == False
+                PasswordReset.is_used.is_(False)
             )
         )
     )

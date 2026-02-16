@@ -24,18 +24,18 @@ from typing import Optional, Tuple, Dict, Any, Set
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
-from sqlalchemy import select, update
+from sqlalchemy import select
 
 from app.core.logger import logger
-
-# Module-level tracking for in-flight model pulls to prevent duplicates
-_in_flight_pulls: Set[str] = set()
-_in_flight_lock = asyncio.Lock()
 from app.core.embedding_model_registry import (
     get_embedding_registry,
     EmbeddingModelSpec
 )
-from app.models.database_models import UserSettings, User
+from app.models.database_models import UserSettings
+
+# Module-level tracking for in-flight model pulls to prevent duplicates
+_in_flight_pulls: Set[str] = set()
+_in_flight_lock = asyncio.Lock()
 
 
 class UserEmbeddingSettingsService:

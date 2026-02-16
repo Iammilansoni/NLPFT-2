@@ -34,7 +34,6 @@ import numpy as np
 from typing import List, Dict, Optional, Tuple, Any
 import uuid
 from datetime import datetime, timezone
-import json
 
 from redis.commands.search.field import VectorField, TextField, NumericField, TagField
 from redis.commands.search.indexDefinition import IndexDefinition, IndexType
@@ -43,13 +42,7 @@ from redis.commands.search.query import Query
 from app.core.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
 from app.core.logger import logger
 from app.core.embedding_model_registry import (
-    get_embedding_registry,
-    EmbeddingModelSpec
-)
-from app.core.redis_security import (
-    RedisKeyValidator, 
-    validate_embedding_access, 
-    RedisAccessDeniedError
+    get_embedding_registry
 )
 
 

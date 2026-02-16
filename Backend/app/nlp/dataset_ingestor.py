@@ -5,7 +5,7 @@ Supports both old format (api column) and new format (intent column)
 
 import pandas as pd
 import json
-from typing import Dict, List, Optional
+from typing import Dict, List
 from app.nlp.embedding_manager import get_embedding_manager
 from app.core.logger import logger
 

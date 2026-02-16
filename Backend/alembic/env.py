@@ -1,5 +1,6 @@
 """Alembic environment configuration for async PostgreSQL migrations."""
 
+import os
 from logging.config import fileConfig
 import asyncio
 from sqlalchemy import pool
@@ -7,6 +8,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
+from dotenv import load_dotenv
 
 # Import your models
 import sys
@@ -16,11 +18,7 @@ from pathlib import Path
 backend_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from app.core.postgres import Base
-from app.models.database_models import (
-    User, Template, Parameter, ExpectedResponse, 
-    Metadata, CSVData, Embedding
-)
+from app.core.postgres import Base  # noqa: E402
 
 # this is the Alembic Config object
 config = context.config
@@ -33,8 +31,6 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Get database URL from environment
-import os
-from dotenv import load_dotenv
 load_dotenv()
 
 DATABASE_URL = os.getenv(
@@ -70,7 +66,7 @@ async def run_async_migrations() -> None:
     """Run migrations in async mode."""
     configuration = config.get_section(config.config_ini_section)
     configuration["sqlalchemy.url"] = DATABASE_URL
-    
+
     connectable = async_engine_from_config(
         configuration,
         prefix="sqlalchemy.",

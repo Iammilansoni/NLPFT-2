@@ -3,18 +3,17 @@ Embedding Manager - Handle embeddings and Redis vector operations
 Uses Ollama for CPU-based embeddings (no HuggingFace dependency)
 """
 
-import os
 import hashlib
 import json
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 import numpy as np
 import redis
 from redis.commands.search.field import VectorField, TextField, NumericField
 from redis.commands.search.indexDefinition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 
-from app.core.config import settings, REDIS_HOST, REDIS_PORT, MODEL_NAME
+from app.core.config import REDIS_HOST, REDIS_PORT
 from app.core.logger import logger
 from app.nlp.embedding_model import OllamaEmbeddingModel
 
@@ -110,7 +109,7 @@ class EmbeddingManager:
             )
             
             definition = IndexDefinition(
-                prefix=[f"api:"],
+                prefix=["api:"],
                 index_type=IndexType.HASH
             )
             

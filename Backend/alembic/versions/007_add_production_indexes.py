@@ -10,7 +10,6 @@ This migration adds critical indexes for production performance:
 """
 
 from alembic import op
-import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.

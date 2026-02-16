@@ -651,8 +651,8 @@ class HuggingFaceProvider(BaseLLMProvider):
         """Test HuggingFace API connectivity."""
         try:
             start_time = time.time()
-            
-            response = await self.generate(
+
+            await self.generate(
                 prompt="Say 'OK' to confirm connection.",
                 system_prompt="Respond only with 'OK'.",
                 config=LLMConfig(max_tokens=10, temperature=0),

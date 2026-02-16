@@ -2,7 +2,6 @@
 
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from pathlib import Path
 
 from fastapi import FastAPI, Request, APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -377,7 +376,6 @@ def create_app() -> FastAPI:
     async def websocket_endpoint(websocket: WebSocket, token: str = None):
         from app.core.log_manager import log_manager
         from app.core.security import verify_token
-        from fastapi import Query
         
         logger.info(f"WebSocket connection attempt with token: {'present' if token else 'missing'}")
         

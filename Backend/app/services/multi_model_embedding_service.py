@@ -26,19 +26,17 @@ Embedding Flow:
 """
 
 import uuid
-import asyncio
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, Optional, Any
 from datetime import datetime, timezone
 from pathlib import Path
-from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select
 
 from app.core.logger import logger
 from app.core.embedding_model_registry import get_embedding_registry
-from app.models.database_models import Dataset, Template, Metadata, UserSettings
+from app.models.database_models import Dataset
 from app.services.user_embedding_settings_service import get_user_embedding_settings_service
 from app.services.multi_model_redis_service import get_multi_model_redis_service
 from app.services.ollama_embedding_service import get_ollama_service

@@ -11,10 +11,10 @@ This API provides high-precision semantic search with cross-encoder reranking.
 """
 
 from fastapi import APIRouter, Query, HTTPException, Body, Depends
-from typing import Optional, Union, Annotated
+from typing import Optional, Annotated
 from app.nlp.ranking_engine import (
-    rank_query, 
-    rank_query_detailed, 
+    rank_query,
+    rank_query_detailed,
     get_reranker_info,
     stage1_vector_retrieval,
     stage2_flashrank_rerank,
@@ -24,9 +24,13 @@ from app.models.schemas import (
     RankingResponse,
     DetailedRankingResponse,
     RerankerInfoResponse,
+    SemanticRetrievalRequest,
+    SemanticRetrievalResponse,
 )
 from app.api.v1.auth import get_current_user
 from app.models.database_models import User
+from app.services.multi_model_semantic_service import get_multi_model_semantic_service
+from app.core.postgres import get_db
 from app.core.logger import logger
 
 router = APIRouter()
@@ -312,14 +316,6 @@ async def rank_stage2_only(
 
 
 # --- Semantic API Retrieval Pipeline ---
-
-from app.models.schemas import (
-    SemanticRetrievalRequest,
-    SemanticRetrievalResponse,
-)
-# Migrated to multi-model semantic service for proper model governance
-from app.services.multi_model_semantic_service import get_multi_model_semantic_service
-from app.core.postgres import get_db
 
 
 @router.post("/semantic-retrieve", response_model=SemanticRetrievalResponse)

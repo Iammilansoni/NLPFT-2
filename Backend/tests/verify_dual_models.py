@@ -1,16 +1,12 @@
 
 import sys
-import os
-import asyncio
 import uuid
-import numpy as np
 from pathlib import Path
 
 # Add Backend to path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from app.services.redis_vector_service import RedisVectorService
-from app.core.config import REDIS_HOST, REDIS_PORT
 
 def verify_dual_models():
     print("🚀 Starting Dual Model Verification...")

@@ -203,7 +203,7 @@ class MultiModelSemanticRetrievalService:
                         ]
                     }
                 
-                logger.info(f"Step 2: Model compatibility verified")
+                logger.info("Step 2: Model compatibility verified")
         
         # =====================================================================
         # STEP 3: Generate query embedding using correct model
@@ -234,7 +234,7 @@ class MultiModelSemanticRetrievalService:
                 return {
                     "success": False,
                     "error": "DIMENSION_MISMATCH",
-                    "message": f"Query embedding dimension mismatch"
+                    "message": "Query embedding dimension mismatch"
                 }
                 
         except Exception as e:

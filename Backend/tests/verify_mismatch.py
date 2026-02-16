@@ -1,6 +1,5 @@
 
 import sys
-import os
 import asyncio
 import uuid
 from unittest.mock import MagicMock, AsyncMock

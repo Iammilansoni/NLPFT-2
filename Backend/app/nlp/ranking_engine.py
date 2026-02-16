@@ -21,7 +21,7 @@ import warnings
 import os
 import numpy as np
 import json
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from redis.commands.search.query import Query
 from app.redis_config import get_redis_client
 from app.nlp.embedding_model import get_model
@@ -79,12 +79,12 @@ def _get_reranker():
     global _reranker
     if _reranker is None:
         try:
-            from flashrank import Ranker, RerankRequest
+            from flashrank import Ranker
             logger.info(f"Initializing FlashRank reranker: {RERANKER_MODEL}...")
             _reranker = Ranker(model_name=RERANKER_MODEL, cache_dir=FLASHRANK_CACHE_DIR)
             logger.info(f"FlashRank reranker ready: {RERANKER_MODEL}")
         except ImportError as e:
-            logger.error(f"FlashRank not installed. Install with: pip install flashrank")
+            logger.error("FlashRank not installed. Install with: pip install flashrank")
             raise ImportError("FlashRank is required for reranking. Install with: pip install flashrank") from e
         except Exception as e:
             logger.error(f"Failed to initialize FlashRank: {e}")

@@ -5,9 +5,8 @@ Provides validation functions for template parameters and generation settings.
 Dataset generation is handled directly in the API endpoint (app/api/v1/datasets.py).
 """
 
-from typing import Dict, List, Any
+from typing import Dict, List
 
-from app.core.logger import logger
 
 
 # =============================================================================

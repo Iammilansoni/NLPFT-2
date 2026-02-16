@@ -11,8 +11,7 @@ Matches: templates, parameters, expected_responses, metadata tables
 
 from datetime import datetime
 from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, Field, field_validator, model_validator
-from uuid import UUID
+from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 
 
