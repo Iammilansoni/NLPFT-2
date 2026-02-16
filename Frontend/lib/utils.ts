@@ -9,12 +9,6 @@ export function cn(...inputs: ClassValue[]) {
 // CENTRALIZED ERROR HANDLING
 // ============================================================================
 
-export interface ApiError {
-  message: string;
-  detail?: string | { message?: string; errors?: string[] };
-  status?: number;
-}
-
 /**
  * Parse API error response and return a user-friendly message
  */
@@ -43,12 +37,6 @@ export function parseApiError(error: unknown, fallbackMessage: string = 'An erro
   return fallbackMessage;
 }
 
-/**
- * Log error to console with consistent formatting
- */
-export function logError(context: string, error: unknown): void {
-  console.error(`[${context}]`, error);
-}
 
 // ============================================================================
 // INPUT SANITIZATION

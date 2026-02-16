@@ -119,12 +119,6 @@ export interface ApiResponse<T> {
   message?: string;
 }
 
-export interface ApiError {
-  message: string;
-  status: number;
-  details?: unknown;
-}
-
 export interface EmbeddingModel {
   id: string;
   name: string;

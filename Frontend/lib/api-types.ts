@@ -233,7 +233,7 @@ export interface QueryResponse {
 // Common Types
 // ============================================================================
 
-export interface ApiError {
+export interface ApiErrorResponse {
   error: string;
   detail?: string;
   timestamp?: string;

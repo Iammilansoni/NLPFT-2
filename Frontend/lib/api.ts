@@ -18,7 +18,7 @@ import type {
   DatasetGenerateResponse,
   QueryRequest,
   QueryResponse,
-  ApiError,
+  ApiErrorResponse,
 } from './api-types';
 import { getApiBase } from './runtime-config';
 
@@ -68,7 +68,7 @@ class ApiClient {
           }
         }
 
-        let errorData: ApiError;
+        let errorData: ApiErrorResponse;
         try {
           errorData = await response.json();
         } catch {
