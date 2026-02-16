@@ -28,7 +28,7 @@ export default function TermsPage() {
               <li>Use the materials for any commercial purpose without authorization</li>
               <li>Attempt to reverse engineer any software contained on NLPForge</li>
               <li>Remove any copyright or other proprietary notations</li>
-              <li>Transfer the materials to another person or "mirror" the materials on any other server</li>
+              <li>Transfer the materials to another person or &quot;mirror&quot; the materials on any other server</li>
             </ul>
           </section>
 

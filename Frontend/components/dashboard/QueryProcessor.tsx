@@ -52,7 +52,7 @@ export function QueryProcessor() {
             Natural Language Query
           </CardTitle>
           <CardDescription>
-            Describe your API test in plain English. We'll extract the intent, generate test cases, and run semantic matching.
+            Describe your API test in plain English. We&apos;ll extract the intent, generate test cases, and run semantic matching.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -238,7 +238,7 @@ export function QueryProcessor() {
                           </Badge>
                         </div>
                         <div className="text-sm text-muted-foreground italic">
-                          "{searchResult.query}"
+                          &quot;{searchResult.query}&quot;
                         </div>
                         {searchResult.endpoint && (
                           <div className="mt-2 text-xs font-mono text-primary">

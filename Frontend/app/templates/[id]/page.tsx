@@ -100,7 +100,7 @@ export default function TemplateDetailPage() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-2">Template Not Found</h2>
-          <p className="text-muted-foreground mb-4">The template you're looking for doesn't exist.</p>
+          <p className="text-muted-foreground mb-4">The template you&apos;re looking for doesn&apos;t exist.</p>
           <Button onClick={() => router.push("/templates")}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Templates

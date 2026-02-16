@@ -137,7 +137,7 @@ export function MetricsProof() {
                   <CardContent className="p-6 space-y-4">
                     <Quote className="h-8 w-8 text-primary/20" />
                     <p className="text-muted-foreground leading-relaxed">
-                      "{testimonial.quote}"
+                      &quot;{testimonial.quote}&quot;
                     </p>
                     <div className="flex items-center gap-3 pt-4 border-t">
                       <div className="h-12 w-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-bold text-sm">

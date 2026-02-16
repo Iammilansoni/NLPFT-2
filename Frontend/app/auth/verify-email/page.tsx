@@ -136,7 +136,7 @@ function VerifyEmailContent() {
               Verify Your Email
             </CardTitle>
             <CardDescription className="text-center">
-              We've sent a 6-digit code to<br />
+              We&apos;ve sent a 6-digit code to<br />
               <span className="font-semibold text-foreground">{email}</span>
             </CardDescription>
           </CardHeader>
@@ -193,7 +193,7 @@ function VerifyEmailContent() {
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
                   <span className="bg-background px-2 text-muted-foreground">
-                    Didn't receive code?
+                    Didn&apos;t receive code?
                   </span>
                 </div>
               </div>
@@ -224,7 +224,7 @@ function VerifyEmailContent() {
               </Button>
 
               <p className="text-center text-sm text-muted-foreground">
-                Check your spam folder if you don't see the email
+                Check your spam folder if you don&apos;t see the email
               </p>
             </form>
           </CardContent>

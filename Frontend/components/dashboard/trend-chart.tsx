@@ -109,33 +109,33 @@ export function TrendChart() {
   const RAW_API_BASE = getApiBase()
   const API_BASE = RAW_API_BASE ? RAW_API_BASE.replace(/\/$/, '') : ''
 
-  const fetchTelemetry = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/api/v1/telemetry/metrics?limit=12`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('nlpforge_access_token')}`,
-        },
-      })
+  useEffect(() => {
+    const fetchTelemetry = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/api/v1/telemetry/metrics?limit=12`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('nlpforge_access_token')}`,
+          },
+        })
 
-      if (response.ok) {
-        const metrics = await response.json()
-        if (metrics && metrics.length > 0) {
-          setData(metrics)
+        if (response.ok) {
+          const metrics = await response.json()
+          if (metrics && metrics.length > 0) {
+            setData(metrics)
+          } else {
+            setData(generateSampleData())
+          }
         } else {
           setData(generateSampleData())
         }
-      } else {
+      } catch (error) {
+        console.debug('Failed to fetch telemetry, using sample data:', error)
         setData(generateSampleData())
+      } finally {
+        setLoading(false)
       }
-    } catch (error) {
-      console.debug('Failed to fetch telemetry, using sample data:', error)
-      setData(generateSampleData())
-    } finally {
-      setLoading(false)
     }
-  }
 
-  useEffect(() => {
     // Fetch initial data
     fetchTelemetry()
 
@@ -143,7 +143,7 @@ export function TrendChart() {
     const interval = setInterval(fetchTelemetry, 30000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [API_BASE])
 
   if (loading) {
     return (

@@ -66,7 +66,7 @@ const GettingStartedContent = () => (
         Semantic API Search
       </h4>
       <p className="text-sm text-muted-foreground ml-8">
-        Ask questions in natural language like "How do I create a user?" and find the right API instantly.
+        Ask questions in natural language like &quot;How do I create a user?&quot; and find the right API instantly.
       </p>
     </div>
 
@@ -115,7 +115,7 @@ const TemplatesContent = () => (
       <div>
         <h4 className="font-semibold mb-2">Best Practices</h4>
         <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-          <li>Use descriptive API names (e.g., "Create User Account")</li>
+          <li>Use descriptive API names (e.g., &quot;Create User Account&quot;)</li>
           <li>Include multiple sample requests covering edge cases</li>
           <li>Add relevant domain tags for better discoverability</li>
           <li>Document expected responses with realistic data</li>
@@ -193,15 +193,15 @@ const SearchContent = () => (
         <ul className="text-sm text-muted-foreground space-y-2">
           <li className="flex items-start gap-2">
             <Search className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-            <span>"How do I create a new user account?"</span>
+            <span>&quot;How do I create a new user account?&quot;</span>
           </li>
           <li className="flex items-start gap-2">
             <Search className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-            <span>"Get product details by SKU"</span>
+            <span>&quot;Get product details by SKU&quot;</span>
           </li>
           <li className="flex items-start gap-2">
             <Search className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-            <span>"Update customer billing address"</span>
+            <span>&quot;Update customer billing address&quot;</span>
           </li>
         </ul>
       </div>

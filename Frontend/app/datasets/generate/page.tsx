@@ -606,7 +606,7 @@ export default function DatasetGenerationPage() {
                   </div>
                   <div className="flex items-start gap-2">
                     <ChevronRight className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <span><strong>Click "Embed to Redis"</strong> to create vectors for search</span>
+                    <span><strong>Click &quot;Embed to Redis&quot;</strong> to create vectors for search</span>
                   </div>
                 </div>
               </div>

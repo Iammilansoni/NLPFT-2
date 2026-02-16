@@ -41,11 +41,11 @@ export default function ForgotPasswordPage() {
           </div>
           <h2 className="text-2xl font-bold text-foreground mb-3">Check your email</h2>
           <p className="text-muted-foreground mb-6">
-            We've sent a password reset link to<br />
+            We&apos;ve sent a password reset link to<br />
             <strong className="text-foreground">{email}</strong>
           </p>
           <p className="text-sm text-muted-foreground mb-8">
-            Didn't receive the email? Check your spam folder or{' '}
+            Didn&apos;t receive the email? Check your spam folder or{' '}
             <button
               onClick={() => setSuccess(false)}
               className="text-primary hover:text-primary/80 font-medium transition-colors"
@@ -73,7 +73,7 @@ export default function ForgotPasswordPage() {
           Reset Password
         </h1>
         <p className="text-muted-foreground">
-          No worries, we'll send you reset instructions
+          No worries, we&apos;ll send you reset instructions
         </p>
       </div>
 

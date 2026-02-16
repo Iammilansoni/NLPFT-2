@@ -34,42 +34,38 @@ export function JSONViewer({
   const [isMasked, setIsMasked] = React.useState(maskSecrets)
   const [isCopied, setIsCopied] = React.useState(false)
 
-  const maskValue = (key: string, value: any): any => {
-    if (!isMasked) return value
-
-    const lowerKey = key.toLowerCase()
-    const shouldMask = secretKeys.some(secret => lowerKey.includes(secret.toLowerCase()))
-
-    if (shouldMask && typeof value === 'string') {
-      return '••••••••'
-    }
-
-    return value
-  }
-
-  const processData = (obj: any): any => {
-    if (obj === null || obj === undefined) return obj
-    if (typeof obj !== 'object') return obj
-
-    if (Array.isArray(obj)) {
-      return obj.map(item => processData(item))
-    }
-
-    const processed: Record<string, any> = {}
-    for (const [key, value] of Object.entries(obj)) {
-      if (typeof value === 'object' && value !== null) {
-        processed[key] = processData(value)
-      } else {
-        processed[key] = maskValue(key, value)
-      }
-    }
-    return processed
-  }
-
   const displayData = React.useMemo(() => {
     if (!data) return null
-    return processData(data)
-  }, [data, isMasked])
+
+    const maskVal = (key: string, value: any): any => {
+      if (!isMasked) return value
+      const lowerKey = key.toLowerCase()
+      const shouldMask = secretKeys.some(secret => lowerKey.includes(secret.toLowerCase()))
+      if (shouldMask && typeof value === 'string') {
+        return '••••••••'
+      }
+      return value
+    }
+
+    const process = (obj: any): any => {
+      if (obj === null || obj === undefined) return obj
+      if (typeof obj !== 'object') return obj
+      if (Array.isArray(obj)) {
+        return obj.map(item => process(item))
+      }
+      const processed: Record<string, any> = {}
+      for (const [key, value] of Object.entries(obj)) {
+        if (typeof value === 'object' && value !== null) {
+          processed[key] = process(value)
+        } else {
+          processed[key] = maskVal(key, value)
+        }
+      }
+      return processed
+    }
+
+    return process(data)
+  }, [data, isMasked, secretKeys])
 
   const handleCopy = async () => {
     if (!data) return

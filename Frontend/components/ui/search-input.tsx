@@ -66,6 +66,7 @@ export function SearchInput({
     if (value !== localValue) {
       setLocalValue(value)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value])
 
   return (

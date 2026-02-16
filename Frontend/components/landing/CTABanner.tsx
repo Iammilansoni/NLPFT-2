@@ -42,7 +42,7 @@ export function CTABanner() {
             </h2>
 
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Join teams who've already automated their API testing with natural language.
+              Join teams who&apos;ve already automated their API testing with natural language.
               No credit card required for your 14-day trial.
             </p>
 

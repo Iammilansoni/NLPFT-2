@@ -762,7 +762,7 @@ export default function TemplatesPage() {
             </div>
             <h3 className="text-xl font-semibold mb-2">No matches found</h3>
             <p className="text-muted-foreground text-center max-w-md mb-6">
-              Adjust your search or filters to find what you're looking for.
+              Adjust your search or filters to find what you&apos;re looking for.
             </p>
             <Button 
               variant="outline"

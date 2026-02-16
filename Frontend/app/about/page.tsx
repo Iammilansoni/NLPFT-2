@@ -146,7 +146,7 @@ export default function AboutPage() {
                                 </div>
                                 <div className="p-5 bg-card">
                                     <p className="text-muted-foreground mb-4 italic">
-                                        "Authenticate with email krishna@nlpforge.com and password secure123"
+                                        &quot;Authenticate with email krishna@nlpforge.com and password secure123&quot;
                                     </p>
                                     <div className="flex items-center gap-2 text-primary mb-4">
                                         <ArrowRight className="w-4 h-4" />

@@ -382,7 +382,7 @@ const ActiveModelStatus = ({ activeModel, activeModelInfo, dimension }: ActiveMo
               Select a model below to get started
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              Choose a model and click "Download & Activate" to enable embedding operations
+              Choose a model and click &quot;Download &amp; Activate&quot; to enable embedding operations
             </p>
           </div>
         </div>
@@ -923,7 +923,7 @@ export const EmbeddingModelPicker = ({ onModelActivated }: EmbeddingModelPickerP
                   {/* Help text */}
                   <div className="rounded-lg bg-blue-500/5 border border-blue-500/20 p-3 text-xs text-muted-foreground">
                     <Info className="h-4 w-4 text-blue-500 inline mr-2" />
-                    <strong>Unified workflow:</strong> Click "Download & Activate" to download a model and immediately set it as your default for all embedding operations.
+                    <strong>Unified workflow:</strong> Click &quot;Download &amp; Activate&quot; to download a model and immediately set it as your default for all embedding operations.
                   </div>
                 </>
               )}

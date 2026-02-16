@@ -7,8 +7,7 @@ import { useEffect } from 'react';
 export function HydrationWarningSuppress() {
   useEffect(() => {
     const originalError = console.error;
-    
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     console.error = (...args: any[]) => {
       
       if (
@@ -41,8 +40,7 @@ export function HydrationWarningSuppress() {
 
 if (typeof window !== 'undefined') {
   const originalError = console.error;
-  
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   console.error = (...args: any[]) => {
     if (
       typeof args[0] === 'string' &&
