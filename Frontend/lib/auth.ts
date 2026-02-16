@@ -27,6 +27,7 @@ export interface RegisterRequest {
 
 export interface AuthResponse {
   access_token: string;
+  refresh_token?: string;
   token_type: string;
   user: User;
 }
@@ -49,6 +50,7 @@ export interface ChangePasswordRequest {
 
 class AuthService {
   private readonly TOKEN_KEY = 'nlpforge_access_token';
+  private readonly REFRESH_TOKEN_KEY = 'nlpforge_refresh_token';
   private readonly USER_KEY = 'nlpforge_user';
 
   /**
@@ -57,6 +59,9 @@ class AuthService {
   async register(data: RegisterRequest): Promise<AuthResponse> {
     const response = await apiClient.post<AuthResponse>('/api/v1/auth/register', data);
     this.setToken(response.data.access_token);
+    if (response.data.refresh_token) {
+      this.setRefreshToken(response.data.refresh_token);
+    }
     this.setUser(response.data.user);
     return response.data;
   }
@@ -67,6 +72,9 @@ class AuthService {
   async login(data: LoginRequest): Promise<AuthResponse> {
     const response = await apiClient.post<AuthResponse>('/api/v1/auth/login/json', data);
     this.setToken(response.data.access_token);
+    if (response.data.refresh_token) {
+      this.setRefreshToken(response.data.refresh_token);
+    }
     this.setUser(response.data.user);
     return response.data;
   }
@@ -76,6 +84,7 @@ class AuthService {
    */
   logout(): void {
     this.removeToken();
+    this.removeRefreshToken();
     this.removeUser();
   }
 
@@ -147,6 +156,80 @@ class AuthService {
   removeToken(): void {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(this.TOKEN_KEY);
+    }
+  }
+
+  // Refresh token management
+  // NOTE: Refresh tokens should ideally be stored in httpOnly cookies set by
+  // the server. Until the backend sets httpOnly cookies on /login and /refresh
+  // responses (and the /refresh endpoint reads the cookie instead of the body),
+  // we keep localStorage as a transitional store but mark it clearly.
+  // TODO: Once the backend sets httpOnly refresh-token cookies, remove these
+  // localStorage helpers entirely and rely on credentials: 'include' / withCredentials.
+  setRefreshToken(token: string): void {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(this.REFRESH_TOKEN_KEY, token);
+    }
+  }
+
+  getRefreshToken(): string | null {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(this.REFRESH_TOKEN_KEY);
+    }
+    return null;
+  }
+
+  removeRefreshToken(): void {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(this.REFRESH_TOKEN_KEY);
+    }
+  }
+
+  /**
+   * Refresh the access token using the stored refresh token.
+   * Uses a single-flight lock so concurrent callers share one in-flight request.
+   * Returns the new access token or null if refresh failed.
+   */
+  private refreshPromise: Promise<string | null> | null = null;
+
+  async refreshAccessToken(): Promise<string | null> {
+    // Single-flight: if a refresh is already in progress, piggyback on it
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = this._doRefresh();
+    try {
+      return await this.refreshPromise;
+    } finally {
+      this.refreshPromise = null;
+    }
+  }
+
+  private async _doRefresh(): Promise<string | null> {
+    const refreshToken = this.getRefreshToken();
+    if (!refreshToken) return null;
+
+    try {
+      const response = await apiClient.post<AuthResponse>('/api/v1/auth/refresh', {
+        refresh_token: refreshToken,
+      });
+
+      const { access_token, refresh_token: newRefreshToken } = response.data;
+
+      this.setToken(access_token);
+      if (newRefreshToken) {
+        this.setRefreshToken(newRefreshToken);
+      }
+      if (response.data.user) {
+        this.setUser(response.data.user);
+      }
+
+      return access_token;
+    } catch {
+      // Refresh token is invalid/expired - force logout
+      this.logout();
+      return null;
     }
   }
 

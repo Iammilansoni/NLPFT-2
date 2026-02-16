@@ -44,27 +44,15 @@ export default function LoginPage() {
       const from = searchParams.get('from');
       const redirectPath = from || '/dashboard';
 
-      // Verify cookie is set before redirect
-      const maxRetries = 10;
-      let retries = 0;
-      let cookieSet = false;
-
-      while (retries < maxRetries && !cookieSet) {
-        if (document.cookie.includes('nlpforge_access_token')) {
-          cookieSet = true;
-          break;
-        }
-        await new Promise(resolve => setTimeout(resolve, 50));
-        retries++;
-      }
-
-      if (!cookieSet) {
-        setError('Authentication failed. Please try again.');
+      // Verify login succeeded by checking the response contains a token,
+      // rather than polling document.cookie (which can't see HttpOnly cookies
+      // and is fragile with third-party cookie blocking).
+      if (!response || !response.access_token) {
+        setError('Login succeeded but no session token was returned. Please try again.');
         setIsLoading(false);
         return;
       }
 
-      await new Promise(resolve => setTimeout(resolve, 100));
       window.location.href = redirectPath;
     } catch (err: any) {
       const errorMessage = err.response?.data?.detail || 'Invalid email or password';
