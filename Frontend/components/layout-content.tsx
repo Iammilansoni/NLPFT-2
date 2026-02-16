@@ -22,7 +22,7 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
 
   // Command Center: Three-column layout spacing
   // Left: 48px collapsed, 240px expanded
-  // Right: 320px when activity open, 0 when closed
+  // Right: 520px when activity open (matches system-logs-sidebar lg:w-[520px]), 0 when closed
   return (
     <main
       id="main-content"
@@ -33,7 +33,7 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
         // Command Center left spacing
         isCollapsed ? "lg:pl-[48px]" : "lg:pl-[240px]",
         // Command Center right spacing for Activity panel
-        isSystemLogsOpen ? "lg:pr-[320px]" : "lg:pr-0"
+        isSystemLogsOpen ? "lg:pr-[520px]" : "lg:pr-0"
       )}
     >
       {children}

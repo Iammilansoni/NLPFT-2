@@ -417,7 +417,7 @@ export function TemplateForm({
   const createAuditLog = useCreateAuditLog();
   const approveTemplateMutation = useApproveTemplate();
 
-  const isLoading = createTemplate.isPending || updateTemplate.isPending || createDraftTemplate.isPending || updateDraftTemplate.isPending;
+  const isLoading = createTemplate.isPending || updateTemplate.isPending || createDraftTemplate.isPending || updateDraftTemplate.isPending || approveTemplateMutation.isPending;
 
   // Validation
   const validate = (): boolean => {
@@ -1215,7 +1215,8 @@ export function TemplateForm({
                 </button>
                 <button
                   onClick={handleApprove}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
                 >
                   Approve
                 </button>
@@ -1253,7 +1254,8 @@ export function TemplateForm({
                     setShowDatasetWarning(false);
                     handleSubmitForReview();
                   }}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
                 >
                   Submit for Review
                 </button>
