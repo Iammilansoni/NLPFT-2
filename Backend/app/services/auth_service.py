@@ -117,3 +117,21 @@ _auth_service = AuthService()
 
 def get_auth_service() -> AuthService:
     return _auth_service
+
+
+# ---- Module-level convenience aliases (used by tests & older code) ----------
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return AuthService.verify_password(plain_password, hashed_password)
+
+def get_password_hash(password: str) -> str:
+    return AuthService.hash_password(password)
+
+def create_access_token(data, expires_delta: Optional[timedelta] = None) -> str:
+    """Accept either a dict or a bare user_id string."""
+    if isinstance(data, str):
+        data = {"sub": data}
+    return AuthService.create_access_token(data, expires_delta)
+
+def decode_access_token(token: str) -> Optional[dict]:
+    return AuthService.decode_token(token)
