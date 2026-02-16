@@ -8,7 +8,7 @@ Endpoints:
 from typing import Annotated, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from pydantic import BaseModel
 from uuid import UUID
 
@@ -72,8 +72,10 @@ async def validate_embedding_model(
         user_model = settings.default_embedding_model
         user_dimension = settings.embedding_dimension
         
-        # Get dataset metadata
-        metadata_query = select(Metadata).where(Metadata.t_id == UUID(template_id))
+        # Get dataset metadata (enforce tenant isolation)
+        metadata_query = select(Metadata).where(
+            and_(Metadata.t_id == UUID(template_id), Metadata.u_id == current_user.u_id)
+        )
         metadata_result = await db.execute(metadata_query)
         metadata = metadata_result.scalar_one_or_none()
         
@@ -175,8 +177,10 @@ async def reembed_dataset(
     3. Update metadata
     """
     try:
-        # Get metadata to find CSV path
-        metadata_query = select(Metadata).where(Metadata.t_id == UUID(request.template_id))
+        # Get metadata to find CSV path (enforce tenant isolation)
+        metadata_query = select(Metadata).where(
+            and_(Metadata.t_id == UUID(request.template_id), Metadata.u_id == current_user.u_id)
+        )
         metadata_result = await db.execute(metadata_query)
         metadata = metadata_result.scalar_one_or_none()
         

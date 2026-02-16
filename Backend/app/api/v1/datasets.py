@@ -548,7 +548,8 @@ async def generate_dataset(
                 focus_areas=dataset_request.focus_areas,
                 scenario_distribution=dataset_request.scenario_distribution,
                 task_id=task_id,
-                user_id=str(current_user.u_id)  # Pass user ID for LLM provider lookup
+                user_id=str(current_user.u_id),  # Pass user ID for LLM provider lookup
+                db=db  # Reuse existing async session instead of creating sync sessions
             )
             
             if not result.get("success"):

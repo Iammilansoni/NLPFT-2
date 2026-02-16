@@ -19,8 +19,11 @@ from app.models.database_models import User
 from app.models.email_verification_models import EmailVerification
 from app.services.email_service import get_email_service, EmailService
 from app.core.logger import logger
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 router = APIRouter(prefix="/auth", tags=["email-verification"])
+limiter = Limiter(key_func=get_remote_address)
 
 
 # --- Schemas ---
@@ -47,9 +50,10 @@ class OTPResponse(BaseModel):
 # --- Endpoints ---
 
 @router.post("/send-verification-otp", response_model=OTPResponse)
+@limiter.limit("5/minute")
 async def send_verification_otp(
     request_data: SendOTPRequest,
-    http_request: Request,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     email_service: EmailService = Depends(get_email_service)
 ):
@@ -104,27 +108,27 @@ async def send_verification_otp(
             email=email,
             otp=otp,
             expires_at=expires_at,
-            ip_address=http_request.client.host if http_request.client else None
+            ip_address=request.client.host if request.client else None
         )
         db.add(verification)
         await db.commit()
-        
+
         # Send email
         username = user.user_name or email.split('@')[0]
         sent = email_service.send_verification_email(email, otp, username)
-        
+
         if not sent:
-            logger.warning(f"Email not sent, but OTP created: {otp}")
-        
+            logger.warning(f"Email not sent, OTP created for {email}")
+
         logger.info(f"OTP sent to {email} (expires in 10 minutes)")
-        
+
         return OTPResponse(
             success=True,
             message="OTP sent to your email. Please check your inbox (and spam folder).",
             email=email,
             expires_in_minutes=10
         )
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -136,8 +140,10 @@ async def send_verification_otp(
 
 
 @router.post("/verify-otp", response_model=OTPResponse)
+@limiter.limit("10/minute")
 async def verify_otp(
     request_data: VerifyOTPRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -237,9 +243,10 @@ async def verify_otp(
 
 
 @router.post("/resend-otp", response_model=OTPResponse)
+@limiter.limit("3/minute")
 async def resend_otp(
     request_data: SendOTPRequest,
-    http_request: Request,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     email_service: EmailService = Depends(get_email_service)
 ):
@@ -307,7 +314,7 @@ async def resend_otp(
             email=email,
             otp=otp,
             expires_at=expires_at,
-            ip_address=http_request.client.host if http_request.client else None
+            ip_address=request.client.host if request.client else None
         )
         db.add(verification)
         await db.commit()
