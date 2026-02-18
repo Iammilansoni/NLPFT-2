@@ -175,9 +175,9 @@ export function LandingNav() {
       <div
         id="mobile-menu"
         className={cn(
-          'fixed top-16 left-0 right-0 z-50 bg-background border-b border-border md:hidden',
-          'transform transition-transform duration-200 ease-out',
-          isMobileMenuOpen ? 'translate-y-0' : '-translate-y-full'
+          'fixed top-16 left-0 right-0 z-50 bg-background border-b border-border shadow-lg md:hidden',
+          'transition-all duration-200 ease-out',
+          isMobileMenuOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-2 pointer-events-none'
         )}
         role="dialog"
         aria-modal="true"

@@ -65,6 +65,12 @@ export default function LoginPage() {
     <div className="w-full">
       {/* Header */}
       <div className="mb-8">
+        <Link
+          href="/"
+          className="inline-flex items-center text-sm text-primary hover:text-primary/80 transition-colors mb-4"
+        >
+          ← Return Home
+        </Link>
         <h1 className="text-3xl font-bold text-foreground mb-2">
           Login
         </h1>

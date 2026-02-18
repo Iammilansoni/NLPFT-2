@@ -60,7 +60,7 @@ export function Navigation() {
               variant="ghost"
               size="icon"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden"
+              className="hidden"
               aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
             >
               {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -185,8 +185,8 @@ export function Navigation() {
         </div>
       </aside>
 
-      {/* Mobile Sidebar Overlay - No animations, use CSS */}
-      {mobileMenuOpen && (
+      {/* Mobile Sidebar Overlay - hidden on mobile (bottom nav bar used instead) */}
+      {mobileMenuOpen && false && (
         <>
           <div
             className="lg:hidden fixed inset-0 bg-background/80 backdrop-blur-sm z-40"

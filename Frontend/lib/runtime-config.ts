@@ -6,23 +6,14 @@ export function getApiBase(): string {
       process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://backend:8000'
     ).replace(/\/$/, '');
   }
-  // Detect common hostnames used in development/host networking and map to backend
   const host = window.location.hostname;
-  if (host === '10.0.0.1') {
-    return 'http://10.0.0.1:8000';
-  }
-  if (host === 'host.docker.internal') {
-    return 'http://host.docker.internal:8000';
-  }
-  if (host === 'localhost' || host === '127.0.0.1') {
-    return 'http://localhost:8000';
-  }
 
-  // Fallback: check for explicit env var or use :8000 on current host
+  // Prefer explicit public API URL when provided
   const env = process.env.NEXT_PUBLIC_API_URL;
   if (env && !env.includes('backend:8000')) return env.replace(/\/$/, '');
   
-  return `http://${host}:8000`;
+  // Fallback: use backend port on current host without hard-targeting a specific IP
+  return `http://${host}:19000`;
 }
 
 export function getWsUrl(): string {
@@ -35,17 +26,6 @@ export function getWsUrl(): string {
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
   const host = window.location.hostname;
 
-  // Map common development hostnames to the backend websocket port
-  if (host === '10.0.0.1') {
-    return `${proto}://10.0.0.1:8000`;
-  }
-  if (host === 'host.docker.internal') {
-    return `${proto}://host.docker.internal:8000`;
-  }
-  if (host === 'localhost' || host === '127.0.0.1') {
-    return `${proto}://localhost:8000`;
-  }
-
-  // Fallback: use :8000 on current host
-  return `${proto}://${host}:8000`;
+  // Fallback: use backend port on current host without hard-targeting a specific IP
+  return `${proto}://${host}:19000`;
 }

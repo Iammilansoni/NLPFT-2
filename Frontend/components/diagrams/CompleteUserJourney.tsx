@@ -1,6 +1,7 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { useRef, useMemo } from 'react';
+import { motion, useInView, type Variants } from 'framer-motion';
 import {
   LogIn,
   FileText,
@@ -9,231 +10,340 @@ import {
   Cpu,
   Search,
   CheckCircle,
-  ArrowRight,
+  Zap,
+  Bot,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
- * CompleteUserJourney Component
- * 
- * A clean flowchart-style diagram showing the user journey in NLPForge.
- * Uses a horizontal flow on desktop and vertical on mobile.
+ * CompleteUserJourney — Theme-aligned Animated Flow Diagram
+ *
+ * Follows the "Enterprise Calm" design system:
+ *  - bg-card / border-2 border-border cards with hover:border-primary/50
+ *  - bg-primary/10 icon backgrounds, text-primary accents
+ *  - bg-gradient-to-b from-background via-primary/5 to-background section bg
+ *  - Thin animated connectors with travelling particle (PipelineAnimation-style)
+ *  - Staggered whileInView entrance, single subtle blob (no floating orbs)
+ *  - Snake layout: Row 1 L→R, vertical drop connector, Row 2 R→L
+ *  - Mobile: compact vertical timeline
  */
 
-interface FlowNode {
+interface NodeDef {
   id: string;
+  step: number;
   title: string;
   subtitle: string;
-  icon: ReactNode;
-  color: string;
-  bgColor: string;
-  borderColor: string;
-  glowColor: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  iconColor: string;
+  iconBg: string;
+  particleColor: string;
 }
 
-const flowNodes: FlowNode[] = [
-  {
-    id: 'auth',
-    title: 'Sign In',
-    subtitle: 'Login / Register',
-    icon: <LogIn className="w-5 h-5" />,
-    color: 'text-emerald-600 dark:text-emerald-400',
-    bgColor: 'bg-emerald-50 dark:bg-emerald-950/50',
-    borderColor: 'border-emerald-300 dark:border-emerald-700',
-    glowColor: 'shadow-emerald-500/20',
-  },
-  {
-    id: 'template',
-    title: 'Templates',
-    subtitle: 'Create API specs',
-    icon: <FileText className="w-5 h-5" />,
-    color: 'text-blue-600 dark:text-blue-400',
-    bgColor: 'bg-blue-50 dark:bg-blue-950/50',
-    borderColor: 'border-blue-300 dark:border-blue-700',
-    glowColor: 'shadow-blue-500/20',
-  },
-  {
-    id: 'settings',
-    title: 'Configure',
-    subtitle: 'LLM & Embeddings',
-    icon: <Settings className="w-5 h-5" />,
-    color: 'text-orange-600 dark:text-orange-400',
-    bgColor: 'bg-orange-50 dark:bg-orange-950/50',
-    borderColor: 'border-orange-300 dark:border-orange-700',
-    glowColor: 'shadow-orange-500/20',
-  },
-  {
-    id: 'dataset',
-    title: 'Generate',
-    subtitle: 'Create datasets',
-    icon: <Database className="w-5 h-5" />,
-    color: 'text-purple-600 dark:text-purple-400',
-    bgColor: 'bg-purple-50 dark:bg-purple-950/50',
-    borderColor: 'border-purple-300 dark:border-purple-700',
-    glowColor: 'shadow-purple-500/20',
-  },
-  {
-    id: 'embedding',
-    title: 'Embed',
-    subtitle: 'Vector indexing',
-    icon: <Cpu className="w-5 h-5" />,
-    color: 'text-cyan-600 dark:text-cyan-400',
-    bgColor: 'bg-cyan-50 dark:bg-cyan-950/50',
-    borderColor: 'border-cyan-300 dark:border-cyan-700',
-    glowColor: 'shadow-cyan-500/20',
-  },
-  {
-    id: 'search',
-    title: 'Query',
-    subtitle: 'Semantic search',
-    icon: <Search className="w-5 h-5" />,
-    color: 'text-pink-600 dark:text-pink-400',
-    bgColor: 'bg-pink-50 dark:bg-pink-950/50',
-    borderColor: 'border-pink-300 dark:border-pink-700',
-    glowColor: 'shadow-pink-500/20',
-  },
-  {
-    id: 'results',
-    title: 'Results',
-    subtitle: 'API matches',
-    icon: <CheckCircle className="w-5 h-5" />,
-    color: 'text-lime-600 dark:text-lime-400',
-    bgColor: 'bg-lime-50 dark:bg-lime-950/50',
-    borderColor: 'border-lime-300 dark:border-lime-700',
-    glowColor: 'shadow-lime-500/20',
-  },
+const NODES: NodeDef[] = [
+  { id: 'auth',      step: 1,  title: 'Sign In',     subtitle: 'Login or Register',        Icon: LogIn,       iconColor: 'text-emerald-500', iconBg: 'bg-emerald-500/10', particleColor: '#10b981' },
+  { id: 'templates', step: 2,  title: 'Templates',   subtitle: 'Define API spec once',     Icon: FileText,    iconColor: 'text-blue-500',    iconBg: 'bg-blue-500/10',    particleColor: '#3b82f6' },
+  { id: 'configure', step: 3,  title: 'Configure',   subtitle: 'LLM & Embeddings',         Icon: Settings,    iconColor: 'text-orange-500',  iconBg: 'bg-orange-500/10',  particleColor: '#f97316' },
+  { id: 'generate',  step: 4,  title: 'AI Generate', subtitle: 'Thousands of test cases',  Icon: Bot,         iconColor: 'text-violet-500',  iconBg: 'bg-violet-500/10',  particleColor: '#8b5cf6' },
+  { id: 'embed',     step: 5,  title: 'Embed',       subtitle: 'Vector indexing',          Icon: Cpu,         iconColor: 'text-cyan-500',    iconBg: 'bg-cyan-500/10',    particleColor: '#06b6d4' },
+  { id: 'vectordb',  step: 6,  title: 'Vector DB',   subtitle: 'Redis KNN search',         Icon: Database,    iconColor: 'text-rose-500',    iconBg: 'bg-rose-500/10',    particleColor: '#f43f5e' },
+  { id: 'rerank',    step: 7,  title: 'Re-Rank',     subtitle: 'FlashRank cross-encoder',  Icon: Zap,         iconColor: 'text-purple-500',  iconBg: 'bg-purple-500/10',  particleColor: '#a855f7' },
+  { id: 'query',     step: 8,  title: 'Query',       subtitle: 'Semantic search',          Icon: Search,      iconColor: 'text-pink-500',    iconBg: 'bg-pink-500/10',    particleColor: '#ec4899' },
+  { id: 'insights',  step: 9,  title: 'Insights',    subtitle: 'Test insights & logs',     Icon: CheckCircle, iconColor: 'text-lime-500',    iconBg: 'bg-lime-500/10',    particleColor: '#84cc16' },
+  { id: 'dashboard', step: 10, title: 'Dashboard',   subtitle: 'Real-time results',        Icon: BarChart3,   iconColor: 'text-primary',     iconBg: 'bg-primary/10',     particleColor: '#3b82f6' },
 ];
 
-function FlowNodeCard({ node, isLast }: { node: FlowNode; isLast: boolean }) {
+// ─── Connectors ───────────────────────────────────────────────────────────────
+
+function HorizontalConnector({ delay, color, reverse = false }: { delay: number; color: string; reverse?: boolean }) {
   return (
-    <div className="flex items-center gap-2 md:gap-3">
-      {/* Node */}
+    <div className="relative flex items-center w-6 md:w-10 lg:w-14 flex-shrink-0 mx-0.5" style={{ height: 16 }}>
+      <div className="absolute inset-y-0 w-full flex items-center"><div className="w-full h-px bg-border" /></div>
+      <motion.div
+        className="absolute top-1/2 -translate-y-1/2 h-px"
+        style={{ [reverse ? 'right' : 'left']: 0, backgroundColor: color, opacity: 0.7 }}
+        initial={{ width: 0 }}
+        animate={{ width: '100%' }}
+        transition={{ duration: 0.45, delay, ease: 'easeOut' }}
+      />
+      <motion.div
+        className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full z-10"
+        style={{ backgroundColor: color, boxShadow: `0 0 6px 2px ${color}70` }}
+        animate={reverse
+          ? { right: ['-4px', 'calc(100% + 4px)'], opacity: [0, 1, 1, 0] }
+          : { left: ['-4px', 'calc(100% + 4px)'], opacity: [0, 1, 1, 0] }}
+        transition={{ duration: 1.5, delay: delay + 0.3, repeat: Infinity, repeatDelay: 1.2, ease: 'easeInOut' }}
+      />
       <div
-        className={cn(
-          "relative flex flex-col items-center justify-center",
-          "w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28",
-          "rounded-2xl border-2 transition-all duration-300",
-          "hover:scale-105 hover:shadow-xl cursor-default",
-          node.bgColor,
-          node.borderColor,
-          `shadow-lg ${node.glowColor}`
-        )}
-      >
-        {/* Icon */}
-        <div className={cn(
-          "w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-xl",
-          "flex items-center justify-center mb-1",
-          "bg-white dark:bg-gray-800 shadow-sm",
-          "border",
-          node.borderColor
-        )}>
-          <span className={node.color}>{node.icon}</span>
-        </div>
-        
-        {/* Title */}
-        <span className={cn(
-          "text-xs sm:text-sm font-semibold text-center",
-          node.color
-        )}>
-          {node.title}
-        </span>
-        
-        {/* Subtitle (hidden on small screens) */}
-        <span className="hidden sm:block text-[10px] text-muted-foreground text-center leading-tight px-1">
-          {node.subtitle}
-        </span>
-      </div>
-      
-      {/* Arrow Connector - Hidden on last node */}
-      {!isLast && (
-        <div className="flex items-center">
-          {/* Line */}
-          <div className="w-4 sm:w-6 md:w-8 lg:w-12 h-0.5 bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/20" />
-          {/* Arrow */}
-          <ArrowRight className="w-4 h-4 text-muted-foreground/50 -ml-1" />
-        </div>
-      )}
+        className="absolute top-1/2 -translate-y-1/2 w-0 h-0"
+        style={{
+          [reverse ? 'left' : 'right']: 0,
+          borderTop: '3px solid transparent',
+          borderBottom: '3px solid transparent',
+          ...(reverse ? { borderRight: `5px solid ${color}90` } : { borderLeft: `5px solid ${color}90` }),
+        }}
+      />
     </div>
   );
 }
 
-export function CompleteUserJourney() {
+function VerticalConnector({ delay, fromColor, toColor }: { delay: number; fromColor: string; toColor: string }) {
   return (
-    <div className="w-full">
-      {/* Title */}
-      <h3 className="text-lg font-semibold text-foreground text-center mb-6">
-        User Flow
-      </h3>
-      
-      {/* Horizontal Flowchart - Scrollable on mobile */}
-      <div className="overflow-x-auto pb-4">
-        <div className="flex items-center justify-start lg:justify-center min-w-max px-4">
-          {flowNodes.map((node, idx) => (
-            <FlowNodeCard
-              key={node.id}
-              node={node}
-              isLast={idx === flowNodes.length - 1}
-            />
-          ))}
+    <div className="relative flex justify-center w-full" style={{ height: 40 }}>
+      <div className="absolute left-1/2 -translate-x-1/2 inset-y-0 w-px bg-border" />
+      <motion.div
+        className="absolute left-1/2 -translate-x-1/2 top-0 w-px origin-top"
+        style={{ background: `linear-gradient(180deg, ${fromColor}90, ${toColor}50)` }}
+        initial={{ scaleY: 0 }}
+        animate={{ scaleY: 1 }}
+        transition={{ duration: 0.45, delay, ease: 'easeOut' }}
+      />
+      <motion.div
+        className="absolute left-1/2 -translate-x-1/2 w-2 h-2 rounded-full z-10"
+        style={{ backgroundColor: fromColor, boxShadow: `0 0 6px 2px ${fromColor}70` }}
+        animate={{ top: ['-4px', 'calc(100% + 4px)'], opacity: [0, 1, 1, 0] }}
+        transition={{ duration: 1.0, delay: delay + 0.25, repeat: Infinity, repeatDelay: 1.5, ease: 'easeInOut' }}
+      />
+      <div
+        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-0"
+        style={{ borderLeft: '3px solid transparent', borderRight: '3px solid transparent', borderTop: `5px solid ${toColor}90` }}
+      />
+    </div>
+  );
+}
+
+// ─── Node Card ────────────────────────────────────────────────────────────────
+
+const cardVariants: Variants = {
+  hidden: { opacity: 0, y: 18, scale: 0.93 },
+  visible: (i: number) => ({
+    opacity: 1, y: 0, scale: 1,
+    transition: { duration: 0.5, delay: i * 0.08, type: 'spring', stiffness: 200, damping: 20 },
+  }),
+};
+
+function NodeCard({ node, index }: { node: NodeDef; index: number }) {
+  const { Icon } = node;
+  return (
+    <motion.div
+      custom={index}
+      variants={cardVariants}
+      initial="hidden"
+      animate="visible"
+      whileHover={{ scale: 1.05, y: -3 }}
+      className="group relative flex flex-col items-center"
+    >
+      <motion.div
+        className="absolute -top-2 -right-1.5 z-20 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold shadow"
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: 'spring', stiffness: 320, delay: index * 0.08 + 0.2 }}
+      >
+        {node.step}
+      </motion.div>
+
+      <div
+        className={cn(
+          'relative flex flex-col items-center justify-center gap-2.5 p-3 md:p-4',
+          'w-[104px] h-[112px] sm:w-[110px] sm:h-[118px] md:w-[124px] md:h-[132px]',
+          'rounded-xl border-2 border-border bg-card',
+          'hover:border-primary/50 hover:shadow-md',
+          'transition-all duration-300 overflow-hidden cursor-default',
+        )}
+      >
+        {/* Hover gradient overlay — mirrors FeatureHighlights */}
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-primary/10 via-transparent to-accent/10 pointer-events-none" />
+
+        <div className={cn('w-10 h-10 md:w-11 md:h-11 rounded-lg flex items-center justify-center', node.iconBg)}>
+          <Icon className={cn('w-5 h-5 md:w-6 md:h-6', node.iconColor)} />
+        </div>
+
+        <div className="relative z-10 text-center">
+          <p className="text-[11px] md:text-xs font-semibold text-foreground leading-tight">{node.title}</p>
+          <p className="text-[9px] md:text-[10px] text-muted-foreground leading-tight mt-0.5">{node.subtitle}</p>
         </div>
       </div>
-      
-      {/* Flow Summary Legend */}
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <div className="w-2 h-2 rounded-full bg-emerald-500" />
-          Start
+    </motion.div>
+  );
+}
+
+// ─── Legend ───────────────────────────────────────────────────────────────────
+
+const LEGEND_GROUPS = [
+  { label: 'Auth & Setup',     color: '#10b981' },
+  { label: 'AI Generation',    color: '#8b5cf6' },
+  { label: 'Vector Pipeline',  color: '#06b6d4' },
+  { label: 'Search & Ranking', color: '#ec4899' },
+  { label: 'Insights',         color: '#3b82f6' },
+];
+
+function Legend() {
+  return (
+    <motion.div
+      className="flex flex-wrap justify-center gap-x-6 gap-y-2 mt-10 pt-6 border-t border-border"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4, delay: 1.0 }}
+    >
+      {LEGEND_GROUPS.map((g) => (
+        <span key={g.label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: g.color }} />
+          {g.label}
         </span>
-        <span className="hidden sm:inline">→</span>
-        <span className="flex items-center gap-1.5">
-          <div className="w-2 h-2 rounded-full bg-purple-500" />
-          Data Pipeline
-        </span>
-        <span className="hidden sm:inline">→</span>
-        <span className="flex items-center gap-1.5">
-          <div className="w-2 h-2 rounded-full bg-lime-500" />
-          Output
-        </span>
+      ))}
+    </motion.div>
+  );
+}
+
+// ─── Mobile Timeline ──────────────────────────────────────────────────────────
+
+function MobileTimelineNode({ node, index, isLast }: { node: NodeDef; index: number; isLast: boolean }) {
+  const { Icon } = node;
+  return (
+    <motion.div
+      className="flex gap-3"
+      initial={{ opacity: 0, x: -14 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.4, delay: index * 0.07 }}
+    >
+      <div className="flex flex-col items-center flex-shrink-0">
+        <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center border border-border', node.iconBg)}>
+          <Icon className={cn('w-4 h-4', node.iconColor)} />
+        </div>
+        {!isLast && (
+          <div className="relative w-px flex-1 min-h-[24px] bg-border my-1">
+            <motion.div
+              className="absolute left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full"
+              style={{ backgroundColor: node.particleColor }}
+              animate={{ top: ['0%', '100%'], opacity: [0, 1, 1, 0] }}
+              transition={{ duration: 0.9, delay: index * 0.07 + 0.35, repeat: Infinity, repeatDelay: 1.8, ease: 'linear' }}
+            />
+          </div>
+        )}
       </div>
-      
-      {/* Vertical Flow for Mobile - Alternative view */}
-      <div className="mt-8 block lg:hidden">
-        <div className="relative pl-8">
-          {/* Vertical Line */}
-          <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-gradient-to-b from-emerald-400 via-purple-400 to-lime-400" />
-          
-          {/* Flow Steps */}
-          <div className="space-y-4">
-            {flowNodes.map((node, idx) => (
-              <div key={node.id} className="relative flex items-center gap-4">
-                {/* Node Dot on Line */}
-                <div className={cn(
-                  "absolute -left-5 w-4 h-4 rounded-full border-2 bg-background",
-                  node.borderColor
-                )} />
-                
-                {/* Node Info */}
-                <div className={cn(
-                  "flex items-center gap-3 px-4 py-2 rounded-xl border",
-                  node.bgColor,
-                  node.borderColor
-                )}>
-                  <span className={node.color}>{node.icon}</span>
-                  <div>
-                    <span className={cn("font-medium text-sm", node.color)}>
-                      {node.title}
-                    </span>
-                    <span className="text-xs text-muted-foreground ml-2">
-                      {node.subtitle}
-                    </span>
+
+      <div className="flex-1 pb-4 pt-0.5">
+        <div className="flex items-center gap-1.5">
+          <span className="w-4 h-4 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[9px] font-bold flex-shrink-0">
+            {node.step}
+          </span>
+          <p className="text-sm font-semibold text-foreground">{node.title}</p>
+        </div>
+        <p className="text-xs text-muted-foreground mt-0.5 ml-5">{node.subtitle}</p>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Main Export ──────────────────────────────────────────────────────────────
+
+export function CompleteUserJourney() {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: true, margin: '-60px' });
+  const row2Reversed = useMemo(() => [...NODES.slice(5, 10)].reverse(), []);
+
+  return (
+    <section
+      ref={ref}
+      className="relative py-20 md:py-32 border-t"
+      aria-label="Complete User Journey Diagram"
+    >
+      {/* Section background — identical to FeatureHighlights */}
+      <div className="absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-primary/5 to-background" />
+        <motion.div
+          aria-hidden
+          animate={{ scale: [1, 1.15, 1], opacity: [0.08, 0.18, 0.08] }}
+          transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[400px] bg-accent/20 rounded-full blur-3xl"
+        />
+      </div>
+
+      <div className="container mx-auto px-6 md:px-12 max-w-[1280px]">
+        {isInView && (
+          <>
+            {/* ══ Desktop snake (≥ md) ══ */}
+            <div className="hidden md:block">
+              {/* Row 1 — steps 1–5, L→R */}
+              <div className="flex items-center justify-center">
+                {NODES.slice(0, 5).map((node, i) => (
+                  <div key={node.id} className="flex items-center">
+                    <NodeCard node={node} index={i} />
+                    {i < 4 && <HorizontalConnector delay={i * 0.08 + 0.15} color={node.particleColor} />}
                   </div>
+                ))}
+              </div>
+
+              {/* Vertical turn — right-aligned to last card in row 1 */}
+              <div className="flex" style={{ justifyContent: 'flex-end', paddingRight: 'calc(50% - 362px)' }}>
+                <div style={{ width: 124 }}>
+                  <VerticalConnector delay={0.55} fromColor={NODES[4].particleColor} toColor={NODES[5].particleColor} />
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
+
+              {/* Row 2 — steps 10→6, flow R→L */}
+              <div className="flex items-center justify-center">
+                {row2Reversed.map((node, i) => (
+                  <div key={node.id} className="flex items-center">
+                    <NodeCard node={node} index={node.step - 1} />
+                    {i < 4 && (
+                      <HorizontalConnector
+                        delay={(node.step - 1) * 0.08 + 0.15}
+                        color={row2Reversed[i + 1]?.particleColor ?? node.particleColor}
+                        reverse
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ══ Tablet two-row (sm) ══ */}
+            <div className="hidden sm:flex md:hidden flex-col items-center">
+              <div className="flex items-center justify-center flex-wrap">
+                {NODES.slice(0, 5).map((node, i) => (
+                  <div key={node.id} className="flex items-center">
+                    <NodeCard node={node} index={i} />
+                    {i < 4 && <HorizontalConnector delay={i * 0.08 + 0.15} color={node.particleColor} />}
+                  </div>
+                ))}
+              </div>
+              <div className="self-end pr-2" style={{ width: 110 }}>
+                <VerticalConnector delay={0.55} fromColor={NODES[4].particleColor} toColor={NODES[5].particleColor} />
+              </div>
+              <div className="flex items-center justify-center flex-wrap">
+                {row2Reversed.map((node, i) => (
+                  <div key={node.id} className="flex items-center">
+                    <NodeCard node={node} index={node.step - 1} />
+                    {i < 4 && (
+                      <HorizontalConnector
+                        delay={(node.step - 1) * 0.08 + 0.15}
+                        color={row2Reversed[i + 1]?.particleColor ?? node.particleColor}
+                        reverse
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ══ Mobile vertical timeline ══ */}
+            <div className="sm:hidden max-w-xs mx-auto">
+              {NODES.map((node, i) => (
+                <MobileTimelineNode
+                  key={node.id}
+                  node={node}
+                  index={i}
+                  isLast={i === NODES.length - 1}
+                />
+              ))}
+            </div>
+
+            <Legend />
+          </>
+        )}
       </div>
-    </div>
+    </section>
   );
 }
 

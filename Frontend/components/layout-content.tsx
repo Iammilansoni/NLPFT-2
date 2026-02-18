@@ -30,6 +30,8 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
         "min-h-screen transition-all duration-200 ease-out",
         // Bottom padding for mobile bottom navigation bar (hidden on desktop)
         "pb-20 lg:pb-0",
+        // Top padding for mobile top header bar (hidden on desktop)
+        "pt-14 lg:pt-0",
         // Command Center left spacing
         isCollapsed ? "lg:pl-[48px]" : "lg:pl-[240px]",
         // Command Center right spacing for Activity panel

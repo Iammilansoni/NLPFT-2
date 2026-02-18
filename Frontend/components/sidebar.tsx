@@ -14,8 +14,6 @@ import {
   Sun,
   ChevronLeft,
   ChevronRight,
-  Menu,
-  X,
   User,
   LogOut,
   Zap,
@@ -44,15 +42,13 @@ export function Sidebar() {
   const { theme, setTheme } = useTheme()
   const { isCollapsed, setIsCollapsed, setIsSystemLogsOpen, isSystemLogsOpen } = useSidebar()
   const { user, logout, isAuthenticated } = useAuth()
-  const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isAccountOpen, setIsAccountOpen] = useState(false)
 
-  // On mobile when sidebar is open, always show expanded view with text labels
-  const isExpanded = !isCollapsed || isMobileOpen
+  // Expanded when not collapsed
+  const isExpanded = !isCollapsed
 
   const handleLogout = () => {
     logout()
-    setIsMobileOpen(false)
   }
 
   const getInitials = (name: string) => {
@@ -66,40 +62,87 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile Menu Button - Enhanced visibility */}
-      <div className="lg:hidden fixed top-3 left-3 z-50 safe-area-inset">
-        <Button
-          size="icon"
-          variant="outline"
-          onClick={() => setIsMobileOpen(!isMobileOpen)}
-          className="h-12 w-12 md:h-11 md:w-11 rounded-xl bg-background/95 backdrop-blur-md border-border/60 shadow-lg hover:shadow-xl transition-all active:scale-95"
-          aria-label={isMobileOpen ? 'Close menu' : 'Open menu'}
-        >
-          {isMobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </Button>
-      </div>
+      {/* ── Mobile Top Header (lg:hidden) ── */}
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-50 h-14 flex items-center justify-between px-4 bg-background/95 backdrop-blur-sm border-b border-border">
+        {/* Logo */}
+        <Link href="/dashboard" className="flex items-center gap-2">
+          <div className="flex-shrink-0 h-7 w-7 rounded-sm bg-primary flex items-center justify-center">
+            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+              <path d="M12 2L21 7V17L12 22L3 17V7L12 2Z" stroke="currentColor" strokeWidth="1.5" fill="none" className="text-primary-foreground" />
+              <path d="M12 6L17 9V15L12 18L7 15V9L12 6Z" fill="currentColor" className="text-primary-foreground" />
+            </svg>
+          </div>
+          <span className="font-bold text-base text-foreground">NLPForge</span>
+        </Link>
 
-      {/* Mobile Overlay */}
-      {isMobileOpen && (
-        <div
-          onClick={() => setIsMobileOpen(false)}
-          className="lg:hidden fixed inset-0 bg-black/50 z-40 transition-opacity"
-        />
-      )}
+        {/* Right actions */}
+        <div className="flex items-center gap-1">
+          {/* Theme Toggle */}
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            aria-label="Toggle theme"
+            className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          >
+            <div className="relative h-5 w-5">
+              <Sun className="h-full w-full rotate-0 scale-100 transition-transform dark:-rotate-90 dark:scale-0" />
+              <Moon className="absolute inset-0 h-full w-full rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" />
+            </div>
+          </button>
 
-      {/* Navigation Rail */}
+          {/* Help */}
+          <div className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+            <HelpButton className="!h-auto !w-auto p-0 hover:bg-transparent" />
+          </div>
+
+          {/* User Avatar */}
+          {isAuthenticated && user && (
+            <div className="relative">
+              <button
+                onClick={() => setIsAccountOpen(!isAccountOpen)}
+                className="flex items-center justify-center h-8 w-8 rounded-sm bg-primary text-primary-foreground font-medium text-xs hover:opacity-90 transition-opacity"
+                aria-label="Account menu"
+              >
+                {getInitials(user.username || user.email)}
+              </button>
+              {isAccountOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsAccountOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-md border border-border bg-card shadow-lg overflow-hidden">
+                    <div className="p-1">
+                      <div className="px-2 py-1.5 border-b border-border mb-1">
+                        <p className="text-sm font-medium truncate">{user.username || 'User'}</p>
+                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                      </div>
+                      <Link href="/settings" onClick={() => setIsAccountOpen(false)}>
+                        <div className="flex items-center gap-2 px-2 py-1.5 rounded-sm text-xs text-foreground hover:bg-accent transition-colors">
+                          <User className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span>My Account</span>
+                        </div>
+                      </Link>
+                      <div className="h-px bg-border my-1" />
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-sm text-xs text-destructive hover:bg-destructive/10 transition-colors"
+                      >
+                        <LogOut className="h-3.5 w-3.5" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* ── Desktop Sidebar (hidden on mobile) ── */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 flex flex-col z-40',
-          'bg-card/95 backdrop-blur-md border-r border-border shadow-2xl lg:shadow-none lg:bg-card lg:backdrop-blur-none',
+          'hidden lg:flex fixed inset-y-0 left-0 flex-col z-40',
+          'bg-card border-r border-border',
           'transition-all duration-300 ease-out',
-          // Responsive widths: optimized for each breakpoint
-          isMobileOpen 
-            ? 'w-[85vw] max-w-[320px] sm:w-[300px] md:w-[280px]' 
-            : isExpanded ? 'w-[240px]' : 'w-[56px] md:w-[48px]',
-          isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
-          // Safe area support for notched devices
-          'pt-safe-top pb-safe-bottom pl-safe-left'
+          isExpanded ? 'w-[240px]' : 'w-[56px]'
         )}
       >
         {/* Logo / Brand */}
@@ -110,7 +153,6 @@ export function Sidebar() {
           <Link
             href="/"
             className="flex items-center gap-2 overflow-hidden"
-            onClick={() => setIsMobileOpen(false)}
           >
             <div className="flex-shrink-0 h-7 w-7 rounded-sm bg-primary flex items-center justify-center">
               <svg
@@ -156,7 +198,7 @@ export function Sidebar() {
               <Link
                 key={item.name}
                 href={item.href}
-                onClick={() => setIsMobileOpen(false)}
+                onClick={() => {}}
                 title={!isExpanded ? item.name : undefined}
               >
                 <div
@@ -183,7 +225,7 @@ export function Sidebar() {
 
         {/* Bottom Section */}
         <div className={cn(
-          "border-t border-border",
+          "border-t border-border overflow-y-auto",
           isExpanded ? "p-3 space-y-2" : "p-1.5 space-y-1"
         )}>
           {/* User Account Section */}
@@ -230,7 +272,6 @@ export function Sidebar() {
                       href="/settings"
                       onClick={() => {
                         setIsAccountOpen(false)
-                        setIsMobileOpen(false)
                       }}
                     >
                       <div className="flex items-center gap-2 px-2 py-1.5 rounded-sm text-xs text-foreground hover:bg-accent transition-colors">
