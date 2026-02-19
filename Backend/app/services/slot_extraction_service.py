@@ -21,6 +21,7 @@ Performance:
 """
 
 import json
+import os
 import re
 import httpx
 from typing import Dict, Any, Optional, List, Tuple
@@ -37,7 +38,7 @@ class SlotExtractionService:
     
     # Use the full model name that Ollama has
     DEFAULT_MODEL = "llama3.2:3b-instruct-q4_K_M"
-    OLLAMA_URL = "http://localhost:11434"
+    OLLAMA_URL = os.getenv("OLLAMA_HOST", "http://ollama:11434")
     
     def __init__(self, model_name: Optional[str] = None):
         self.model_name = model_name or self.DEFAULT_MODEL

@@ -320,7 +320,7 @@ class MultiModelSemanticRetrievalService:
             {
                 "t_id": t.get("t_id", ""),
                 "avg_similarity": round(t.get("avg_similarity", 0.0), 4),
-                "avg_confidence_score": round(t.get("avg_confidence", 0.5), 4),
+                "avg_confidence_score": round(t.get("avg_confidence", 0.7), 4),
                 "final_score": round(t.get("final_score", 0.0), 4),
                 "rank": t.get("rank", 0),
                 "match_count": t.get("match_count", 0)
@@ -582,21 +582,22 @@ class MultiModelSemanticRetrievalService:
         
         Scoring formula:
         final_score = (
-            0.5 × avg_similarity +
-            0.3 × avg_confidence +
-            0.2 × intent_alignment
+            0.7 × avg_similarity +
+            0.15 × avg_confidence +
+            0.15 × intent_alignment
         )
+        + 10% boost if avg_similarity >= 0.85 (capped at 1.0)
         """
         if not grouped_results:
             return None, None, []
         
-        w = weights or {"similarity": 0.6, "confidence": 0.2, "intent": 0.2}
+        w = weights or {"similarity": 0.7, "confidence": 0.15, "intent": 0.15}
         scored_templates = []
         
         for t_id, rows in grouped_results.items():
             # Calculate averages from NORMALIZED scores (not dimensions)
             avg_similarity = mean(r.get("similarity", 0.0) for r in rows)
-            avg_confidence = mean(r.get("confidence_score", 0.5) for r in rows)
+            avg_confidence = mean(r.get("confidence_score", 0.7) for r in rows)
             
             # Intent alignment bonus
             if user_query_intent:
@@ -606,7 +607,7 @@ class MultiModelSemanticRetrievalService:
                 )
                 intent_alignment = matching / len(rows) if rows else 0
             else:
-                intent_alignment = 0.5  # Neutral
+                intent_alignment = 0.7  # Optimistic neutral
             
             # Compute final score
             final_score = (
@@ -614,6 +615,10 @@ class MultiModelSemanticRetrievalService:
                 w["confidence"] * avg_confidence +
                 w["intent"] * intent_alignment
             )
+
+            # Boost for strong vector matches
+            if avg_similarity >= 0.85:
+                final_score = min(final_score * 1.1, 1.0)
             
             # Dominant intent
             intent_counts: Dict[str, int] = defaultdict(int)

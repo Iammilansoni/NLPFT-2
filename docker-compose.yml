@@ -127,6 +127,8 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://10.0.0.1:3000,http://10.0.0.1:8000}
+      # Must be 1: in-memory task store is not shared between workers
+      WEB_CONCURRENCY: 1
 
     extra_hosts:
       - "host.docker.internal:host-gateway"

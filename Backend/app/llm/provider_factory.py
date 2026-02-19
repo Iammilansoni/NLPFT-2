@@ -148,12 +148,14 @@ class LLMProviderFactory:
         # Extract config parameters
         config_params = config.config_params or {}
         
+        # Use longer default timeout for Ollama (local CPU inference is slow)
+        default_timeout = 600.0 if config.provider == "ollama" else 120.0
         return cls.create(
             provider_type=config.provider,
             model=config.model_name,
             api_key=decrypted_api_key,
             base_url=config.base_url,
-            timeout=config_params.get("timeout", 120.0),
+            timeout=config_params.get("timeout", default_timeout),
             max_retries=config_params.get("max_retries", 3),
         )
     
@@ -168,12 +170,14 @@ class LLMProviderFactory:
         Returns:
             Configured BaseLLMProvider instance
         """
+        # Use longer default timeout for Ollama (local CPU inference is slow)
+        default_timeout = 600.0 if config_dict.get("provider") == "ollama" else 120.0
         return cls.create(
             provider_type=config_dict["provider"],
             model=config_dict["model_name"],
             api_key=config_dict.get("api_key"),
             base_url=config_dict.get("base_url"),
-            timeout=config_dict.get("timeout", 120.0),
+            timeout=config_dict.get("timeout", default_timeout),
             max_retries=config_dict.get("max_retries", 3),
         )
     

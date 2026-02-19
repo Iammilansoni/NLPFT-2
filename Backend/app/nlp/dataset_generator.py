@@ -92,6 +92,7 @@ class EnterpriseDatasetGenerator:
         self._provider_initialized = False
         self._provider_user_id: Optional[str] = None  # Track which user's provider is cached
         self._provider_lock = asyncio.Lock()  # Mutex for provider initialization
+        self._db_max_tokens: Optional[int] = None  # max_tokens from DB config_params
         
         # Track provider info for logging
         self.provider = "not_configured"
@@ -187,7 +188,11 @@ Each data point must contain:
    - scenario_type → valid | edge | extreme
    - test_category → valid_flow | boundary | typo | error_case | paraphrase
    - intent_type → create | read | update | delete | query (MUST match the HTTP method: POST=create, GET=read, PUT/PATCH=update, DELETE=delete)
-5. confidence_score → 0.6 to 1.0 (how confident you are this is a good test case)
+5. confidence_score → score how well-formed and unambiguous this test case is:
+   - 0.90 – 0.98 : valid_flow cases with realistic, complete data (most cases should be here)
+   - 0.75 – 0.89 : edge/boundary cases that are valid but unusual
+   - 0.60 – 0.74 : error/extreme cases with intentionally broken input
+   DO NOT give low scores to normal valid requests. A clear, complete valid_flow case MUST score ≥ 0.90.
 6. short `notes` (explain intention, edge, typo, boundary)
 
 ===============================================================================
@@ -641,6 +646,7 @@ Return ONLY the JSON array, nothing else."""
                     self._provider_user_id = result["user_id"]
                     self.provider = result["provider_type"]
                     self.model_name = result["model_name"]
+                    self._db_max_tokens = result.get("max_tokens")  # store DB-configured max_tokens
 
                     logger.info(f"Loaded user's configured LLM provider: {result['provider_type']}/{result['model_name']}")
                     return self._llm_provider
@@ -694,7 +700,8 @@ Return ONLY the JSON array, nothing else."""
             "provider": provider,
             "provider_type": default_config.provider,
             "model_name": default_config.model_name,
-            "user_id": user_id
+            "user_id": user_id,
+            "max_tokens": (default_config.config_params or {}).get("max_tokens"),
         }
 
     async def _load_provider_new_session(self, user_id: str) -> Optional[Dict[str, Any]]:
@@ -729,43 +736,71 @@ Return ONLY the JSON array, nothing else."""
         provider = await self._get_llm_provider(user_id, db=db)
         
         if provider:
-            try:
-                from app.llm.providers.base import LLMConfig
-                
-                # Calculate max_tokens proportional to batch size
-                # ~150 tokens per example for JSON output
-                base_tokens = min(num_examples * 150, 32768)
-                
-                config = LLMConfig(
-                    temperature=0.7,
-                    max_tokens=max(base_tokens, 4096),  # At least 4096, proportional to examples
-                    top_p=0.9,
-                )
-                
-                response = await provider.generate(
-                    prompt=user_prompt,
-                    system_prompt=system_prompt,
-                    config=config,
-                )
-                
-                logger.info(f"LLM response received from {self.provider}/{self.model_name}: {len(response.content)} chars")
-                return response.content
-                
-            except Exception as e:
-                logger.warning(f"Configured provider failed: {e}")
-                # Close and reset provider so we can try fallback
+            from app.llm.providers.base import LLMConfig
+
+            # Use the provider's configured max_tokens from DB if available.
+            # Each test case can be 1000-2000 tokens of JSON; use 2000 per example
+            # as a safe estimate, capped at the model's maximum (65536).
+            db_max_tokens = getattr(self, '_db_max_tokens', None) or getattr(provider, 'max_tokens', None) or getattr(getattr(provider, 'config', None), 'max_tokens', None)
+            per_example_tokens = 2000
+            estimated_tokens = num_examples * per_example_tokens
+            if db_max_tokens:
+                max_tokens_to_use = min(int(db_max_tokens), estimated_tokens)
+            else:
+                max_tokens_to_use = max(estimated_tokens, 16384)
+            max_tokens_to_use = min(max_tokens_to_use, 65536)  # hard cap
+
+            config = LLMConfig(
+                temperature=0.7,
+                max_tokens=max_tokens_to_use,
+                top_p=0.9,
+            )
+            
+            # Retry transient errors (timeouts, network) up to 3 times with backoff
+            max_retries = 3
+            last_error = None
+            for attempt in range(1, max_retries + 1):
                 try:
-                    if hasattr(provider, 'close'):
-                        await provider.close()
-                except Exception:
-                    pass
-                self._llm_provider = None
-                self._provider_initialized = False
-                
-                # If Gemini is available, fall through to use it
-                if not _gemini_available:
-                    raise ValueError(f"LLM provider '{self.provider}' failed: {e}")
-                logger.info("Attempting Gemini fallback...")
+                    response = await provider.generate(
+                        prompt=user_prompt,
+                        system_prompt=system_prompt,
+                        config=config,
+                    )
+                    
+                    logger.info(f"LLM response received from {self.provider}/{self.model_name}: {len(response.content)} chars")
+                    return response.content
+                    
+                except Exception as e:
+                    last_error = e
+                    error_str = str(e).lower()
+                    is_transient = any(kw in error_str for kw in ["timeout", "timed out", "connection", "network", "transient"])
+                    
+                    if is_transient and attempt < max_retries:
+                        wait_time = 5 * attempt
+                        logger.warning(f"Transient error on attempt {attempt}/{max_retries}: {e}. Retrying in {wait_time}s...")
+                        await asyncio.sleep(wait_time)
+                        continue
+                    else:
+                        logger.warning(f"Configured provider failed (attempt {attempt}/{max_retries}): {e}")
+                        break
+            
+            # All retries exhausted — decide whether to fallback or raise
+            # Close and reset provider
+            try:
+                if hasattr(provider, 'close'):
+                    await provider.close()
+            except Exception:
+                pass
+            self._llm_provider = None
+            self._provider_initialized = False
+            
+            # Only fall back to Gemini for non-transient errors when key is valid
+            error_str = str(last_error).lower()
+            is_transient = any(kw in error_str for kw in ["timeout", "timed out", "connection", "network", "transient"])
+            if is_transient or not _gemini_available:
+                # Transient errors: don't silently switch providers, surface the real problem
+                raise ValueError(f"LLM provider '{self.provider}' failed after {max_retries} attempts: {last_error}")
+            logger.info("Attempting Gemini fallback...")
         
         # Fallback to Gemini
         if _gemini_available and _gemini_client:
@@ -806,12 +841,12 @@ Return ONLY the JSON array, nothing else."""
                 full_prompt = f"{system_prompt}\n\n{user_prompt}"
                 
                 # Configure generation settings
-                # Calculate max_tokens proportional to batch size (same formula as LLMConfig path)
-                base_tokens = min(num_examples * 150, 65536)
+                # Each test case can be 1000-2000 tokens; use 2000 per example as safe estimate
+                estimated_tokens = num_examples * 2000
                 generation_config = {
                     "temperature": 0.7,
                     "top_p": 0.9,
-                    "max_output_tokens": max(base_tokens, 8192),  # At least 8192, up to Gemini max
+                    "max_output_tokens": min(max(estimated_tokens, 16384), 65536),  # At least 16384, capped at 65536
                 }
                 
                 # Run the synchronous generate_content in a thread pool
@@ -837,8 +872,8 @@ Return ONLY the JSON array, nothing else."""
                     continue
                     
                 if "api_key" in error_str or "authentication" in error_str:
-                    logger.error("Gemini API key is invalid. Check your GOOGLE_API_KEY in .env")
-                    raise ValueError("Gemini API authentication failed. Check your GOOGLE_API_KEY.")
+                    logger.error("Gemini API key is invalid. Check your GEMINI_API_KEY in environment.")
+                    raise ValueError("Gemini API authentication failed. Check your GEMINI_API_KEY, or go to Settings → LLM Providers and set your Ollama/other provider as Default.")
                 
                 if attempt < max_retries - 1:
                     logger.warning(f"Gemini API error (attempt {attempt + 1}): {e}")
@@ -943,7 +978,16 @@ Return ONLY the JSON array, nothing else."""
             import time
             start_time = time.time()
 
-            BATCH_SIZE = 50  # Generate 50 test cases per API call for faster generation
+            # Adapt batch size to provider: local models (Ollama) need smaller batches
+            # to avoid timeouts and produce higher quality output
+            if self.provider.lower() == "ollama":
+                BATCH_SIZE = 10  # Smaller batches for local inference (avoids timeouts)
+            elif self.provider.lower() in ("gemini", "openai", "anthropic", "google"):
+                BATCH_SIZE = 10  # Keep batches small — each test case can be 500-1500 tokens;
+                                 # 10 cases × ~1000 tokens = ~10k tokens, safe within model limits
+            else:
+                BATCH_SIZE = 10  # Default conservative batch size
+            
             all_test_cases = []
             total_batches = (target_count + BATCH_SIZE - 1) // BATCH_SIZE 
             
@@ -995,6 +1039,9 @@ Return ONLY the JSON array, nothing else."""
                 if batch_test_cases:
                     all_test_cases.extend(batch_test_cases)
                     logger.info(f"Batch {batch_num + 1}: Got {len(batch_test_cases)} test cases (total: {len(all_test_cases)})")
+                    # Brief pause between batches for local providers to release resources
+                    if self.provider.lower() == "ollama" and batch_num < total_batches - 1:
+                        await asyncio.sleep(1)
                 else:
                     logger.warning(f"Batch {batch_num + 1}: No test cases extracted")
                     debug_file = os.path.join(self.datasets_dir, f"debug_response_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")

@@ -412,14 +412,24 @@ class OllamaLLMProvider(BaseLLMProvider):
                 error_code="CONNECTION_ERROR",
             )
         
-        # Check if model is available
+        # Check if model is available, auto-pull if enabled
         if not await self.is_model_available():
-            return ConnectionTestResult(
-                success=False,
-                message=f"Model '{self.model}' not found. Pull with: ollama pull {self.model}",
-                error_code="MODEL_NOT_FOUND",
-            )
-        
+            if self.auto_pull:
+                logger.info(f"Model '{self.model}' not found locally, pulling automatically...")
+                pulled = await self.pull_model()
+                if not pulled:
+                    return ConnectionTestResult(
+                        success=False,
+                        message=f"Model '{self.model}' not found and auto-pull failed.",
+                        error_code="MODEL_PULL_FAILED",
+                    )
+            else:
+                return ConnectionTestResult(
+                    success=False,
+                    message=f"Model '{self.model}' not found. Pull with: ollama pull {self.model}",
+                    error_code="MODEL_NOT_FOUND",
+                )
+
         # Test generation
         try:
             start_time = time.time()

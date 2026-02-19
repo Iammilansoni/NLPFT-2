@@ -401,27 +401,159 @@ async def upload_dataset(
     }
 
 
+async def _run_generation_background(
+    task_id: str,
+    template_data: dict,
+    dataset_request_dict: dict,
+    user_id_str: str,
+    user_id_uuid,
+    template_id_str: str,
+):
+    """
+    Background coroutine: runs the full LLM generation + DB storage without
+    blocking the HTTP request. Uses its own DB session so it is completely
+    decoupled from the request lifecycle.
+    """
+    import asyncio
+    from app.core.postgres import AsyncSessionLocal
+    from app.nlp.dataset_generator import get_enterprise_dataset_generator
+    from app.services.dataset_task_manager import get_task_manager
+    from app.services.audit_service import get_audit_service
+    from app.models.schemas.embedding_schemas import EmbeddingStatus
+
+    task_manager = get_task_manager()
+
+    try:
+        async with AsyncSessionLocal() as bg_db:
+            enterprise_generator = get_enterprise_dataset_generator()
+
+            result = await enterprise_generator.generate_dataset_from_template(
+                template_data=template_data,
+                num_examples=dataset_request_dict.get("num_examples"),
+                user_prompt=dataset_request_dict.get("user_prompt", ""),
+                focus_areas=dataset_request_dict.get("focus_areas"),
+                scenario_distribution=dataset_request_dict.get("scenario_distribution"),
+                task_id=task_id,
+                user_id=user_id_str,
+                db=bg_db,
+            )
+
+            if not result.get("success"):
+                task_manager.update_task(
+                    task_id,
+                    status="failed",
+                    message=f"Dataset generation failed: {result.get('error')}",
+                    error=result.get("error"),
+                    progress=0,
+                )
+                return
+
+            csv_path = result["paths"]["csv"]
+
+            # Store in PostgreSQL
+            dataset = None
+            try:
+                dataset = await store_csv_to_postgresql(
+                    csv_path=csv_path,
+                    user_id=user_id_uuid,
+                    template_id=UUID(template_id_str),
+                    db=bg_db,
+                    dataset_name=f"{result['template_name']}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
+                    generated_with_llm=result.get("model_used"),
+                    generation_prompt=dataset_request_dict.get("user_prompt", ""),
+                    scenario_distribution=result.get("scenario_distribution"),
+                )
+                logger.info(f"Background task: stored dataset in PostgreSQL (id={dataset.dataset_id})")
+            except Exception as store_error:
+                logger.error(f"Background task: failed to store dataset: {store_error}", exc_info=True)
+                task_manager.update_task(
+                    task_id,
+                    status="failed",
+                    message=f"Failed to store dataset: {store_error}",
+                    error=str(store_error),
+                )
+                return
+
+            # Mark embedding as pending
+            from app.models.schemas.embedding_schemas import EmbeddingStatus
+            if dataset:
+                dataset.embedding_status = EmbeddingStatus.PENDING
+                await bg_db.commit()
+
+            task_manager.update_progress(task_id, 95, "Finalizing...", "finalize")
+
+            # Audit log
+            audit_service = get_audit_service()
+            try:
+                await audit_service.log_dataset_generated(
+                    db=bg_db,
+                    user_id=user_id_uuid,
+                    template_id=UUID(template_id_str),
+                    dataset_path=csv_path,
+                    num_examples=result["total_generated"],
+                    metadata_={
+                        "template_name": result["template_name"],
+                        "user_prompt": dataset_request_dict.get("user_prompt", "")[:200],
+                        "scenario_distribution": result["scenario_distribution"],
+                        "embedding_status": "pending",
+                    },
+                    request=None,
+                )
+            except Exception as audit_err:
+                logger.warning(f"Background task: audit log failed (non-fatal): {audit_err}")
+
+            task_manager.update_task(
+                task_id,
+                status="completed",
+                message=f"Generated {result['total_generated']} test cases. Click 'Embed to Redis' to create vectors.",
+                result={
+                    "total_generated": result["total_generated"],
+                    "csv_path": csv_path,
+                    "dataset_id": str(dataset.dataset_id) if dataset else None,
+                    "embedded_to_redis": False,
+                    "embedding_status": "pending",
+                    "template_name": result["template_name"],
+                    "template_id": result["template_id"],
+                    "requested": result["requested"],
+                    "scenario_distribution": result["scenario_distribution"],
+                    "category_distribution": result["category_distribution"],
+                    "csv_preview": result["csv_preview"],
+                    "user_prompt": result["user_prompt"],
+                    "focus_areas": result["focus_areas"],
+                    "timestamp": result["timestamp"],
+                    "download_url": f"/v1/datasets/download/{os.path.basename(csv_path)}",
+                    "stored_in_postgresql": dataset is not None,
+                },
+                files={"csv": csv_path},
+            )
+
+    except Exception as e:
+        logger.error(f"Background generation task {task_id} failed: {e}", exc_info=True)
+        try:
+            task_manager.update_task(
+                task_id, status="failed", message=str(e), error=str(e)
+            )
+        except Exception:
+            pass
+
+
 @router.post("/generate")
-# Rate limiting temporarily disabled - use app-level limiter instead
 async def generate_dataset(
     request: Request,
     dataset_request: DatasetGenerateRequest,
-    background_tasks: BackgroundTasks = BackgroundTasks(),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Generate dataset from plain English query using LLM
-    
-    NEW REQUIREMENT: Template must be 'approved' before dataset generation
-    RATE LIMIT: 10 generations per minute per IP to prevent API abuse
-    
+    Generate dataset from an approved template using a configured LLM provider.
+
+    Returns immediately with a task_id. Generation runs in the background.
+    Poll GET /datasets/status/{task_id} for progress and results.
+
     Workflow:
-    1. If template_id provided → Check approval status
-    2. If not approved → Return 403 Forbidden
-    3. If approved → Proceed with dataset generation
-    
-    Supports both new format (api_context + template_id) and legacy format (seed_query)
+    1. Validate template is approved
+    2. Create task, return task_id immediately (no timeout risk)
+    3. Background coroutine handles LLM calls + DB storage
     """
     try:
         # ============== TEMPLATE APPROVAL CHECK ==============
@@ -472,27 +604,13 @@ async def generate_dataset(
                 )
             
             logger.info(f"Template {dataset_request.template_id} approved by {metadata.approved_by} at {metadata.approved_at}")
-            
-            # Create task for tracking
-            task_manager = get_task_manager()
-            # Associate task with current user
-            task_id = task_manager.create_task(user_id=current_user.u_id)
-            task_manager.update_task(task_id, status="running", message="Starting dataset generation...", progress=0)
-            
-            # ============== ENTERPRISE DATASET GENERATION ==============
-            # Load full template data with all related information
-            task_manager.update_progress(task_id, 5, "Loading template data...", "load_template")
-            
+
+            # ── Load template data now (while we have the DB session) ──────────
             params_result = await db.execute(
                 select(Parameter).where(Parameter.t_id == dataset_request.template_id)
             )
             parameters = params_result.scalars().all()
-            exp_resp_result = await db.execute(
-                select(ExpectedResponse).where(ExpectedResponse.t_id == dataset_request.template_id)
-            )
-            expected_responses = exp_resp_result.scalars().all()
-            
-            # Build comprehensive template data dictionary
+
             template_data = {
                 "id": str(template.t_id),
                 "name": template.api_name,
@@ -506,7 +624,7 @@ async def generate_dataset(
                         "type": p.type,
                         "required": p.required,
                         "example": p.example,
-                        "description": p.description
+                        "description": p.description,
                     }
                     for p in parameters
                 ],
@@ -518,121 +636,45 @@ async def generate_dataset(
                 "auth_config": template.auth_config or {},
                 "headers": template.headers or {},
                 "rate_limit": template.rate_limit or {},
-                "assertions": template.assertions or []
+                "assertions": template.assertions or [],
             }
-            
-            # Use enterprise generator
-            enterprise_generator = get_enterprise_dataset_generator()
-            
-            # Generate dataset with full template context (pass task_id for progress tracking)
-            # Pass user_id to enable loading user's configured LLM provider
-            result = await enterprise_generator.generate_dataset_from_template(
-                template_data=template_data,
-                num_examples=dataset_request.num_examples,
-                user_prompt=dataset_request.user_prompt,
-                focus_areas=dataset_request.focus_areas,
-                scenario_distribution=dataset_request.scenario_distribution,
-                task_id=task_id,
-                user_id=str(current_user.u_id),  # Pass user ID for LLM provider lookup
-                db=db  # Reuse existing async session instead of creating sync sessions
-            )
-            
-            if not result.get("success"):
-                task_manager.update_task(task_id, status="failed", message=f"Dataset generation failed: {result.get('error')}", progress=0)
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Dataset generation failed: {result.get('error')}"
-                )
-            
-            # Get CSV path from result
-            csv_path = result["paths"]["csv"]
-            
-            # ========== STORE GENERATED CSV TO POSTGRESQL ==========
-            dataset = None
-            try:
-                dataset = await store_csv_to_postgresql(
-                    csv_path=csv_path,
-                    user_id=current_user.u_id,
-                    template_id=UUID(dataset_request.template_id),
-                    db=db,
-                    dataset_name=f"{result['template_name']}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
-                    generated_with_llm=result.get("model_used"),
-                    generation_prompt=dataset_request.user_prompt,
-                    scenario_distribution=result.get("scenario_distribution")
-                )
-                logger.info(f"Generated dataset stored in PostgreSQL (dataset_id={dataset.dataset_id})")
-            except Exception as store_error:
-                logger.error(f"Failed to store generated dataset in PostgreSQL: {store_error}", exc_info=True)
-                task_manager.update_task(task_id, status="failed", message=f"Failed to store dataset: {store_error}")
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to store generated dataset: {store_error}"
-                )
-            
-            
-            # ========== EMBEDDING IS NOW MANUAL ==========
-            # Dataset is created and stored, embedding can be done later via the Embed button
-            from app.models.schemas.embedding_schemas import EmbeddingStatus
-            if dataset:
-                dataset.embedding_status = EmbeddingStatus.PENDING
-                await db.commit()
-            
-            task_manager.update_progress(task_id, 95, "Finalizing...", "finalize")
-            
-            # Audit log
-            audit_service = get_audit_service()
-            await audit_service.log_dataset_generated(
-                db=db,
-                user_id=current_user.u_id,
-                template_id=UUID(dataset_request.template_id),
-                dataset_path=csv_path,
-                num_examples=result['total_generated'],
-                metadata_={
-                    "template_name": result["template_name"],
-                    "user_prompt": dataset_request.user_prompt[:200],
-                    "scenario_distribution": result["scenario_distribution"],
-                    "embedding_status": "pending",
-                    "embedded_to_redis": False
-                },
-                request=request
-            )
-            
-            # Mark task as completed
+
+            # ── Create task and return immediately ────────────────────────────
+            task_manager = get_task_manager()
+            task_id = task_manager.create_task(user_id=current_user.u_id)
             task_manager.update_task(
-                task_id, 
-                status="completed", 
-                message=f"Generated {result['total_generated']} test cases. Click 'Embed to Redis' to create vectors.",
-                result={
-                    "total_generated": result["total_generated"],
-                    "csv_path": csv_path,
-                    "embedded_to_redis": False,
-                    "embedding_status": "pending"
-                },
-                files={
-                    "csv": csv_path
-                }
+                task_id,
+                status="running",
+                message="Generation queued, starting in background...",
+                progress=0,
             )
-            
+
+            # Dispatch background coroutine — zero impact on HTTP response time
+            import asyncio
+            asyncio.ensure_future(
+                _run_generation_background(
+                    task_id=task_id,
+                    template_data=template_data,
+                    dataset_request_dict={
+                        "num_examples": dataset_request.num_examples,
+                        "user_prompt": dataset_request.user_prompt,
+                        "focus_areas": dataset_request.focus_areas,
+                        "scenario_distribution": dataset_request.scenario_distribution,
+                    },
+                    user_id_str=str(current_user.u_id),
+                    user_id_uuid=current_user.u_id,
+                    template_id_str=dataset_request.template_id,
+                )
+            )
+
             return {
                 "success": True,
                 "task_id": task_id,
-                "dataset_id": str(dataset.dataset_id) if dataset else None,
-                "embedding_status": "pending",
-                "embedded_to_redis": False,
-                "message": f"Dataset generated ({result['total_generated']} rows) - Stored in PostgreSQL. Click 'Embed to Redis' to create vectors.",
-                "template_name": result["template_name"],
-                "template_id": result["template_id"],
-                "total_generated": result["total_generated"],
-                "requested": result["requested"],
-                "scenario_distribution": result["scenario_distribution"],
-                "category_distribution": result["category_distribution"],
-                "csv_path": csv_path,
-                "csv_preview": result["csv_preview"],
-                "user_prompt": result["user_prompt"],
-                "focus_areas": result["focus_areas"],
-                "timestamp": result["timestamp"],
-                "download_url": f"/v1/datasets/download/{os.path.basename(csv_path)}",
-                "stored_in_postgresql": dataset is not None
+                "status": "running",
+                "message": "Dataset generation started in background. Poll /datasets/status/{task_id} for progress.",
+                "template_name": template.api_name,
+                "template_id": dataset_request.template_id,
+                "requested": dataset_request.num_examples,
             }
         
         # ============== LEGACY SUPPORT (DISABLED - REQUIRES template_id) ==============

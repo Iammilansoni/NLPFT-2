@@ -162,13 +162,39 @@ class MultiModelDatasetEmbeddingService:
                     }
                 else:
                     # Force re-embed: delete existing vectors
-                    logger.info(f" Deleting existing vectors (model={dataset.embedding_model})")
-                    deleted = self.redis_service.delete_dataset_vectors(
-                        model_id=dataset.embedding_model,
-                        user_id=user_id,
-                        dataset_id=dataset_id
-                    )
-                    logger.info(f" Deleted {deleted} existing vectors")
+                    old_model = dataset.embedding_model
+                    logger.info(f" Deleting existing vectors (model={old_model})")
+                    try:
+                        deleted = self.redis_service.delete_dataset_vectors(
+                            model_id=old_model,
+                            user_id=user_id,
+                            dataset_id=dataset_id
+                        )
+                        logger.info(f" Deleted {deleted} existing vectors")
+                    except ValueError:
+                        # Old model no longer in registry (e.g. removed invalid model)
+                        # Construct namespace directly and clean up orphaned keys
+                        logger.warning(
+                            f" Old model '{old_model}' not in registry, "
+                            f"attempting direct key cleanup"
+                        )
+                        safe_id = old_model.replace("-", "_").replace(".", "_").replace("/", "_").lower()
+                        namespace = f"vector:{safe_id}"
+                        pattern = f"{namespace}:{user_id}:{dataset_id}:*"
+                        keys = []
+                        cursor = 0
+                        while True:
+                            cursor, batch = self.redis_service.redis_client.scan(
+                                cursor=cursor, match=pattern.encode(), count=100
+                            )
+                            keys.extend(batch)
+                            if cursor == 0:
+                                break
+                        if keys:
+                            self.redis_service.redis_client.delete(*keys)
+                            logger.info(f" Cleaned up {len(keys)} orphaned vectors for old model '{old_model}'")
+                        else:
+                            logger.info(f" No orphaned vectors found for old model '{old_model}'")
             
             # 4. Check Ollama availability
             if not await self.ollama_service.check_ollama_available():
@@ -317,9 +343,24 @@ class MultiModelDatasetEmbeddingService:
             
             await db.commit()
             
+            # Verify actual Redis vector count matches what we think we stored
+            verify_count = self.redis_service.count_vectors(model_id, user_id, dataset_id)
+            if verify_count != embedded_count:
+                logger.warning(
+                    f"⚠️ Embedding count mismatch after storage! "
+                    f"Expected {embedded_count} vectors in Redis, "
+                    f"but count_vectors reports {verify_count}. "
+                    f"(dataset={str(dataset_id)[:8]}, model={model_id})"
+                )
+                # Trust the actual Redis count
+                embedded_count = verify_count
+                dataset.embedded_rows = embedded_count
+                await db.commit()
+            
             logger.info(
-                f" Embedding completed: {embedded_count}/{total_rows} rows "
-                f"(model={model_id}, failed={failed_count})"
+                f"✅ Embedding completed: {embedded_count}/{total_rows} rows "
+                f"(model={model_id}, failed={failed_count}, "
+                f"verified_redis_count={verify_count})"
             )
             
             return {
@@ -333,6 +374,7 @@ class MultiModelDatasetEmbeddingService:
                 "total_rows": total_rows,
                 "embedded_count": embedded_count,
                 "failed_count": failed_count,
+                "verified_redis_count": verify_count,
                 "status": EmbeddingStatus.COMPLETED
             }
             

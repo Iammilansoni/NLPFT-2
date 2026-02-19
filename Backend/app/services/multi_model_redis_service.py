@@ -718,6 +718,10 @@ class MultiModelRedisVectorService:
         """
         Count vectors for a user/dataset in a model's index.
         
+        Uses FT.SEARCH with LIMIT 0 0 (returns total count without fetching
+        document bodies) and falls back to key-scan counting if the index
+        query returns a suspicious result.
+        
         Args:
             model_id: Embedding model ID
             user_id: User UUID
@@ -737,11 +741,67 @@ class MultiModelRedisVectorService:
             filter_query += f" @dataset_id:{{{escaped_dataset_id}}}"
         
         try:
-            q = Query(filter_query).no_content().dialect(2)
+            # Use paging(0, 0) to request ONLY the total count, no doc bodies.
+            # This avoids any default LIMIT cap issues on result.total.
+            q = Query(filter_query).no_content().paging(0, 0).dialect(2)
             result = self.redis_client.ft(index_name).search(q)
-            return result.total
+            ft_total = result.total
+            
+            # Cross-check with scan-based count for reliability
+            scan_total = self._count_vectors_by_scan(model_id, user_id, dataset_id)
+            
+            if ft_total != scan_total:
+                logger.warning(
+                    f"⚠️ Vector count mismatch for index {index_name}: "
+                    f"FT.SEARCH reports {ft_total}, key scan found {scan_total}. "
+                    f"Using scan count (more reliable)."
+                )
+                return scan_total
+            
+            return ft_total
         except Exception as e:
-            logger.debug(f"Count failed for index {index_name}: {e}")
+            logger.debug(f"FT.SEARCH count failed for index {index_name}: {e}")
+            # Fall back to scan-based counting
+            return self._count_vectors_by_scan(model_id, user_id, dataset_id)
+    
+    def _count_vectors_by_scan(
+        self,
+        model_id: str,
+        user_id: uuid.UUID,
+        dataset_id: Optional[uuid.UUID] = None
+    ) -> int:
+        """
+        Count vectors by scanning Redis keys directly.
+        
+        This is a reliable fallback that doesn't depend on RediSearch
+        index state. It scans keys matching the model namespace pattern
+        and filters by user_id (and optionally dataset_id).
+        
+        Args:
+            model_id: Embedding model ID
+            user_id: User UUID
+            dataset_id: Optional dataset UUID filter
+            
+        Returns:
+            Count of matching keys
+        """
+        namespace = self._get_namespace(model_id)
+        
+        if dataset_id:
+            pattern = f"{namespace}:{user_id}:{dataset_id}:*"
+        else:
+            pattern = f"{namespace}:{user_id}:*"
+        
+        try:
+            count = 0
+            for _ in self.redis_client.scan_iter(
+                match=pattern.encode() if isinstance(pattern, str) else pattern,
+                count=500
+            ):
+                count += 1
+            return count
+        except Exception as e:
+            logger.debug(f"Scan count failed for pattern {pattern}: {e}")
             return 0
     
     def get_index_info(self, model_id: str) -> Optional[Dict[str, Any]]:

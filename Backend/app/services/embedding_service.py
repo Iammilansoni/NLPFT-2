@@ -19,6 +19,7 @@ Key Design: One Embedding Model Per Dataset
 - Re-embedding requires explicit user action via /reembed endpoint
 """
 
+import os
 import uuid
 import asyncio
 import pandas as pd
@@ -221,7 +222,7 @@ class EnhancedEmbeddingService:
             
             # Check if Ollama is available
             if not await self.ollama_service.check_ollama_available():
-                raise RuntimeError("Ollama service not available at http://localhost:11434. Please start Ollama first.")
+                raise RuntimeError(f"Ollama service not available at {os.getenv('OLLAMA_HOST', 'http://ollama:11434')}. Please start Ollama first.")
             
             # Get user's preferred embedding model
             model_id, dimension = self._get_user_embedding_model(db, user_id)
@@ -301,11 +302,11 @@ class EnhancedEmbeddingService:
                         intent_type = get_intent_from_method(template_method)
                     
                     # Get confidence score, default based on scenario
-                    confidence_score = row.get('confidence_score', 0.5)
+                    confidence_score = row.get('confidence_score', None)
                     try:
-                        confidence_score = float(confidence_score) if confidence_score else 0.5
+                        confidence_score = float(confidence_score) if confidence_score is not None else 0.7
                     except (ValueError, TypeError):
-                        confidence_score = 0.5
+                        confidence_score = 0.7
                     
                     document = {
                         "user_id": str(user_id),
@@ -347,7 +348,7 @@ class EnhancedEmbeddingService:
                     "embedded_at": datetime.now(timezone.utc).isoformat(),
                     "csv_path": csv_path,
                     "hnsw_index": self.index_mapping[dimension],
-                    "ollama_service": "localhost:11434"
+                    "ollama_service": os.getenv("OLLAMA_HOST", "http://ollama:11434")
                 }
                 
                 # Update or create metadata field
@@ -885,7 +886,7 @@ def create_embedding_task(csv_path: str, user_id: str, template_id: str, model_n
             """Embed a single text asynchronously"""
             try:
                 response = await client.post(
-                    "http://localhost:11434/api/embeddings",
+                    f"{os.getenv('OLLAMA_HOST', 'http://ollama:11434')}/api/embeddings",
                     json={"model": model, "prompt": text},
                     timeout=60.0
                 )

@@ -80,25 +80,6 @@
       }
     },
     {
-      "model_id": "bge-base",
-      "type": "embedding",
-      "name": "BGE-Base",
-      "dimension": 768,
-      "context_tokens": 512,
-      "cpu_friendly": true,
-      "provider": "ollama",
-      "ollama_model": "bge-base",
-      "notes": "BAAI's balanced embedding model. Good tradeoff between speed and accuracy for general retrieval.",
-      "status": "available",
-      "use_cases": ["general-retrieval", "balanced", "cost-effective"],
-      "performance": {
-        "speed": "fast",
-        "quality": "good",
-        "memory_mb": 220,
-        "parameters": "109M"
-      }
-    },
-    {
       "model_id": "bge-large",
       "type": "embedding",
       "name": "BGE-Large",

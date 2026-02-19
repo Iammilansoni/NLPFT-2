@@ -212,11 +212,12 @@ class LLMConfigService:
             encrypted_key = encrypt_api_key(data.api_key)
         
         # Default config params
+        default_timeout = 600.0 if data.provider.lower() == "ollama" else 120.0
         config_params = data.config_params or {
             "temperature": 0.7,
             "max_tokens": 4096,
             "top_p": 0.9,
-            "timeout": 120.0,
+            "timeout": default_timeout,
             "max_retries": 3,
         }
         
@@ -394,20 +395,30 @@ class LLMConfigService:
         return True
     
     async def _set_single_default(self, user_id: UUID, config_id: UUID):
-        """Ensure only one config is default for user (atomic operation using CASE)"""
-        from sqlalchemy import case
+        """Ensure only one config is default for user.
         
-        # SECURITY FIX: Use single atomic UPDATE with CASE expression
-        # This prevents race conditions when concurrent requests set different defaults
+        Uses two sequential statements in the same transaction:
+        1. Clear all defaults for user (avoids unique constraint violation)
+        2. Set the requested config as default
+        
+        A single CASE-based UPDATE fails because PostgreSQL enforces the partial
+        unique index row-by-row, causing a UniqueViolationError when a second row
+        is temporarily set to is_default=true before the old one is cleared.
+        """
+        # Step 1: clear all defaults for this user
         await self.db.execute(
             update(LLMProviderConfig)
             .where(LLMProviderConfig.u_id == user_id)
-            .values(
-                is_default=case(
-                    (LLMProviderConfig.config_id == config_id, 1),
-                    else_=0
-                )
+            .values(is_default=False)
+        )
+        # Step 2: mark only the target config as default
+        await self.db.execute(
+            update(LLMProviderConfig)
+            .where(
+                LLMProviderConfig.u_id == user_id,
+                LLMProviderConfig.config_id == config_id,
             )
+            .values(is_default=True)
         )
     
     # =========================================================================
@@ -490,7 +501,7 @@ class LLMConfigService:
                 model=config.model_name,
                 api_key=decrypted_key,
                 base_url=config.base_url,
-                timeout=config_params.get("timeout", 120.0),
+                timeout=config_params.get("timeout", 600.0 if config.provider == "ollama" else 120.0),
                 max_retries=1,  # Only one attempt for testing
             )
         except Exception as e:
@@ -539,12 +550,13 @@ class LLMConfigService:
                 # or will fail with a clear error message
         
         config_params = config.config_params or {}
+        default_timeout = 600.0 if config.provider == "ollama" else 120.0
         return LLMProviderFactory.create(
             provider_type=config.provider,
             model=config.model_name,
             api_key=decrypted_key,
             base_url=config.base_url,
-            timeout=config_params.get("timeout", 120.0),
+            timeout=config_params.get("timeout", default_timeout),
             max_retries=config_params.get("max_retries", 3),
         )
     

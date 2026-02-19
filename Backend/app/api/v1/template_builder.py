@@ -1226,11 +1226,11 @@ async def approve_template_by_id(
         metadata.approved_by = current_user.u_id
         metadata.approved_at = datetime.now(timezone.utc)
         metadata.updated_at = datetime.now(timezone.utc)
-        
+
         await db.commit()
-        
+
         logger.info(f"Template approved: {template_id} by expert {current_user.u_id}")
-        
+
         # Audit log
         audit_service = get_audit_service()
         template_result = await db.execute(select(Template).where(Template.t_id == UUID(template_id)))
@@ -1243,7 +1243,7 @@ async def approve_template_by_id(
             approver_id=current_user.u_id,
             request=request
         )
-        
+
         return TemplateApprovalResponse(
             template_id=template_id,
             status=TemplateStatus.APPROVED.value,
@@ -1251,7 +1251,7 @@ async def approve_template_by_id(
             approved_by=str(current_user.u_id),
             timestamp=datetime.now(timezone.utc)
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1311,9 +1311,9 @@ async def approve_template(
         metadata.approved_by = current_user.u_id
         metadata.approved_at = datetime.now(timezone.utc)
         metadata.updated_at = datetime.now(timezone.utc)
-        
+
         await db.commit()
-        
+
         logger.info(f"Template approved: {approval_data.template_id} by expert {current_user.u_id}")
         
         # Audit log
@@ -1747,12 +1747,12 @@ async def toggle_template_visibility(
             # Turn ON - show in dataset page (from draft, rejected, or review)
             metadata.status = TemplateStatus.APPROVED.value
             metadata.approved_by = current_user.u_id
-            metadata.approved_at = datetime.now(timezone.utc)
+            metadata.approved_at = datetime.now(timezone.utc).replace(tzinfo=None)
             new_status = TemplateStatus.APPROVED.value
             message = "Template now visible in dataset page"
             action = "template_visibility_on"
         
-        metadata.updated_at = datetime.now(timezone.utc)
+        metadata.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         await db.commit()
         
         logger.info(f"Template visibility toggled: {template_id} -> {new_status} by user {current_user.u_id}")

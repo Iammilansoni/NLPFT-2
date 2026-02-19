@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { getApiBase } from '@/lib/runtime-config'
 import {
   Download,
@@ -52,7 +52,6 @@ import {
 } from "@/components/ui/tooltip"
 import { toast } from '@/hooks/use-toast'
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour'
-import { ActiveTasksPanel } from '@/components/datasets/ActiveTasksPanel'
 
 interface DatasetRecord {
   api: string
@@ -235,6 +234,12 @@ export default function DatasetGeneratorPage() {
     }
   }, [API_BASE])
 
+  const isMountedRef = useRef(true)
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => { isMountedRef.current = false }
+  }, [])
+
   const fetchTaskStatus = useCallback(async (taskId: string) => {
     try {
       const token = localStorage.getItem('nlpforge_access_token')
@@ -243,7 +248,22 @@ export default function DatasetGeneratorPage() {
           'Authorization': `Bearer ${token}`
         }
       })
+
+      if (!isMountedRef.current) return
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          // Task no longer exists (server restart or task expired)
+          setIsGenerating(false)
+          setCurrentTask(null)
+          return
+        }
+        throw new Error(`Request failed with status ${response.status}`)
+      }
+
       const data = await response.json()
+      if (!isMountedRef.current) return
+
       setCurrentTask(data)
 
       if (data.status === 'completed') {
@@ -255,6 +275,7 @@ export default function DatasetGeneratorPage() {
         setError(formatError(data.message || data))
       }
     } catch (err) {
+      if (!isMountedRef.current) return
       console.error('Error fetching task status:', err)
       setError(formatError(err))
     }
@@ -666,11 +687,6 @@ export default function DatasetGeneratorPage() {
 
       {/* Main Content */}
       <main className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Active Tasks Panel - Shows running/recent generation tasks */}
-        <ActiveTasksPanel 
-          onTaskComplete={fetchAllTasks}
-          className="animate-in fade-in slide-in-from-top-2 duration-300 mb-8"
-        />
 
         <Tabs defaultValue="generate" className="w-full space-y-6" data-tour="dataset-tabs">
           <TabsList className="grid w-full sm:w-[400px] grid-cols-2 p-1 bg-muted/50 rounded-xl" data-tour="generate-dataset">

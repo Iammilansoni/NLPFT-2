@@ -115,35 +115,42 @@ async def get_user_dashboard_stats(
         try:
             for model_id in registry.list_model_ids():
                 try:
-                    embedding_count += redis_service.count_vectors(model_id, current_user.u_id)
-                except Exception:
-                    # If counting for a model fails, continue with others
+                    model_count = redis_service.count_vectors(model_id, current_user.u_id)
+                    logger.debug(f"Model {model_id}: {model_count} vectors")
+                    embedding_count += model_count
+                except Exception as model_err:
+                    logger.debug(f"Count failed for model {model_id}: {model_err}")
                     continue
         except Exception:
             embedding_count = 0
         
-        # Get unique intents and APIs by scanning user's embeddings
+        # Also count legacy embedding:* keys and aggregate intents/APIs using a single shared client
+        legacy_count = 0
         intents = {}
         unique_apis = set()
-        
-        try:
-            import redis as _redis
-            from app.core.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
-            
-            user_id = str(current_user.u_id)
-            pattern = f"embedding:{user_id}:*"
-            
-            # Legacy intents/APIs aggregation - attempt to read legacy keys if present
-            try:
-                r = _redis.Redis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD, decode_responses=False)
-            except Exception:
-                r = None
 
-            if r:
+        _r = None
+        try:
+            import redis as _redis_shared
+            from app.core.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
+            _r = _redis_shared.Redis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD, decode_responses=False)
+            legacy_pattern = f"embedding:{str(current_user.u_id)}:*"
+            for _ in _r.scan_iter(match=legacy_pattern.encode(), count=500):
+                legacy_count += 1
+            if legacy_count > 0:
+                logger.info(f"Found {legacy_count} legacy embeddings for user {str(current_user.u_id)[:8]}")
+        except Exception as e:
+            logger.debug(f"Could not count legacy embeddings: {e}")
+
+        embedding_count += legacy_count
+
+        # Get unique intents and APIs by scanning user's embeddings (reuse shared client)
+        try:
+            if _r is not None:
                 pattern = f"embedding:{str(current_user.u_id)}:*"
-                for key in r.scan_iter(match=pattern.encode(), count=100):
+                for key in _r.scan_iter(match=pattern.encode(), count=100):
                     try:
-                        data = r.json().get(key)
+                        data = _r.json().get(key)
                         if data:
                             intent = data.get('intent_type') or data.get('scenario_type') or 'unknown'
                             if isinstance(intent, bytes):
@@ -159,6 +166,12 @@ async def get_user_dashboard_stats(
                         continue
         except Exception as e:
             logger.warning(f"Could not aggregate intents/APIs: {e}")
+        finally:
+            if _r is not None:
+                try:
+                    _r.close()
+                except Exception as e:
+                    logger.debug(f"Error closing Redis client: {e}")
         
         # Return structure matching Frontend StatsResponse
         return {

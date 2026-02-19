@@ -186,7 +186,7 @@ class RedisVectorService:
             "created_at": datetime.now(timezone.utc).isoformat(),
             # Semantic retrieval metadata (defaults for backward compatibility)
             "intent_type": intent_type or "unknown",
-            "confidence_score": confidence_score if confidence_score is not None else 0.5
+            "confidence_score": confidence_score if confidence_score is not None else 0.7
         }
         
         if t_id:
@@ -281,7 +281,7 @@ class RedisVectorService:
                 "redis_key": doc.id,
                 # Semantic retrieval metadata (with defaults for backward compatibility)
                 "intent_type": getattr(doc, "intent_type", "unknown"),
-                "confidence_score": float(getattr(doc, "confidence_score", 0.5)) if getattr(doc, "confidence_score", None) else 0.5
+                "confidence_score": (float(_cs) if (_cs := getattr(doc, "confidence_score", None)) is not None else 0.7)
             } for doc in results.docs]
             
         except Exception as e:

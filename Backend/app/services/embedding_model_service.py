@@ -100,27 +100,11 @@ class EmbeddingModelService:
         "snowflake-arctic-embed2": 1024,
         "snowflake-arctic-embed2:568m": 1024,
         
-        # BGE models (BAAI)
+        # BGE models (BAAI) — only models available in Ollama registry
         "bge-m3": 1024,
         "bge-m3:567m": 1024,
         "bge-large": 1024,
         "bge-large:335m": 1024,
-        "bge-base": 768,
-        "bge-small": 384,
-        
-        # E5 models
-        "e5-large": 1024,
-        "e5-base": 768,
-        "e5-small": 384,
-        
-        # GTE models
-        "gte-large": 1024,
-        "gte-base": 768,
-        "gte-small": 384,
-        
-        # Jina models
-        "jina-embeddings-v2-base-en": 768,
-        "jina-embeddings-v2-small-en": 512,
         
         # Google EmbeddingGemma
         "embeddinggemma": 768,
@@ -407,6 +391,8 @@ class EmbeddingModelService:
     ) -> bool:
         """Pull a model from Ollama registry."""
         logger.info(f"🔄 Pulling Ollama embedding model: {model_name}")
+        pull_succeeded = False
+        last_error: Optional[str] = None
         
         try:
             async with httpx.AsyncClient(timeout=None) as client:
@@ -426,7 +412,21 @@ class EmbeddingModelService:
                         try:
                             import json
                             data = json.loads(line)
+
+                            # Ollama can return HTTP 200 with stream-level error payload.
+                            error_message = data.get("error")
+                            if error_message:
+                                last_error = str(error_message)
+                                logger.error(f"Ollama pull error for {model_name}: {last_error}")
+                                return False
+
                             status = data.get("status", "")
+                            status_lower = status.lower()
+
+                            if "error" in status_lower:
+                                last_error = status
+                                logger.error(f"Ollama pull failed for {model_name}: {status}")
+                                return False
                             
                             total = data.get("total", 0)
                             completed = data.get("completed", 0)
@@ -435,14 +435,25 @@ class EmbeddingModelService:
                             if progress_callback:
                                 await asyncio.to_thread(progress_callback, status, percent)
                             
-                            if "success" in status.lower():
+                            if "success" in status_lower:
+                                pull_succeeded = True
                                 logger.info(f"✅ Model pulled successfully: {model_name}")
                                 return True
                         except Exception:
                             pass
-                    
-                    logger.info(f"✅ Model pull completed: {model_name}")
-                    return True
+
+                    # Some Ollama versions may not emit an explicit "success" status.
+                    # Verify local availability before declaring success.
+                    is_local = await self.is_model_available_locally(model_name)
+                    if pull_succeeded or is_local:
+                        logger.info(f"✅ Model pull completed: {model_name}")
+                        return True
+
+                    if last_error:
+                        logger.error(f"❌ Model pull did not complete: {model_name} ({last_error})")
+                    else:
+                        logger.error(f"❌ Model pull did not complete for {model_name}; model not found locally after pull")
+                    return False
                     
         except Exception as e:
             logger.error(f"Failed to pull model {model_name}: {e}")
@@ -468,9 +479,7 @@ class EmbeddingModelService:
     
     # Known display names for better formatting
     DISPLAY_NAME_OVERRIDES: Dict[str, str] = {
-        "bge-base": "BGE Base",
         "bge-large": "BGE Large",
-        "bge-small": "BGE Small",
         "bge-m3": "BGE M3 (Multilingual)",
         "nomic-embed-text": "Nomic Embed Text",
         "nomic-embed-text-v2-moe": "Nomic Embed Text v2",
@@ -478,14 +487,6 @@ class EmbeddingModelService:
         "mxbai-embed-large": "MxBai Embed Large",
         "snowflake-arctic-embed": "Snowflake Arctic Embed",
         "snowflake-arctic-embed2": "Snowflake Arctic Embed 2",
-        "e5-large": "E5 Large",
-        "e5-base": "E5 Base",
-        "e5-small": "E5 Small",
-        "gte-large": "GTE Large",
-        "gte-base": "GTE Base",
-        "gte-small": "GTE Small",
-        "jina-embeddings-v2-base-en": "Jina Embeddings v2 Base",
-        "jina-embeddings-v2-small-en": "Jina Embeddings v2 Small",
         "embeddinggemma": "Embedding Gemma",
         "qwen3-embedding": "Qwen3 Embedding",
         "paraphrase-multilingual": "Paraphrase Multilingual",

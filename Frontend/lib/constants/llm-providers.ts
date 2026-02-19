@@ -221,7 +221,7 @@ export const LLM_PROVIDERS: Record<LLMProviderType, LLMProviderInfo> = {
         icon: 'ollama',
         requiresApiKey: false,
         supportsCustomBaseUrl: true,
-        baseUrlPlaceholder: 'http://localhost:11434',
+        baseUrlPlaceholder: 'http://localhost:11434', // Docker: http://ollama:11434
         docsUrl: 'https://ollama.com/library',
         implemented: true,
         models: [

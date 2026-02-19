@@ -432,7 +432,14 @@ const ProviderDialog = ({
                   <SelectItem key={provider.id} value={provider.id} className="rounded-lg">
                     <div className="flex items-center gap-3 py-1">
                       <ProviderIcon provider={provider.icon} size={20} />
-                      <span className="font-medium">{provider.name}</span>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{provider.name}</span>
+                        {provider.id === 'custom' && (
+                          <span className="text-xs text-muted-foreground">
+                            Only if you run LM Studio, vLLM, or another OpenAI-compatible server separately
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </SelectItem>
                 ))}
