@@ -83,6 +83,16 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Could not auto-register embedding models ({type(e).__name__}): {e}")
 
+    # Recover stale embedding tasks (server crashed mid-embedding)
+    if postgres_connected:
+        try:
+            from app.services.stale_task_recovery import recover_stale_embedding_tasks
+            recovered = await recover_stale_embedding_tasks()
+            if recovered > 0:
+                logger.info(f"🔄 Recovered {recovered} stale embedding task(s)")
+        except Exception as e:
+            logger.warning(f"Stale task recovery failed ({type(e).__name__}): {e}")
+
     logger.info("Application startup completed")
 
     yield

@@ -32,7 +32,7 @@ from typing import Dict, Optional, Any
 from datetime import datetime, timezone
 from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.core.logger import logger
 from app.core.embedding_model_registry import get_embedding_registry
@@ -248,9 +248,35 @@ class MultiModelDatasetEmbeddingService:
             
             logger.info(f" Embedding {total_rows} rows")
             
-            # 8. Process in batches
-            embedded_count = 0
+            # 8. Check for already-embedded rows (resumable embedding)
+            already_embedded_rows = set()
+            if not force_reembed:
+                try:
+                    namespace = self.redis_service._get_namespace(model_id)
+                    pattern = f"{namespace}:{user_id}:{dataset_id}:*"
+                    for key in self.redis_service.redis_client.scan_iter(
+                        match=pattern.encode(), count=500
+                    ):
+                        # Extract row_id from key: vector:model:user:dataset:ROW_ID
+                        try:
+                            key_str = key.decode() if isinstance(key, bytes) else key
+                            row_id = int(key_str.rsplit(':', 1)[-1])
+                            already_embedded_rows.add(row_id)
+                        except (ValueError, IndexError):
+                            continue
+                    
+                    if already_embedded_rows:
+                        logger.info(
+                            f"⏭️ Resumable: found {len(already_embedded_rows)} already-embedded rows, "
+                            f"will skip them"
+                        )
+                except Exception as e:
+                    logger.warning(f"Could not check for existing embeddings: {e}")
+            
+            # 9. Process in batches
+            embedded_count = len(already_embedded_rows)
             failed_count = 0
+            skipped_count = len(already_embedded_rows)
             template_id = dataset.t_id
             
             for batch_start in range(0, total_rows, batch_size):
@@ -262,6 +288,10 @@ class MultiModelDatasetEmbeddingService:
                 row_metadata = []
                 
                 for idx, row in batch.iterrows():
+                    # Skip already-embedded rows (resumable embedding)
+                    if int(idx) in already_embedded_rows:
+                        continue
+                    
                     # Combine fields for rich context
                     query = row.get('query', '')
                     api = row.get('api', row.get('api_name', ''))
@@ -284,6 +314,10 @@ class MultiModelDatasetEmbeddingService:
                         "test_category": str(row.get('test_category', 'valid_flow')),
                         "notes": str(notes),
                     })
+                
+                # Skip batch if all rows already embedded
+                if not texts:
+                    continue
                 
                 # Generate embeddings using Ollama
                 try:
@@ -332,7 +366,7 @@ class MultiModelDatasetEmbeddingService:
                     f" Progress: {progress}% ({embedded_count}/{total_rows})"
                 )
             
-            # 9. Finalize
+            # 10. Finalize
             dataset.embedding_status = EmbeddingStatus.COMPLETED
             dataset.embedding_progress = 100
             dataset.embedded_rows = embedded_count
@@ -340,6 +374,22 @@ class MultiModelDatasetEmbeddingService:
             
             if failed_count > 0:
                 dataset.embedding_error = f"{failed_count} rows failed to embed"
+            
+            # Bulk-update is_embedded flag for all dataset rows
+            if embedded_count > 0:
+                try:
+                    from app.models.database_models import CSVData
+                    stmt = (
+                        update(CSVData)
+                        .where(
+                            CSVData.dataset_id == dataset_id,
+                            CSVData.u_id == user_id
+                        )
+                        .values(is_embedded=1)
+                    )
+                    await db.execute(stmt)
+                except Exception as e:
+                    logger.warning(f"Could not update is_embedded flag: {e}")
             
             await db.commit()
             

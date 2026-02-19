@@ -42,7 +42,7 @@ class OllamaEmbeddingService:
         self.embeddings_endpoint = f"{base_url}/api/embeddings"
         self.pull_endpoint = f"{base_url}/api/pull"
         self.tags_endpoint = f"{base_url}/api/tags"
-        self.timeout = 60.0  # 60 seconds for embedding requests
+        self.timeout = 180.0  # 180 seconds for CPU-based embedding (heavy models like mxbai-embed-large need more time)
         
     async def check_ollama_available(self) -> bool:
         """
@@ -93,86 +93,155 @@ class OllamaEmbeddingService:
         self,
         model_name: str,
         text: str,
-        retry_with_pull: bool = True
+        retry_with_pull: bool = True,
+        max_retries: int = 3,
+        base_delay: float = 2.0
     ) -> Optional[List[float]]:
         """
-        Generate embedding for a single text using Ollama
+        Generate embedding for a single text using Ollama with retry + backoff.
         
         Args:
             model_name: Ollama model name (e.g., "nomic-embed-text")
             text: Text to embed
             retry_with_pull: If True, try to pull model on failure
+            max_retries: Maximum number of retry attempts (default: 3)
+            base_delay: Base delay in seconds for exponential backoff (default: 2.0)
         
         Returns:
             List of floats (embedding vector) or None on failure
         """
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
-                    self.embeddings_endpoint,
-                    json={
-                        "model": model_name,
-                        "prompt": text
-                    }
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    return data.get("embedding")
-                elif response.status_code == 404 and retry_with_pull:
-                    # Model not found, try to pull it
-                    logger.warning(f"Model {model_name} not found, attempting to pull...")
-                    if await self.pull_model(model_name):
-                        # Retry after pulling
-                        return await self.generate_embedding(model_name, text, retry_with_pull=False)
-                    return None
-                else:
-                    logger.error(f"Ollama API error: {response.status_code} - {response.text}")
-                    return None
+        import asyncio
         
-        except Exception as e:
-            logger.error(f"Error generating embedding: {e}")
-            return None
+        last_error = None
+        
+        for attempt in range(max_retries + 1):
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    response = await client.post(
+                        self.embeddings_endpoint,
+                        json={
+                            "model": model_name,
+                            "prompt": text
+                        }
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        if attempt > 0:
+                            logger.info(f"✅ Embedding succeeded on retry {attempt}/{max_retries}")
+                        return data.get("embedding")
+                    elif response.status_code == 404 and retry_with_pull:
+                        # Model not found — do NOT retry, try to pull instead
+                        logger.warning(f"Model {model_name} not found, attempting to pull...")
+                        if await self.pull_model(model_name):
+                            return await self.generate_embedding(
+                                model_name, text, retry_with_pull=False,
+                                max_retries=max_retries, base_delay=base_delay
+                            )
+                        return None
+                    elif response.status_code in (400, 404):
+                        # Client errors — do NOT retry
+                        logger.error(f"Ollama API client error (no retry): {response.status_code} - {response.text}")
+                        return None
+                    elif response.status_code >= 500:
+                        # Server errors — retry with backoff
+                        last_error = f"HTTP {response.status_code}: {response.text}"
+                        if attempt < max_retries:
+                            delay = base_delay * (2 ** attempt)
+                            logger.warning(
+                                f"⚠️ Ollama server error, retry {attempt + 1}/{max_retries} "
+                                f"in {delay:.1f}s: {last_error}"
+                            )
+                            await asyncio.sleep(delay)
+                            continue
+                        logger.error(f"Ollama API error after {max_retries} retries: {last_error}")
+                        return None
+                    else:
+                        logger.error(f"Ollama API unexpected status: {response.status_code} - {response.text}")
+                        return None
+            
+            except (httpx.TimeoutException, httpx.ConnectError, httpx.ConnectTimeout) as e:
+                # Network/timeout errors — retry with backoff
+                last_error = str(e)
+                if attempt < max_retries:
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(
+                        f"⚠️ Embedding attempt {attempt + 1}/{max_retries} failed, "
+                        f"retrying in {delay:.1f}s: {type(e).__name__}: {e}"
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                logger.error(
+                    f"Embedding failed after {max_retries} retries: "
+                    f"{type(e).__name__}: {e}"
+                )
+                return None
+            
+            except Exception as e:
+                # Unexpected errors — do NOT retry
+                logger.error(f"Unexpected error generating embedding: {e}")
+                return None
+        
+        return None
     
     async def generate_embeddings_batch(
         self,
         model_name: str,
         texts: List[str],
-        batch_size: int = 32
+        batch_size: int = 32,
+        max_concurrent: int = 4
     ) -> List[Optional[List[float]]]:
         """
-        Generate embeddings for multiple texts in batches
+        Generate embeddings for multiple texts in batches with controlled concurrency.
+        
+        Uses a semaphore to limit parallel Ollama requests, preventing CPU-based
+        Ollama from being overwhelmed (which causes timeouts and failed embeddings).
         
         Args:
             model_name: Ollama model name
             texts: List of texts to embed
-            batch_size: Number of texts to process in parallel
+            batch_size: Number of texts per batch
+            max_concurrent: Max parallel requests to Ollama (default: 4)
         
         Returns:
             List of embedding vectors (or None for failures)
         """
         embeddings = []
+        semaphore = asyncio.Semaphore(max_concurrent)
+        
+        async def _embed_with_limit(text: str) -> Optional[List[float]]:
+            """Embed a single text with concurrency limiting."""
+            async with semaphore:
+                return await self.generate_embedding(model_name, text)
         
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
             
-            # Process batch in parallel
-            tasks = [
-                self.generate_embedding(model_name, text)
-                for text in batch
-            ]
-            
+            # Process batch with concurrency-limited parallelism
+            tasks = [_embed_with_limit(text) for text in batch]
             batch_results = await asyncio.gather(*tasks, return_exceptions=True)
             
             # Handle results and exceptions
+            success_count = 0
+            fail_count = 0
             for result in batch_results:
                 if isinstance(result, Exception):
                     logger.error(f"Batch embedding error: {result}")
                     embeddings.append(None)
+                    fail_count += 1
                 else:
                     embeddings.append(result)
+                    if result is not None:
+                        success_count += 1
+                    else:
+                        fail_count += 1
             
-            logger.info(f"Processed batch {i//batch_size + 1}/{(len(texts) + batch_size - 1)//batch_size}")
+            batch_num = i // batch_size + 1
+            total_batches = (len(texts) + batch_size - 1) // batch_size
+            logger.info(
+                f"Processed batch {batch_num}/{total_batches} "
+                f"(success={success_count}, failed={fail_count}, concurrent={max_concurrent})"
+            )
         
         return embeddings
     

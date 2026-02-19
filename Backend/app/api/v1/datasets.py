@@ -1135,9 +1135,13 @@ async def delete_dataset_from_db(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Delete a dataset and all its rows from PostgreSQL.
+    Delete a dataset, all its rows from PostgreSQL, AND its Redis vectors.
     
-    WARNING: This also deletes all associated CSV rows and embeddings.
+    Cleanup order:
+    1. Clean up Redis vectors (before DB delete, so we still have metadata)
+    2. Delete dataset from PostgreSQL (cascade deletes csv_rows)
+    
+    WARNING: This permanently deletes all associated CSV rows and embeddings.
     """
     try:
         # Verify dataset ownership
@@ -1152,7 +1156,58 @@ async def delete_dataset_from_db(
         if not dataset:
             raise HTTPException(status_code=404, detail="Dataset not found")
         
-        # Delete dataset (cascade will delete csv_rows)
+        # 1. Clean up Redis vectors BEFORE deleting from DB
+        vectors_deleted = 0
+        try:
+            from app.services.multi_model_redis_service import get_multi_model_redis_service
+            from app.core.embedding_model_registry import get_embedding_registry
+            
+            redis_service = get_multi_model_redis_service()
+            registry = get_embedding_registry()
+            
+            parsed_dataset_id = UUID(dataset_id)
+            
+            if dataset.embedding_model:
+                # Try the known model first
+                try:
+                    vectors_deleted = redis_service.delete_dataset_vectors(
+                        model_id=dataset.embedding_model,
+                        user_id=current_user.u_id,
+                        dataset_id=parsed_dataset_id
+                    )
+                except ValueError:
+                    # Model not in registry — fall back to direct key scan
+                    logger.warning(
+                        f"Model '{dataset.embedding_model}' not in registry, "
+                        f"scanning all namespaces for orphan vectors"
+                    )
+            
+            if vectors_deleted == 0:
+                # Fallback: scan ALL registered models for this dataset's vectors
+                for model_id in registry.list_model_ids():
+                    try:
+                        deleted = redis_service.delete_dataset_vectors(
+                            model_id=model_id,
+                            user_id=current_user.u_id,
+                            dataset_id=parsed_dataset_id
+                        )
+                        vectors_deleted += deleted
+                    except Exception:
+                        continue
+            
+            if vectors_deleted > 0:
+                logger.info(
+                    f"Cleaned up {vectors_deleted} Redis vectors for dataset "
+                    f"{dataset_id[:8]} during deletion"
+                )
+        except Exception as redis_err:
+            # Log but don't fail the deletion — Redis cleanup is best-effort
+            logger.warning(
+                f"Could not clean Redis vectors for dataset {dataset_id[:8]}: {redis_err}"
+            )
+        
+        # 2. Delete dataset from PostgreSQL (cascade will delete csv_rows)
+        total_rows = dataset.total_rows
         await db.delete(dataset)
         await db.commit()
         
@@ -1161,7 +1216,8 @@ async def delete_dataset_from_db(
         return {
             "success": True,
             "message": f"Dataset {dataset_id} and all its rows deleted",
-            "deleted_rows": dataset.total_rows
+            "deleted_rows": total_rows,
+            "vectors_cleaned": vectors_deleted
         }
     except HTTPException:
         raise
