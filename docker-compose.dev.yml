@@ -37,7 +37,7 @@ services:
     env_file:
       - ./Backend/.env
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-nlpforge}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nlpforge_secure_password}
@@ -65,8 +65,8 @@ services:
     env_file:
       - ./Backend/.env
     ports:
-      - "6379:6379"     # Redis port
-      - "8001:8001"     # RedisInsight UI
+      - "127.0.0.1:6379:6379"   # Redis port
+      - "127.0.0.1:8001:8001"   # RedisInsight UI (localhost only)
     environment:
       REDIS_ARGS: >-
         --requirepass ${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024}
@@ -96,7 +96,7 @@ services:
     env_file:
       - ./Backend/.env
     ports:
-      - "8081:8081"
+      - "127.0.0.1:8081:8081"
     environment:
       REDIS_HOSTS: local:redis:6379:0:${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024}
       HTTP_USER: ${REDIS_COMMANDER_USER:-admin}
@@ -118,7 +118,7 @@ services:
     env_file:
       - ./Backend/.env
     ports:
-      - "5050:80"
+      - "127.0.0.1:5050:80"
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
