@@ -18,10 +18,10 @@ import { cn } from '@/lib/utils';
  */
 
 const NAV_LINKS = [
-  { href: '/', label: 'Home' },
   { href: '/product', label: 'Product' },
+  { href: '/docs', label: 'Docs' },
+  { href: '/help', label: 'Help' },
   { href: '/about', label: 'About' },
-  { href: '/contact', label: 'Contact' },
 ] as const;
 
 export function LandingNav() {
@@ -32,8 +32,11 @@ export function LandingNav() {
   // Check if user is authenticated on mount (client-side only)
   useEffect(() => {
     try {
-      const token = localStorage.getItem('nlpforge_access_token');
-      setIsAuthenticated(!!token);
+      // Tokens live in HttpOnly cookies (not readable from JS). Use the
+      // cached, non-sensitive user profile as the signed-in UX hint -
+      // real authorization is always enforced server-side.
+      const user = localStorage.getItem('nlpforge_user');
+      setIsAuthenticated(!!user);
     } catch {
       // localStorage not available (SSR, private browsing, etc.)
       setIsAuthenticated(false);

@@ -34,14 +34,11 @@ class ApiClient {
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
 
-    // Get auth token from localStorage
-    const token = typeof window !== 'undefined' ? localStorage.getItem('nlpforge_access_token') : null;
-
     const config: RequestInit = {
       ...options,
+      credentials: 'include',   // sends HttpOnly auth cookies automatically
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         ...options.headers,
       },
     };
@@ -50,21 +47,11 @@ class ApiClient {
       const response = await fetch(url, config);
 
       if (!response.ok) {
-        // Handle 401 Unauthorized
-        if (response.status === 401) {
-          if (typeof window !== 'undefined') {
-            const hasToken = localStorage.getItem('nlpforge_access_token');
-
-            // Only clear and redirect if we actually had a token (meaning it's expired)
-            if (hasToken) {
-              localStorage.removeItem('nlpforge_access_token');
-              localStorage.removeItem('nlpforge_user');
-
-              // Redirect to login if not already on auth page
-              if (!window.location.pathname.startsWith('/auth')) {
-                window.location.href = '/auth/login';
-              }
-            }
+        if (response.status === 401 && typeof window !== 'undefined') {
+          // The Axios api-client handles silent refresh for Axios calls.
+          // For raw-fetch callers, redirect when truly unauthenticated.
+          if (!window.location.pathname.startsWith('/auth')) {
+            window.location.href = '/auth/login';
           }
         }
 
@@ -72,22 +59,14 @@ class ApiClient {
         try {
           errorData = await response.json();
         } catch {
-          errorData = {
-            error: response.statusText,
-            detail: `HTTP ${response.status}`,
-          };
+          errorData = { error: response.statusText, detail: `HTTP ${response.status}` };
         }
-        throw {
-          ...errorData,
-          status: response.status,
-        };
+        throw { ...errorData, status: response.status };
       }
 
       return await response.json();
     } catch (error) {
-      if (error && typeof error === 'object' && 'status' in error) {
-        throw error;
-      }
+      if (error && typeof error === 'object' && 'status' in error) throw error;
       throw {
         error: 'Network Error',
         detail: error instanceof Error ? error.message : 'Unknown error',
@@ -477,14 +456,9 @@ class ApiClient {
     formData.append('file', file);
     if (autoEmbed) formData.append('auto_embed', 'true');
 
-    // Get auth token
-    const token = typeof window !== 'undefined' ? localStorage.getItem('nlpforge_access_token') : null;
-
     return fetch(`${this.baseUrl}/api/v1/datasets/upload`, {
       method: 'POST',
-      headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-      },
+      credentials: 'include',    // HttpOnly cookie sent automatically
       body: formData,
     }).then(async (response) => {
       if (!response.ok) {
@@ -1217,9 +1191,9 @@ class ApiClient {
     const params = new URLSearchParams({ model_name: modelName });
     const url = `${this.baseUrl}/api/v1/embeddings/models/pull?${params}`;
     
-    // Get auth token from localStorage
-    const token = typeof window !== 'undefined' ? localStorage.getItem('nlpforge_access_token') : null;
-    
+    // SECURITY: auth via HttpOnly cookie (credentials: 'include' below).
+    // No client-side token handling.
+
     // Use AbortController for timeout (10 minutes for large model pulls)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minute timeout
@@ -1229,8 +1203,8 @@ class ApiClient {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
+        credentials: 'include',
         signal: controller.signal,
       });
       
@@ -1240,13 +1214,10 @@ class ApiClient {
         // Handle 401 Unauthorized - same as main request method
         if (response.status === 401) {
           if (typeof window !== 'undefined') {
-            const hasToken = localStorage.getItem('nlpforge_access_token');
-            if (hasToken) {
-              localStorage.removeItem('nlpforge_access_token');
-              localStorage.removeItem('nlpforge_user');
-              if (!window.location.pathname.startsWith('/auth')) {
-                window.location.href = '/auth/login';
-              }
+            // Clear the cached profile (non-sensitive) and re-authenticate.
+            localStorage.removeItem('nlpforge_user');
+            if (!window.location.pathname.startsWith('/auth')) {
+              window.location.href = '/auth/login';
             }
           }
         }
