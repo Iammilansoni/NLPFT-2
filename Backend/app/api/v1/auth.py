@@ -26,6 +26,7 @@ from app.core.cookie_config import (
     ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE,
     set_auth_cookies, clear_auth_cookies
 )
+from app.core.token_denylist import revoke_token, is_token_revoked
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
@@ -60,6 +61,10 @@ async def get_current_user(
 
     payload = auth_service.decode_token(token)
     if payload is None or payload.get("type") != "access":
+        raise credentials_exception
+
+    # SECURITY: reject tokens revoked via logout / rotation
+    if await is_token_revoked(payload.get("jti")):
         raise credentials_exception
 
     user_id: str = payload.get("sub")
@@ -663,6 +668,10 @@ async def refresh_access_token(
     if payload is None or payload.get("type") != "refresh":
         raise _unauth
 
+    # SECURITY: reject refresh tokens revoked via logout / prior rotation
+    if await is_token_revoked(payload.get("jti")):
+        raise _unauth
+
     user_id = payload.get("sub")
     if not user_id:
         raise _unauth
@@ -683,6 +692,11 @@ async def refresh_access_token(
     )
     new_refresh = auth_service.create_refresh_token(data={"sub": str(user.u_id)})
 
+    # SECURITY: refresh tokens are one-time use - revoke the one just spent
+    # so a stolen (already-used) refresh token cannot mint new sessions.
+    if payload.get("jti") and payload.get("exp"):
+        await revoke_token(payload["jti"], payload["exp"])
+
     logger.info(f"Token rotated for user: {user.email}")
 
     response = JSONResponse(content={"user": UserResponse.model_validate(user).model_dump(mode="json")})
@@ -694,12 +708,29 @@ async def refresh_access_token(
 async def logout(
     request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """
-    Logout: expires both HttpOnly auth cookies.
-    TODO: push token JTI to Redis blacklist for true stateless revocation.
+    Logout: expires both HttpOnly auth cookies AND revokes the tokens
+    server-side via the Redis denylist, so they cannot be replayed even
+    if captured before logout.
     """
-    logger.info(f"User logged out: {current_user.email}")
+    # Collect both tokens (cookie first, Bearer fallback for access)
+    access_raw = request.cookies.get(ACCESS_TOKEN_COOKIE)
+    if not access_raw:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            access_raw = auth_header[7:]
+    refresh_raw = request.cookies.get(REFRESH_TOKEN_COOKIE)
+
+    for raw in (access_raw, refresh_raw):
+        if not raw:
+            continue
+        payload = auth_service.decode_token(raw)
+        if payload and payload.get("jti") and payload.get("exp"):
+            await revoke_token(payload["jti"], payload["exp"])
+
+    logger.info(f"User logged out (tokens revoked): {current_user.email}")
     response = JSONResponse(content={"message": "Logged out successfully."})
     clear_auth_cookies(response)
     return response

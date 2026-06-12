@@ -52,18 +52,22 @@ class AuthService:
     
     @staticmethod
     def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-        """Create JWT access token with type='access' claim"""
+        """Create JWT access token with type='access' claim.
+
+        Includes a unique `jti` claim so the token can be individually
+        revoked via the Redis denylist (see app.core.token_denylist).
+        """
         to_encode = data.copy()
         expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-        to_encode.update({"exp": expire, "type": "access"})
+        to_encode.update({"exp": expire, "type": "access", "jti": str(uuid.uuid4())})
         return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
     @staticmethod
     def create_refresh_token(data: dict) -> str:
-        """Create a long-lived JWT refresh token"""
+        """Create a long-lived JWT refresh token with a revocable `jti` claim."""
         to_encode = data.copy()
         expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-        to_encode.update({"exp": expire, "type": "refresh"})
+        to_encode.update({"exp": expire, "type": "refresh", "jti": str(uuid.uuid4())})
         return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     
     @staticmethod
@@ -77,7 +81,12 @@ class AuthService:
     
     @staticmethod
     async def create_user(db: AsyncSession, email: str, password: str, user_name: Optional[str] = None) -> User:
-        """Create new user with hashed password"""
+        """Create new user with hashed password.
+
+        NOTE: This method flushes (not commits) so the caller controls the
+        transaction. The caller is responsible for committing after any
+        additional records (e.g. EmailVerification) have been added.
+        """
         user = User(
             u_id=uuid.uuid4(),
             email=email,
@@ -86,9 +95,9 @@ class AuthService:
             created_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         db.add(user)
-        await db.commit()
+        await db.flush()  # Send INSERT to DB but keep the transaction open
         await db.refresh(user)
-        logger.info(f"Created user: {email}")
+        logger.info(f"Created user (pending commit): {email}")
         return user
     
     @staticmethod
