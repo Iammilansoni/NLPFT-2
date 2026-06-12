@@ -16,7 +16,7 @@ from app.core.postgres import get_db
 from app.services.auth_service import get_auth_service, AuthService, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.models.schemas.auth_schemas import (
     UserCreate, UserLogin, UserResponse, Token, ChangePasswordRequest,
-    ForgotPasswordRequest, ResetPasswordRequest
+    ForgotPasswordRequest, ResetPasswordRequest, PromoteExpertRequest
 )
 from app.models.schemas.common_schemas import MessageResponse
 from app.models.database_models import User
@@ -80,6 +80,24 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     return user
+
+
+async def require_admin(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    """
+    Dependency: allow only administrators.
+
+    Admin (system privilege) is distinct from expert (domain privilege).
+    The admin role can only be granted via scripts/make_admin.py - there is
+    deliberately no API path to self-assign it.
+    """
+    if not bool(getattr(current_user, "is_admin", 0)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrator privileges required",
+        )
+    return current_user
 
 
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
@@ -283,34 +301,50 @@ async def get_current_user_info(
 
 @router.post("/promote-expert", response_model=UserResponse)
 async def promote_to_expert(
-    current_user: Annotated[User, Depends(get_current_user)],
-    db: AsyncSession = Depends(get_db)
+    promote_data: PromoteExpertRequest,
+    current_user: Annotated[User, Depends(require_admin)],
+    db: AsyncSession = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """
-    Promote current user to expert status
-    
-    This is a development/testing endpoint that allows users to
-    become experts so they can approve/reject templates.
-    
-    In production, this would require admin privileges.
+    Promote a user to expert status (ADMIN ONLY).
+
+    Experts can approve/reject templates. Only administrators may grant
+    this role.
+
+    SECURITY: this endpoint previously allowed ANY authenticated user to
+    promote themselves (privilege escalation). It is now admin-gated and
+    targets a user by email instead of the caller.
+
+    - **email**: Email address of the user to promote
     """
     from sqlalchemy import update
-    
+
+    target = await auth_service.get_user_by_email(db, promote_data.email)
+    if target is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
     await db.execute(
-        update(User).where(User.u_id == current_user.u_id).values(is_expert=1)
+        update(User).where(User.u_id == target.u_id).values(is_expert=1)
     )
     await db.commit()
-    await db.refresh(current_user)
-    
-    logger.info(f"User promoted to expert: {current_user.email}")
+    await db.refresh(target)
+
+    logger.info(
+        f"User promoted to expert: {target.email} "
+        f"(by admin: {current_user.email})"
+    )
 
     await log_audit_event(
         db, action="promote_to_expert", user_id=current_user.u_id,
         resource_type="user",
-        resource_id=str(current_user.u_id),
+        resource_id=str(target.u_id),
     )
 
-    return UserResponse.model_validate(current_user)
+    return UserResponse.model_validate(target)
 
 
 @router.post("/change-password", response_model=MessageResponse)

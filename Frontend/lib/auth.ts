@@ -1,6 +1,9 @@
 /**
- * Authentication API Service
- * Handles all authentication-related API calls
+ * auth.ts — Authentication service
+ *
+ * Cookie-based: tokens live in HttpOnly cookies set by the server.
+ * This service only manages the user PROFILE object (non-sensitive).
+ * No access_token or refresh_token is ever stored on the client.
  */
 
 import apiClient from './api-client';
@@ -25,215 +28,81 @@ export interface RegisterRequest {
   confirm_password: string;
 }
 
+/** Shape returned by login/register — only the user object; tokens are in cookies. */
 export interface AuthResponse {
-  access_token: string;
-  refresh_token?: string;
-  token_type: string;
   user: User;
 }
 
-export interface ForgotPasswordRequest {
-  email: string;
-}
-
-export interface ResetPasswordRequest {
-  token: string;
-  new_password: string;
-  confirm_password: string;
-}
-
-export interface ChangePasswordRequest {
-  current_password: string;
-  new_password: string;
-  confirm_password: string;
-}
+export interface ForgotPasswordRequest { email: string }
+export interface ResetPasswordRequest  { token: string; new_password: string; confirm_password: string }
+export interface ChangePasswordRequest { current_password: string; new_password: string; confirm_password: string }
 
 class AuthService {
-  private readonly TOKEN_KEY = 'nlpforge_access_token';
-  private readonly REFRESH_TOKEN_KEY = 'nlpforge_refresh_token';
-  private readonly USER_KEY = 'nlpforge_user';
+  private readonly USER_KEY = 'nlpforge_user';   // profile only — not a token
 
-  /**
-   * Register a new user
-   */
+  /** Register. Backend sets auth cookies; we persist the user profile. */
   async register(data: RegisterRequest): Promise<AuthResponse> {
     const response = await apiClient.post<AuthResponse>('/api/v1/auth/register', data);
-    this.setToken(response.data.access_token);
-    if (response.data.refresh_token) {
-      this.setRefreshToken(response.data.refresh_token);
-    }
     this.setUser(response.data.user);
     return response.data;
   }
 
-  /**
-   * Login with email and password
-   */
+  /** Login. Backend sets HttpOnly cookies; response body has user profile only. */
   async login(data: LoginRequest): Promise<AuthResponse> {
     const response = await apiClient.post<AuthResponse>('/api/v1/auth/login/json', data);
-    this.setToken(response.data.access_token);
-    if (response.data.refresh_token) {
-      this.setRefreshToken(response.data.refresh_token);
-    }
     this.setUser(response.data.user);
     return response.data;
   }
 
-  /**
-   * Logout user
-   */
-  logout(): void {
-    this.removeToken();
-    this.removeRefreshToken();
-    this.removeUser();
+  /** Logout. Backend clears both cookies; we clear the local user profile. */
+  async logout(): Promise<void> {
+    try {
+      await apiClient.post('/api/v1/auth/logout');
+    } catch {
+      // Even if the server call fails, clear local state
+    } finally {
+      this.removeUser();
+    }
   }
 
-  /**
-   * Get current user info from API
-   */
+  /** Fetch current user from the server (validates the access cookie). */
   async getCurrentUser(): Promise<User> {
     const response = await apiClient.get<User>('/api/v1/auth/me');
     this.setUser(response.data);
     return response.data;
   }
 
-  /**
-   * Request password reset
-   */
   async forgotPassword(data: ForgotPasswordRequest): Promise<{ message: string }> {
     const response = await apiClient.post('/api/v1/auth/forgot-password', data);
     return response.data;
   }
 
-  /**
-   * Reset password with token
-   */
   async resetPassword(data: ResetPasswordRequest): Promise<{ message: string }> {
     const response = await apiClient.post('/api/v1/auth/reset-password', data);
     return response.data;
   }
 
-  /**
-   * Change password (requires authentication)
-   */
   async changePassword(data: ChangePasswordRequest): Promise<{ message: string }> {
     const response = await apiClient.post('/api/v1/auth/change-password', data);
     return response.data;
   }
 
-  /**
-   * Check authentication service health
-   */
   async checkHealth(): Promise<{ status: string; service: string }> {
     const response = await apiClient.get('/api/v1/auth/health');
     return response.data;
   }
 
   /**
-   * Promote current user to expert status
-   * Experts can approve/reject templates
+   * Promote a user to expert status. ADMIN ONLY — the backend rejects
+   * non-admin callers with 403. Targets a user by email (no self-promotion).
    */
-  async promoteToExpert(): Promise<User> {
-    const response = await apiClient.post<User>('/api/v1/auth/promote-expert');
-    this.setUser(response.data);
+  async promoteToExpert(email: string): Promise<User> {
+    const response = await apiClient.post<User>('/api/v1/auth/promote-expert', { email });
     return response.data;
   }
 
-  // Token management
-  setToken(token: string): void {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(this.TOKEN_KEY, token);
-    }
-  }
+  // ── User profile (non-sensitive; only cached for UX, never used for auth) ──
 
-  getToken(): string | null {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(this.TOKEN_KEY);
-    }
-    return null;
-  }
-
-  removeToken(): void {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(this.TOKEN_KEY);
-    }
-  }
-
-  // Refresh token management
-  // NOTE: Refresh tokens should ideally be stored in httpOnly cookies set by
-  // the server. Until the backend sets httpOnly cookies on /login and /refresh
-  // responses (and the /refresh endpoint reads the cookie instead of the body),
-  // we keep localStorage as a transitional store but mark it clearly.
-  // TODO: Once the backend sets httpOnly refresh-token cookies, remove these
-  // localStorage helpers entirely and rely on credentials: 'include' / withCredentials.
-  setRefreshToken(token: string): void {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(this.REFRESH_TOKEN_KEY, token);
-    }
-  }
-
-  getRefreshToken(): string | null {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(this.REFRESH_TOKEN_KEY);
-    }
-    return null;
-  }
-
-  removeRefreshToken(): void {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(this.REFRESH_TOKEN_KEY);
-    }
-  }
-
-  /**
-   * Refresh the access token using the stored refresh token.
-   * Uses a single-flight lock so concurrent callers share one in-flight request.
-   * Returns the new access token or null if refresh failed.
-   */
-  private refreshPromise: Promise<string | null> | null = null;
-
-  async refreshAccessToken(): Promise<string | null> {
-    // Single-flight: if a refresh is already in progress, piggyback on it
-    if (this.refreshPromise) {
-      return this.refreshPromise;
-    }
-
-    this.refreshPromise = this._doRefresh();
-    try {
-      return await this.refreshPromise;
-    } finally {
-      this.refreshPromise = null;
-    }
-  }
-
-  private async _doRefresh(): Promise<string | null> {
-    const refreshToken = this.getRefreshToken();
-    if (!refreshToken) return null;
-
-    try {
-      const response = await apiClient.post<AuthResponse>('/api/v1/auth/refresh', {
-        refresh_token: refreshToken,
-      });
-
-      const { access_token, refresh_token: newRefreshToken } = response.data;
-
-      this.setToken(access_token);
-      if (newRefreshToken) {
-        this.setRefreshToken(newRefreshToken);
-      }
-      if (response.data.user) {
-        this.setUser(response.data.user);
-      }
-
-      return access_token;
-    } catch {
-      // Refresh token is invalid/expired - force logout
-      this.logout();
-      return null;
-    }
-  }
-
-  // User management
   setUser(user: User): void {
     if (typeof window !== 'undefined') {
       localStorage.setItem(this.USER_KEY, JSON.stringify(user));
@@ -242,8 +111,8 @@ class AuthService {
 
   getUser(): User | null {
     if (typeof window !== 'undefined') {
-      const user = localStorage.getItem(this.USER_KEY);
-      return user ? JSON.parse(user) : null;
+      const raw = localStorage.getItem(this.USER_KEY);
+      return raw ? JSON.parse(raw) : null;
     }
     return null;
   }
@@ -255,10 +124,12 @@ class AuthService {
   }
 
   /**
-   * Check if user is authenticated
+   * isAuthenticated: checks for a cached user profile.
+   * The real authority is the server (cookie). This is only used to decide
+   * whether to render the loading spinner on cold page loads.
    */
   isAuthenticated(): boolean {
-    return !!this.getToken();
+    return !!this.getUser();
   }
 }
 

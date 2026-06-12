@@ -5,11 +5,12 @@ Requires expert (admin) privileges.
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.postgres import get_db
-from app.api.v1.auth import get_current_user
+from app.api.v1.auth import get_current_user, require_admin
 from app.models.database_models import User, LLMProviderConfig
 from app.core.encryption import get_encryption_service, APIKeyEncryption
 from app.core.logger import logger
@@ -17,31 +18,48 @@ from app.core.logger import logger
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
+class RotateKeyRequest(BaseModel):
+    """
+    The administrator generates the new Fernet key LOCALLY and provides it
+    in the request. SECURITY: the server never returns key material -
+    the previous design generated the key server-side and sent it back in
+    the HTTP response body, exposing it to logs/proxies/browser history.
+
+    Generate a key with:
+        python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    """
+    new_key: str = Field(..., min_length=32, description="New Fernet key (generated locally)")
+
+
 @router.post("/rotate-encryption-key")
 async def rotate_encryption_key(
     request: Request,
-    current_user: User = Depends(get_current_user),
+    payload: RotateKeyRequest,
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Rotate the API key encryption key (expert-only).
+    Rotate the API key encryption key (ADMIN ONLY).
 
-    Re-encrypts ALL stored API keys (all users) with a new encryption key.
-    The response includes the new key which must be saved to SECRET_KEY_ENCRYPTION
-    in the environment, then the server must be restarted.
+    Re-encrypts ALL stored API keys (all users) with the new key supplied
+    by the administrator. The key is generated LOCALLY by the admin and is
+    never returned by the server.
 
-    WARNING: After rotation, update SECRET_KEY_ENCRYPTION in .env
-    to the returned new_key value, then restart the server.
+    After a successful rotation: update SECRET_KEY_ENCRYPTION in .env to
+    the same key you provided, then restart the server.
     """
-    if not getattr(current_user, "is_expert", False):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only expert users can rotate encryption keys",
-        )
-
     old_encryptor = get_encryption_service()
-    new_key = APIKeyEncryption.generate_key()
-    new_encryptor = APIKeyEncryption(secret_key=new_key)
+    try:
+        new_encryptor = APIKeyEncryption(secret_key=payload.new_key)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Invalid Fernet key. Generate one locally with: "
+                "python -c \"from cryptography.fernet import Fernet; "
+                "print(Fernet.generate_key().decode())\""
+            ),
+        )
 
     # Find ALL LLM configs with encrypted API keys (all users, not just current)
     result = await db.execute(
@@ -92,13 +110,14 @@ async def rotate_encryption_key(
         f"{rotated_count} keys re-encrypted"
     )
 
+    # SECURITY: never include key material in the response.
     return JSONResponse(content={
         "message": (
             f"Successfully rotated encryption key. "
             f"{rotated_count} API keys re-encrypted. "
             f"IMPORTANT: Update SECRET_KEY_ENCRYPTION in your .env file "
-            f"with the new_key value below and restart the server."
+            f"to the key you provided, then restart the server."
         ),
         "success": True,
-        "new_key": new_key,
+        "rotated_count": rotated_count,
     })

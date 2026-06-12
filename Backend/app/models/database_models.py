@@ -77,6 +77,7 @@ class User(Base):
     password = Column(Text, nullable=False)
     is_active = Column(Integer, nullable=False, default=1)  # 0=disabled, 1=active
     is_expert = Column(Integer, nullable=False, default=0)  # 0=regular user, 1=expert (can approve templates)
+    is_admin = Column(Integer, nullable=False, default=0)  # 0=regular user, 1=admin (grants roles, rotates keys)
     email_verified = Column(Integer, nullable=False, default=0)  # 0=no, 1=yes
     created_at = Column(TIMESTAMP, default=utc_now, nullable=False)
     
