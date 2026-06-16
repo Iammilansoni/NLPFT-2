@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
@@ -7,7 +7,7 @@ import Link from 'next/link'
 
 export function CTABanner() {
   return (
-    <section className="py-20 md:py-32 border-t">
+    <section className="py-12 md:py-16 border-t">
       <div className="container mx-auto px-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}

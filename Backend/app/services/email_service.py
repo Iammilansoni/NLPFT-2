@@ -170,11 +170,16 @@ class EmailService:
             message.attach(part1)
             message.attach(part2)
             
-            # Send email
-            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
-                server.starttls()
-                server.login(self.smtp_user, self.smtp_password)
-                server.send_message(message)
+            # Send email — port 465 uses SSL wrapper, port 587 uses STARTTLS
+            if self.smtp_port == 465:
+                with smtplib.SMTP_SSL(self.smtp_host, self.smtp_port) as server:
+                    server.login(self.smtp_user, self.smtp_password)
+                    server.send_message(message)
+            else:
+                with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+                    server.starttls()
+                    server.login(self.smtp_user, self.smtp_password)
+                    server.send_message(message)
             
             logger.info(f"Verification email sent to {to_email}")
             return True
@@ -230,11 +235,16 @@ class EmailService:
             message.attach(part1)
             message.attach(part2)
             
-            # Send email
-            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
-                server.starttls()
-                server.login(self.smtp_user, self.smtp_password)
-                server.send_message(message)
+            # Send email — port 465 uses SSL wrapper, port 587 uses STARTTLS
+            if self.smtp_port == 465:
+                with smtplib.SMTP_SSL(self.smtp_host, self.smtp_port) as server:
+                    server.login(self.smtp_user, self.smtp_password)
+                    server.send_message(message)
+            else:
+                with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+                    server.starttls()
+                    server.login(self.smtp_user, self.smtp_password)
+                    server.send_message(message)
             
             logger.info(f"Resend OTP email sent to {to_email}")
             return True
@@ -382,11 +392,16 @@ class EmailService:
             message.attach(part1)
             message.attach(part2)
             
-            # Send email
-            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
-                server.starttls()
-                server.login(self.smtp_user, self.smtp_password)
-                server.send_message(message)
+            # Send email — port 465 uses SSL wrapper, port 587 uses STARTTLS
+            if self.smtp_port == 465:
+                with smtplib.SMTP_SSL(self.smtp_host, self.smtp_port) as server:
+                    server.login(self.smtp_user, self.smtp_password)
+                    server.send_message(message)
+            else:
+                with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+                    server.starttls()
+                    server.login(self.smtp_user, self.smtp_password)
+                    server.send_message(message)
             
             logger.info(f"Password reset email sent to {to_email}")
             return True

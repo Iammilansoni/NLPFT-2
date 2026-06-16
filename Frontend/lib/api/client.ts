@@ -67,13 +67,9 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
     // Check for invalid token format error
     if (response.status === 401 && errorMessage.includes('Token format invalid')) {
-      // Clear invalid token from storage
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('token')
-        localStorage.removeItem('user')
-        console.warn('🔄 Invalid token detected and cleared. Please log in again.')
-        // Redirect to login page
-        window.location.href = '/login'
+      // Redirect to login — cookies will be cleared server-side on /logout
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth')) {
+        window.location.href = '/auth/login';
       }
     }
 
@@ -100,14 +96,11 @@ export async function apiFetch<T>(
   options: RequestInit = {}
 ): Promise<T> {
   try {
-    // Get auth token from localStorage
-    const token = typeof window !== 'undefined' ? localStorage.getItem('nlpforge_access_token') : null
-
     const response = await fetch(url, {
       ...options,
+      credentials: 'include',   // HttpOnly auth cookie sent automatically
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         ...options.headers,
       },
     })

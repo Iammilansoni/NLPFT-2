@@ -30,14 +30,16 @@ if config.config_file_name is not None:
 # add your model's MetaData object here for 'autogenerate' support
 target_metadata = Base.metadata
 
-# Get database URL from environment
-load_dotenv()
+# Load .env from Backend directory (where this alembic dir lives)
+_backend_dir = Path(__file__).resolve().parent.parent
+load_dotenv(_backend_dir / ".env")
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql+asyncpg://nlpforge:nlpforge_secure_password@localhost:5432/nlpforge"
+    "postgresql+asyncpg://nlpforge:nlpforge_secure_pg_8891@postgres:5432/nlpforge"
 )
 config.set_main_option("sqlalchemy.url", DATABASE_URL)
+
 
 
 def run_migrations_offline() -> None:

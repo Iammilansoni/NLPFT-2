@@ -483,13 +483,23 @@ async def list_templates(
     - `limit`: Max results (default 100)
     """
     try:
-        query = select(Template).where(Template.u_id == current_user.u_id)
-        
-        # Apply filters
+        # Multi-tenant isolation: every query is scoped strictly to the
+        # authenticated user — users can NEVER see another user's templates.
         if status_filter:
-            # Join with metadata to filter by status
-            query = query.join(Metadata).where(Metadata.status == status_filter)
-        
+            # INNER JOIN with explicit condition (matches pattern used in stats endpoint)
+            # Only return templates whose Metadata.status matches the filter
+            query = (
+                select(Template)
+                .join(Metadata, Template.t_id == Metadata.t_id)
+                .where(
+                    Template.u_id == current_user.u_id,
+                    Metadata.status == status_filter
+                )
+            )
+        else:
+            # No status filter — return all of the user's templates
+            query = select(Template).where(Template.u_id == current_user.u_id)
+
         # Add pagination
         query = query.offset(skip).limit(limit)
         

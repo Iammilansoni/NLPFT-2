@@ -44,11 +44,10 @@ export default function LoginPage() {
       const from = searchParams.get('from');
       const redirectPath = from || '/dashboard';
 
-      // Verify login succeeded by checking the response contains a token,
-      // rather than polling document.cookie (which can't see HttpOnly cookies
-      // and is fragile with third-party cookie blocking).
-      if (!response || !response.access_token) {
-        setError('Login succeeded but no session token was returned. Please try again.');
+      // Session is confirmed by the server having set HttpOnly cookies.
+      // We verify via the user object returned in the response body.
+      if (!response?.user) {
+        setError('Login succeeded but session could not be established. Please try again.');
         setIsLoading(false);
         return;
       }

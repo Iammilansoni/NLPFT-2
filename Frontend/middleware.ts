@@ -42,8 +42,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Check for authentication token
-  const token = request.cookies.get('nlpforge_access_token')?.value
+  // Check for authentication cookie (HttpOnly cookie set by the backend)
+  const token = request.cookies.get('nlpf_access')?.value
 
   // If no token and not on public route, redirect to login
   if (!token) {

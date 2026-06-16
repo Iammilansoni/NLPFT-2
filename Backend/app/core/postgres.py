@@ -66,6 +66,14 @@ async def get_db():
 async def init_db():
     """Initialize database - create all tables"""
     try:
+        # Ensure ALL model files are imported so their tables are registered with
+        # Base.metadata before create_all runs. Models in separate files (like
+        # email_verification_models and password_reset_models) won't be picked up
+        # unless they're explicitly imported here.
+        from app.models import database_models  # noqa: F401 - registers all main tables
+        from app.models import email_verification_models  # noqa: F401
+        from app.models import password_reset_models  # noqa: F401
+
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         logger.info("✅ PostgreSQL database initialized")

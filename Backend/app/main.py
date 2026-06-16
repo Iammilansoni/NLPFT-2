@@ -120,7 +120,12 @@ def create_app() -> FastAPI:
     
     # CORS configuration - MUST be added FIRST before other middleware
     # Include both localhost and 127.0.0.1 variants, plus IPv6 localhost
-    cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001,http://[::1]:3000").split(",")
+    cors_origins = os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:3000,http://localhost:3001,http://localhost:19000,"
+        "http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:19000,"
+        "http://[::1]:3000"
+    ).split(",")
     
     app.add_middleware(
         CORSMiddleware,
@@ -326,6 +331,10 @@ def create_app() -> FastAPI:
         auth_header = request.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header.split(" ")[1]
+        # Fallback: read HttpOnly access cookie (used by browser clients)
+        if not token:
+            from app.core.cookie_config import ACCESS_TOKEN_COOKIE
+            token = request.cookies.get(ACCESS_TOKEN_COOKIE)
             
         user_id_token = user_id_ctx.set(None) # Reset context
         

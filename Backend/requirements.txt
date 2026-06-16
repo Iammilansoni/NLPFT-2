@@ -18,6 +18,7 @@ alembic==1.13.0  # Database migrations
 # Redis dependencies
 redis==4.6.0  # Redis client
 redis[hiredis]==4.6.0  # Redis with C parser for performance
+celery[redis]==5.3.6   # Distributed task queue (broker + result backend via Redis)
 
 # Authentication and Security
 python-jose[cryptography]==3.3.0  # JWT tokens

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -61,7 +61,7 @@ const features = [
 
 export function FeatureHighlights() {
   return (
-    <section className="relative py-20 md:py-32 border-t overflow-hidden">
+    <section className="relative py-12 md:py-16 border-t overflow-hidden">
       {/* Animated background */}
       <div className="absolute inset-0 -z-10">
         <div className="absolute inset-0 bg-gradient-to-b from-background via-primary/5 to-background" />

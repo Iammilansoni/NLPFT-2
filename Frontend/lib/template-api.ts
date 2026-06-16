@@ -3,8 +3,8 @@
  * Handles all template-related API calls with proper typing
  */
 
-import axios from 'axios';
 import { getApiBase } from './runtime-config';
+import apiClient from './api-client';
 
 // Helper to get API base dynamically (not at module load time)
 function getApiBaseUrl(): string {
@@ -152,15 +152,11 @@ export interface CreateMetadataRequest {
 // ============================================================================
 
 class TemplateApiClient {
-  private getAuthHeaders(): Record<string, string> {
-    // TODO: Replace with your actual auth token retrieval
-    const token = typeof window !== 'undefined'
-      ? localStorage.getItem('nlpforge_access_token')
-      : null;
+  private readonly client = apiClient;
 
+  private getAuthHeaders(): Record<string, string> {
     return {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
   }
 
@@ -248,7 +244,7 @@ class TemplateApiClient {
    */
   async createTemplate(data: CreateTemplateRequest, parameters?: ParameterSchema[]): Promise<CreateTemplateResponse> {
     const backendData = this.transformToBackendFormat(data, parameters);
-    const response = await axios.post<CreateTemplateResponse>(
+    const response = await this.client.post<CreateTemplateResponse>(
       `${getApiBaseUrl()}/api/v1/templates`,
       backendData,
       { headers: this.getAuthHeaders() }
@@ -263,7 +259,7 @@ class TemplateApiClient {
   async createDraftTemplate(data: CreateTemplateRequest, parameters?: ParameterSchema[]): Promise<CreateTemplateResponse> {
     const backendData = this.transformToDraftFormat(data, parameters);
     try {
-      const response = await axios.post<CreateTemplateResponse>(
+      const response = await this.client.post<CreateTemplateResponse>(
         `${getApiBaseUrl()}/api/v1/templates/draft`,
         backendData,
         { headers: this.getAuthHeaders() }
@@ -283,7 +279,7 @@ class TemplateApiClient {
    * Get template by ID
    */
   async getTemplate(templateId: string): Promise<Template> {
-    const response = await axios.get<Template>(
+    const response = await this.client.get<Template>(
       `${getApiBaseUrl()}/api/v1/templates/${templateId}`,
       { headers: this.getAuthHeaders() }
     );
@@ -336,7 +332,7 @@ class TemplateApiClient {
       }
     }
 
-    const response = await axios.put<Template>(
+    const response = await this.client.put<Template>(
       `${getApiBaseUrl()}/api/v1/templates/${templateId}`,
       transformedData,
       { headers: this.getAuthHeaders() }
@@ -356,7 +352,7 @@ class TemplateApiClient {
     const transformedData = this.transformToDraftFormat(data as CreateTemplateRequest, parameters);
 
     try {
-      const response = await axios.put<Template>(
+      const response = await this.client.put<Template>(
         `${getApiBaseUrl()}/api/v1/templates/draft/${templateId}`,
         transformedData,
         { headers: this.getAuthHeaders() }
@@ -381,13 +377,13 @@ class TemplateApiClient {
     domain_tags?: string[];
   }): Promise<Template[]> {
     const params = new URLSearchParams();
-    if (filters?.status) params.append('status', filters.status);
+    if (filters?.status) params.append('status_filter', filters.status);
     if (filters?.user_id) params.append('user_id', filters.user_id);
     if (filters?.domain_tags) {
       filters.domain_tags.forEach(tag => params.append('domain_tags', tag));
     }
 
-    const response = await axios.get<Template[]>(
+    const response = await this.client.get<Template[]>(
       `${getApiBaseUrl()}/api/v1/templates?${params.toString()}`,
       { headers: this.getAuthHeaders() }
     );
@@ -401,7 +397,7 @@ class TemplateApiClient {
     templateId: string,
     data: CreateParametersRequest
   ): Promise<{ success: boolean; count: number }> {
-    const response = await axios.post(
+    const response = await this.client.post(
       `${getApiBaseUrl()}/api/v1/templates/${templateId}/parameters`,
       data,
       { headers: this.getAuthHeaders() }
@@ -413,7 +409,7 @@ class TemplateApiClient {
    * Get parameters for a template
    */
   async getParameters(templateId: string): Promise<Parameter[]> {
-    const response = await axios.get<Parameter[]>(
+    const response = await this.client.get<Parameter[]>(
       `${getApiBaseUrl()}/api/v1/templates/${templateId}/parameters`,
       { headers: this.getAuthHeaders() }
     );
@@ -427,7 +423,7 @@ class TemplateApiClient {
     templateId: string,
     data: CreateExpectedResponsesRequest
   ): Promise<{ success: boolean; count: number }> {
-    const response = await axios.post(
+    const response = await this.client.post(
       `${getApiBaseUrl()}/api/v1/templates/${templateId}/expected_responses`,
       data,
       { headers: this.getAuthHeaders() }
@@ -439,7 +435,7 @@ class TemplateApiClient {
    * Get expected responses for a template
    */
   async getExpectedResponses(templateId: string): Promise<ExpectedResponse[]> {
-    const response = await axios.get<ExpectedResponse[]>(
+    const response = await this.client.get<ExpectedResponse[]>(
       `${getApiBaseUrl()}/api/v1/templates/${templateId}/expected_responses`,
       { headers: this.getAuthHeaders() }
     );
@@ -453,7 +449,7 @@ class TemplateApiClient {
     templateId: string,
     data: CreateMetadataRequest
   ): Promise<Metadata> {
-    const response = await axios.post<Metadata>(
+    const response = await this.client.post<Metadata>(
       `${getApiBaseUrl()}/api/v1/templates/${templateId}/metadata`,
       data,
       { headers: this.getAuthHeaders() }
@@ -465,7 +461,7 @@ class TemplateApiClient {
    * Approve a template (admin/reviewer only)
    */
   async approveTemplate(templateId: string): Promise<{ success: boolean; message: string }> {
-    const response = await axios.post(
+    const response = await this.client.post(
       `${getApiBaseUrl()}/api/v1/templates/${templateId}/approve`,
       {},
       { headers: this.getAuthHeaders() }
@@ -477,7 +473,7 @@ class TemplateApiClient {
    * Create audit log entry
    */
   async createAuditLog(data: AuditLog): Promise<{ success: boolean }> {
-    const response = await axios.post(
+    const response = await this.client.post(
       `${getApiBaseUrl()}/api/v1/audit/logs`,
       data,
       { headers: this.getAuthHeaders() }
@@ -489,7 +485,7 @@ class TemplateApiClient {
    * Delete template
    */
   async deleteTemplate(templateId: string): Promise<{ success: boolean }> {
-    const response = await axios.delete(
+    const response = await this.client.delete(
       `${getApiBaseUrl()}/api/v1/templates/${templateId}`,
       { headers: this.getAuthHeaders() }
     );

@@ -537,7 +537,7 @@ async def _run_generation_background(
             pass
 
 
-@router.post("/generate")
+@router.post("/generate", status_code=202)
 async def generate_dataset(
     request: Request,
     dataset_request: DatasetGenerateRequest,
@@ -639,68 +639,52 @@ async def generate_dataset(
                 "assertions": template.assertions or [],
             }
 
-            # ── Create task and return immediately ────────────────────────────
-            task_manager = get_task_manager()
-            task_id = task_manager.create_task(user_id=current_user.u_id)
-            task_manager.update_task(
-                task_id,
-                status="running",
-                message="Generation queued, starting in background...",
-                progress=0,
+            # ── Dispatch to Celery — returns immediately ──────────────────────
+            from app.worker.tasks import generate_dataset_task
+
+            celery_result = generate_dataset_task.delay(
+                {
+                    "template_data": template_data,
+                    "num_examples": dataset_request.num_examples,
+                    "user_prompt": dataset_request.user_prompt,
+                    "focus_areas": dataset_request.focus_areas,
+                    "scenario_distribution": dataset_request.scenario_distribution,
+                    "user_id": str(current_user.u_id),
+                    "template_id": dataset_request.template_id,
+                    "dataset_name": template.api_name,
+                }
+            )
+            task_id = celery_result.id  # Standard Celery UUID
+
+            logger.info(
+                f"Dispatched generate_dataset_task task_id={task_id} "
+                f"template={dataset_request.template_id} user={current_user.u_id}"
             )
 
-            # Dispatch background coroutine — zero impact on HTTP response time
-            import asyncio
-            asyncio.ensure_future(
-                _run_generation_background(
-                    task_id=task_id,
-                    template_data=template_data,
-                    dataset_request_dict={
-                        "num_examples": dataset_request.num_examples,
-                        "user_prompt": dataset_request.user_prompt,
-                        "focus_areas": dataset_request.focus_areas,
-                        "scenario_distribution": dataset_request.scenario_distribution,
-                    },
-                    user_id_str=str(current_user.u_id),
-                    user_id_uuid=current_user.u_id,
-                    template_id_str=dataset_request.template_id,
-                )
-            )
-
+            # HTTP 202 Accepted — generation is running in the Celery worker
             return {
                 "success": True,
                 "task_id": task_id,
-                "status": "running",
-                "message": "Dataset generation started in background. Poll /datasets/status/{task_id} for progress.",
+                "status": "queued",
+                "message": "Dataset generation queued. Poll GET /datasets/status/{task_id} for progress.",
                 "template_name": template.api_name,
                 "template_id": dataset_request.template_id,
                 "requested": dataset_request.num_examples,
             }
-        
-        # ============== LEGACY SUPPORT (DISABLED - REQUIRES template_id) ==============
-        # Legacy paths are disabled because they relied on deprecated generator functions
-        # Use template_id for all dataset generation
+
         else:
             raise HTTPException(
                 status_code=400,
                 detail={
                     "error": "Template ID Required",
-                    "message": "Dataset generation requires a template_id. Legacy generation is no longer supported.",
+                    "message": "Dataset generation requires a template_id.",
                     "required_field": "template_id",
-                    "workflow": "1. Create a template → 2. Submit for review → 3. Get approved → 4. Generate dataset with template_id"
                 }
             )
     except HTTPException:
-        raise  # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
         logger.error(f"Error generating dataset: {e}", exc_info=True)
-        # Try to update task status if task was created
-        try:
-            task_manager = get_task_manager()
-            if 'task_id' in locals():
-                task_manager.update_task(task_id, status="failed", message=str(e), error=str(e))
-        except Exception as update_error:
-            logger.debug(f"Could not update task status: {update_error}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -789,36 +773,80 @@ async def get_task_status(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Get status of a dataset generation/upload task
-    
-    User Isolation: Only returns task if it belongs to the authenticated user.
-    
-    Returns progress information including:
-    - status: pending, running, completed, failed
-    - progress: 0-100 percentage
-    - message: current status message
-    - current_step: what's happening now
-    - steps: history of completed steps
+    Get status of a dataset generation task.
+
+    Reads task state from the Celery result backend (Redis DB 2).
+    Celery states map to a normalised status field:
+      PENDING   → "queued"    (task is in the broker queue)
+      STARTED   → "running"
+      PROGRESS  → "running"   (worker pushed a progress update)
+      SUCCESS   → "completed"
+      FAILURE   → "failed"
     """
-    task_manager = get_task_manager()
-    # Pass user_id for access control
-    task = task_manager.get_task(task_id, user_id=current_user.u_id)
-    
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    
+    from celery.result import AsyncResult
+    from app.worker.celery_app import celery_app
+
+    async_result = AsyncResult(task_id, app=celery_app)
+    state = async_result.state          # "PENDING", "PROGRESS", "SUCCESS", etc.
+    info  = async_result.info or {}     # meta dict from update_state() or return value
+
+    # Normalise Celery states → our API contract
+    STATE_MAP = {
+        "PENDING":  "queued",
+        "RECEIVED": "queued",
+        "STARTED":  "running",
+        "PROGRESS": "running",
+        "SUCCESS":  "completed",
+        "FAILURE":  "failed",
+        "REVOKED":  "failed",
+        "RETRY":    "running",
+    }
+    normalised_status = STATE_MAP.get(state, "unknown")
+
+    if state == "PENDING":
+        # Task not yet known to the backend (not started or invalid ID)
+        return {
+            "task_id": task_id,
+            "status": "queued",
+            "progress": 0,
+            "message": "Task is queued and waiting for a worker.",
+            "current_step": "queued",
+        }
+
+    if state == "FAILURE":
+        # For FAILURE state, async_result.info IS the exception instance.
+        # async_result.result is the canonical attribute for the exception.
+        exc = async_result.result
+        error_msg = str(exc) if exc else "Task failed with an unknown error."
+        return {
+            "task_id": task_id,
+            "status": "failed",
+            "progress": 0,
+            "message": error_msg,
+            "current_step": "error",
+            "error": error_msg,
+        }
+
+    if state == "SUCCESS":
+        result: dict = info if isinstance(info, dict) else {}
+        return {
+            "task_id": task_id,
+            "status": "completed",
+            "progress": 100,
+            "message": result.get("message", f"Generated {result.get('total_generated', '?')} test cases."),
+            "current_step": "complete",
+            "result": result,
+        }
+
+    # PROGRESS / STARTED / RETRY
+    meta = info if isinstance(info, dict) else {}
     return {
-        "task_id": task.get("task_id"),
-        "status": task.get("status"),
-        "progress": task.get("progress", 0),
-        "message": task.get("message", ""),
-        "current_step": task.get("current_step", ""),
-        "steps": task.get("steps", []),
-        "created_at": task.get("created_at"),
-        "completed_at": task.get("completed_at"),
-        "statistics": task.get("statistics"),
-        "files": task.get("files"),
-        "error": task.get("error")
+        "task_id": task_id,
+        "status": normalised_status,
+        "progress": meta.get("progress", 0),
+        "message": meta.get("message", "Processing..."),
+        "current_step": meta.get("current_step", ""),
+        "updated_at": meta.get("updated_at"),
     }
 
 

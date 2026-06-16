@@ -113,9 +113,7 @@ export function TrendChart() {
     const fetchTelemetry = async () => {
       try {
         const response = await fetch(`${API_BASE}/api/v1/telemetry/metrics?limit=12`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('nlpforge_access_token')}`,
-          },
+          credentials: 'include',   // HttpOnly cookie sent automatically
         })
 
         if (response.ok) {

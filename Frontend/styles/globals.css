@@ -192,16 +192,11 @@
     font-family: var(--font-sans);
     font-feature-settings: "rlig" 1, "calt" 1;
     line-height: 1.5;
-    /* Off-white typography fallback */
-    color: #fafafa;
   }
 
-  .dark body {
-    color: #fafafa;
-  }
-
+  .dark body,
   body:not(.dark) {
-    color: hsl(240 10% 4%);
+    /* color is controlled by --foreground CSS variable via @apply text-foreground */
   }
 
   /* Typography Scale - Premium SaaS */

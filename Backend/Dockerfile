@@ -53,6 +53,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
-# Run the application with uvicorn
-# Use exec so uvicorn replaces the shell and receives signals (SIGTERM, etc.) directly
-CMD exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WEB_CONCURRENCY:-1}
+# Run DB init then start the application
+# init_db_direct.py creates all tables from SQLAlchemy models (idempotent - safe to run every time)
+CMD python init_db_direct.py && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WEB_CONCURRENCY:-1}

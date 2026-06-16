@@ -100,7 +100,7 @@ async def send_verification_otp(
         
         # Generate new OTP
         otp = email_service.generate_otp()
-        expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+        expires_at = datetime.utcnow() + timedelta(minutes=10)
         
         # Store OTP in database
         verification = EmailVerification(
@@ -194,7 +194,7 @@ async def verify_otp(
             )
         
         # Check if OTP expired
-        if datetime.now(timezone.utc) > verification.expires_at:
+        if datetime.utcnow() > verification.expires_at:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="OTP expired. Please request a new OTP."
@@ -278,7 +278,7 @@ async def resend_otp(
             )
         
         # Check rate limiting - max 3 OTPs per hour
-        one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+        one_hour_ago = datetime.utcnow() - timedelta(hours=1)
         recent_otps = select(EmailVerification).where(
             and_(
                 EmailVerification.email == email,
@@ -307,7 +307,7 @@ async def resend_otp(
         
         # Generate new OTP
         otp = email_service.generate_otp()
-        expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+        expires_at = datetime.utcnow() + timedelta(minutes=10)
         
         verification = EmailVerification(
             email=email,
@@ -381,3 +381,99 @@ async def check_verification_status(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to check verification status"
         )
+
+
+# =============================================================================
+# DEV-ONLY ENDPOINTS — Blocked in production (ENVIRONMENT=production)
+# =============================================================================
+
+@router.get("/dev/otp/{email}", include_in_schema=True)
+async def dev_get_otp(
+    email: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    [DEV ONLY] Retrieve the latest pending OTP for an email directly from the DB.
+
+    Blocked in production. Use this when SMTP is not reachable during local dev.
+    """
+    import os
+    if os.getenv("ENVIRONMENT", "development").lower() == "production":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This endpoint is only available in development mode."
+        )
+
+    email = email.lower()
+
+    otp_query = (
+        select(EmailVerification)
+        .where(
+            and_(
+                EmailVerification.email == email,
+                EmailVerification.is_verified.is_(False),
+            )
+        )
+        .order_by(EmailVerification.created_at.desc())
+    )
+    result = await db.execute(otp_query)
+    verification = result.scalar_one_or_none()
+
+    if not verification:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No pending OTP found. Register or request a new OTP first."
+        )
+
+    expired = datetime.utcnow() > verification.expires_at
+    return {
+        "email": email,
+        "otp": verification.otp,
+        "expires_at": verification.expires_at.isoformat(),
+        "expired": expired,
+        "attempts_used": verification.attempts,
+        "note": "Use this OTP at POST /api/v1/auth/verify-otp"
+    }
+
+
+@router.post("/dev/verify-direct", include_in_schema=True)
+async def dev_verify_direct(
+    request_data: SendOTPRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    [DEV ONLY] Mark an email as verified WITHOUT needing the OTP.
+
+    Blocked in production. Use this to unblock login when SMTP is unavailable.
+    """
+    import os
+    if os.getenv("ENVIRONMENT", "development").lower() == "production":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This endpoint is only available in development mode."
+        )
+
+    email = request_data.email.lower()
+
+    user_query = select(User).where(User.email == email)
+    result = await db.execute(user_query)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found. Please register first."
+        )
+
+    if user.email_verified == 1:
+        return {"success": True, "message": "Email was already verified.", "email": email}
+
+    user.email_verified = 1
+    await db.commit()
+
+    logger.warning(f"[DEV] Email directly verified (OTP bypassed) for: {email}")
+    return {
+        "success": True,
+        "message": "Email verified (dev bypass). You can now log in.",
+        "email": email
+    }
