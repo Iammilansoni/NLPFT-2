@@ -1,4 +1,27 @@
-
 # Environment secrets
 .env
 Backend/.env
+Frontend/.env
+Frontend/.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.venv/
+.venv-eval/
+venv/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+
+# Eval artefacts (results.json is regenerated; BENCHMARK.md is committed by hand)
+evals/results/per_query.json
+
+# Editor / OS
+.DS_Store
+*.swp

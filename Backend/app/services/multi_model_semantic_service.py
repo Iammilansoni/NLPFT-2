@@ -40,6 +40,7 @@ This means re-ranking works correctly regardless of which model
 was used for embedding, as long as the search was done correctly.
 """
 
+import asyncio
 import uuid
 import time
 from typing import Dict, List, Any, Optional, Tuple
@@ -57,6 +58,11 @@ from app.services.multi_model_redis_service import get_multi_model_redis_service
 from app.services.ollama_embedding_service import get_ollama_service
 from app.services.slot_extraction_service import get_slot_extraction_service
 from app.models.schemas.embedding_schemas import ErrorCode
+from app.nlp.cross_encoder_reranker import (
+    get_reranker,
+    STAGE1_TOP_K,
+    STAGE2_TOP_K,
+)
 
 
 class MultiModelSemanticRetrievalService:
@@ -83,6 +89,9 @@ class MultiModelSemanticRetrievalService:
         self.redis_service = get_multi_model_redis_service()
         self.ollama_service = get_ollama_service()
         self.slot_extractor = get_slot_extraction_service()
+        # Stage 2 cross-encoder. Process-wide singleton; the ONNX model is loaded
+        # once, lazily, and every inference is offloaded off the event loop.
+        self.reranker = get_reranker()
 
     # =========================================================================
     # MAIN RETRIEVAL PIPELINE
@@ -93,7 +102,7 @@ class MultiModelSemanticRetrievalService:
         db: AsyncSession,
         user_id: uuid.UUID,
         user_query: str,
-        top_k: int = 10,
+        top_k: int = STAGE1_TOP_K,
         dataset_id: Optional[uuid.UUID] = None,
         template_id: Optional[uuid.UUID] = None,
         user_query_intent: Optional[str] = None,
@@ -254,13 +263,20 @@ class MultiModelSemanticRetrievalService:
             f"Step 4: Searching Redis index '{model_spec.redis_index_name}'"
         )
         
-        search_results = self.redis_service.search_similar_vectors(
+        # GAP 3 FIX: `search_similar_vectors` is a synchronous method using the
+        # blocking `redis` client (multi_model_redis_service.py:32). Calling it
+        # directly from this async path stalled the event loop for the full
+        # duration of every KNN search, serialising all concurrent requests.
+        # Offloading to the default thread pool keeps the loop free to serve
+        # other requests while RediSearch works.
+        search_results = await asyncio.to_thread(
+            self.redis_service.search_similar_vectors,
             model_id=effective_model,
             user_id=user_id,
             query_vector=query_vector,
             top_k=top_k,
             dataset_id=dataset_id,
-            template_id=template_id
+            template_id=template_id,
         )
         
         # Format Stage 1 results
@@ -287,59 +303,62 @@ class MultiModelSemanticRetrievalService:
         logger.info(f"Step 4: Retrieved {len(search_results)} candidates")
         
         # =====================================================================
-        # STEP 5: Group by t_id (template ID)
+        # STEP 5 + 6: Stage 2 — CROSS-ENCODER RERANKING
         # =====================================================================
-        logger.info("Step 5: Grouping by template ID")
-        
-        grouped = self._group_by_template(search_results)
-        
-        if not grouped:
-            return {
-                "success": False,
-                "error": "NO_VALID_TEMPLATES",
-                "message": "No valid template references found",
-                "stage1_vector_search": stage1_results
-            }
-        
-        logger.info(f"Step 5: Grouped into {len(grouped)} template candidates")
-        
-        # =====================================================================
-        # STEP 6: Re-rank candidates (MODEL-AGNOSTIC)
-        # =====================================================================
-        # Auto-detect intent if not provided to maximize intent alignment bonus
-        effective_intent = user_query_intent or self._auto_detect_intent(user_query)
-        logger.info(f"Step 6: Re-ranking candidates (intent={effective_intent})")
-        
-        best_t_id, ranking_metadata, all_scored = self._rerank_by_template(
-            grouped_results=grouped,
-            user_query_intent=effective_intent
+        # v1 grouped rows by t_id and then scored each group with
+        #     0.7*avg_similarity + 0.15*avg_confidence + 0.15*intent_alignment
+        # where avg_similarity WAS the Stage 1 cosine score. That could only
+        # re-sort Stage 1's own ordering; it could never recover a template that
+        # bi-encoder recall ranked poorly.
+        #
+        # v2 cross-encodes (user_query, utterance) for all `top_k` retrieved rows
+        # with ms-marco-MiniLM-L-12-v2, then max-pools rows up to templates.
+        # See app/nlp/cross_encoder_reranker.py for the full rationale.
+        logger.info(
+            f"Step 5+6: Cross-encoder reranking {len(search_results)} rows "
+            f"-> top {STAGE2_TOP_K} templates"
         )
-        
-        # Format Stage 2 results
-        stage2_results = [
-            {
-                "t_id": t.get("t_id", ""),
-                "avg_similarity": round(t.get("avg_similarity", 0.0), 4),
-                "avg_confidence_score": round(t.get("avg_confidence", 0.7), 4),
-                "final_score": round(t.get("final_score", 0.0), 4),
-                "rank": t.get("rank", 0),
-                "match_count": t.get("match_count", 0)
-            }
-            for t in all_scored
-        ]
-        
-        if not best_t_id:
+
+        rerank_outcome = await self.reranker.run(
+            query=user_query,
+            stage1_rows=search_results,
+            top_k=STAGE2_TOP_K,
+        )
+
+        if rerank_outcome.degraded:
+            logger.warning(
+                f"Step 5+6: DEGRADED — {rerank_outcome.degraded_reason}. "
+                f"Serving vector-order results."
+            )
+
+        stage2_results = [t.to_dict() for t in rerank_outcome.templates]
+
+        best = rerank_outcome.best
+        if best is None:
             return {
                 "success": False,
                 "error": "RERANKING_FAILED",
-                "message": "Re-ranking failed to select a candidate",
+                "message": "Re-ranking produced no candidate",
                 "stage1_vector_search": stage1_results,
-                "stage2_reranking": stage2_results
+                "stage2_reranking": stage2_results,
+                "degraded": rerank_outcome.degraded,
+                "degraded_reason": rerank_outcome.degraded_reason,
             }
-        
+
+        best_t_id = best.t_id
+        ranking_metadata = {
+            "final_score": best.ce_score,
+            "vector_score": best.vector_score,
+            "match_count": best.match_count,
+            "reranker_model": rerank_outcome.model,
+            "rows_scored": rerank_outcome.rows_scored,
+            "rerank_latency_ms": rerank_outcome.latency_ms,
+        }
+
         logger.info(
-            f"Step 6: Best t_id={best_t_id[:8]}... "
-            f"(score={ranking_metadata['final_score']:.4f})"
+            f"Step 5+6: Best t_id={best_t_id[:8]}... "
+            f"(ce_score={best.ce_score:.4f}, vector={best.vector_score:.4f}, "
+            f"{rerank_outcome.latency_ms:.1f}ms)"
         )
         
         # =====================================================================
@@ -438,33 +457,37 @@ class MultiModelSemanticRetrievalService:
             "confidence": round(ranking_metadata["final_score"], 4),
             "extracted_request_body": extracted_request_body,
             
+            # Degraded-mode signalling: when the cross-encoder is unavailable the
+            # pipeline still answers, but the caller is told the routing came from
+            # vector order alone rather than silently served worse results.
+            "degraded": rerank_outcome.degraded,
+            "degraded_reason": rerank_outcome.degraded_reason,
+
             # Metadata
             "metadata": {
                 "query": user_query,
                 "embedding_model": effective_model,
-                "top_k": top_k,
+                "stage1_top_k": top_k,
+                "stage2_top_k": STAGE2_TOP_K,
                 "total_candidates": len(search_results),
                 "processing_time_ms": processing_time_ms,
                 "t_id": best_t_id,
                 "match_count": ranking_metadata["match_count"],
-                "avg_similarity": round(ranking_metadata["avg_similarity"], 4),
-                "avg_confidence": round(ranking_metadata["avg_confidence"], 4),
-                "intent_alignment": round(ranking_metadata.get("intent_alignment", 0.5), 4),
-                "dominant_intent": ranking_metadata.get("dominant_intent", "unknown"),
+                "ce_score": round(ranking_metadata["final_score"], 4),
+                "vector_score": round(ranking_metadata["vector_score"], 4),
+                "reranker_model": ranking_metadata["reranker_model"],
+                "rows_cross_encoded": ranking_metadata["rows_scored"],
+                "rerank_latency_ms": ranking_metadata["rerank_latency_ms"],
                 "domain_tags": template.get("domain_tags", [])
             }
         }
-        
-        # Include alternatives if requested
-        if include_alternatives and len(grouped) > 1:
-            alternatives = await self._get_alternatives(
-                db=db,
-                user_id=user_id,
-                grouped=grouped,
-                best_t_id=best_t_id,
-                max_alternatives=3
-            )
-            response["alternatives"] = alternatives
+
+        # Include alternatives if requested — taken straight from the reranked
+        # Stage 2 ordering rather than re-deriving a separate grouping.
+        if include_alternatives and len(rerank_outcome.templates) > 1:
+            response["alternatives"] = [
+                t.to_dict() for t in rerank_outcome.templates[1:4]
+            ]
         
         logger.info(
             f"[Semantic Search] Complete: '{template['api_name']}' "
