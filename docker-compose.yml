@@ -10,7 +10,9 @@ services:
   # PostgreSQL Database
   # ---------------------------------------------------------------------------
   postgres:
-    image: postgres:15-alpine
+    # pgvector/pgvector ships the `vector` extension the Phase 3 migration
+    # needs. Plain postgres:15-alpine cannot CREATE EXTENSION vector.
+    image: pgvector/pgvector:pg16
     container_name: nlpforge-postgres
     hostname: postgres
     env_file:
@@ -75,12 +77,16 @@ services:
     env_file:
       - ./Backend/.env
     ports:
-      - "19000:8000"
+      - "8000:8000"
     environment:
       REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/0
       REDIS_HOST: redis
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_HOST: http://ollama:11434
+      # Local mode: Ollama supplies embeddings + generation, nothing leaves the host.
+      EXECUTION_MODE: ${EXECUTION_MODE:-local}
+      VECTOR_BACKEND: ${VECTOR_BACKEND:-pgvector}
+      SEED_DEMO: ${SEED_DEMO:-false}
       ENVIRONMENT: ${ENVIRONMENT:-production}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
@@ -90,6 +96,10 @@ services:
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/2
       # Unlocked — in-memory task state removed, Celery result backend is shared
       WEB_CONCURRENCY: 4
+      # Seed admin user (created only when users table is empty)
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@nlpforge.dev}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-NlpForge@Auth$9982}
+      SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-admin}
 
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -147,6 +157,9 @@ services:
   # to the host (e.g. http://host.docker.internal:11434).
   # ---------------------------------------------------------------------------
   ollama:
+    # Local mode only. `--profile cloud` omits this service entirely, which is
+    # the whole point of the cloud runtime: no 4-8GB model server.
+    profiles: ["", "local"]
     image: ollama/ollama:latest
     container_name: nlpforge-ollama
     restart: unless-stopped
@@ -190,6 +203,8 @@ services:
       # Sync DB URL for psycopg2 — workers run outside the async event loop
       SYNC_DATABASE_URL: postgresql://${POSTGRES_USER:-nlpforge}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-nlpforge}
       OLLAMA_HOST: http://ollama:11434
+      EXECUTION_MODE: ${EXECUTION_MODE:-local}
+      VECTOR_BACKEND: ${VECTOR_BACKEND:-pgvector}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

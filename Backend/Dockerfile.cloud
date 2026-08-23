@@ -1,0 +1,128 @@
+# =============================================================================
+# NLPForge Backend — CLOUD MODE
+# =============================================================================
+# No Ollama. No GPU. No model server.
+#
+# Embeddings run in-process via ONNX (bge-small-en-v1.5, 384-dim) and generation
+# goes to a hosted API. That removes the 4-8GB Ollama container that made v1
+# undeployable on anything affordable, and collapses the runtime to
+# FastAPI + PostgreSQL.
+#
+# Both ONNX models are DOWNLOADED AT BUILD TIME into the image. A serverless
+# cold start that has to fetch 160MB of weights before serving its first request
+# is not a cold start, it is an outage. Baking them in trades image size (which
+# is cached) for first-request latency (which is user-visible).
+#
+# Build:
+#   docker build -f Dockerfile.cloud -t nlpforge-backend:cloud .
+#
+# Run:
+#   docker run -p 8000:8000 \
+#     -e EXECUTION_MODE=cloud \
+#     -e DATABASE_URL=postgresql+asyncpg://... \
+#     -e GEMINI_API_KEY=... \
+#     nlpforge-backend:cloud
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1 — build wheels
+# -----------------------------------------------------------------------------
+FROM python:3.11-slim AS builder
+
+WORKDIR /build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        gcc g++ libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=300
+
+COPY requirements.txt requirements-cloud.txt ./
+
+# Wheels are built once here and installed into the slim runtime stage, so no
+# compiler ever ships in the final image.
+RUN pip wheel --wheel-dir /wheels -r requirements.txt -r requirements-cloud.txt
+
+
+# -----------------------------------------------------------------------------
+# Stage 2 — bake the ONNX models
+# -----------------------------------------------------------------------------
+# Separate stage so a code change never re-downloads weights: this layer is
+# keyed only on the model ids below.
+FROM python:3.11-slim AS models
+
+ENV PIP_NO_CACHE_DIR=1
+RUN pip install --no-cache-dir fastembed flashrank
+
+ENV ONNX_CACHE_DIR=/opt/models/fastembed \
+    RERANKER_CACHE_DIR=/opt/models/flashrank
+
+RUN mkdir -p "$ONNX_CACHE_DIR" "$RERANKER_CACHE_DIR" && \
+    python -c "\
+from fastembed import TextEmbedding; \
+m = TextEmbedding(model_name='BAAI/bge-small-en-v1.5', cache_dir='/opt/models/fastembed'); \
+list(m.embed(['warm'])); \
+print('embedder baked')" && \
+    python -c "\
+from flashrank import Ranker, RerankRequest; \
+r = Ranker(model_name='ms-marco-MiniLM-L-12-v2', cache_dir='/opt/models/flashrank'); \
+r.rerank(RerankRequest(query='warm', passages=[{'id':1,'text':'warm','meta':{}}])); \
+print('reranker baked')"
+
+
+# -----------------------------------------------------------------------------
+# Stage 3 — runtime
+# -----------------------------------------------------------------------------
+FROM python:3.11-slim AS runtime
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    EXECUTION_MODE=cloud \
+    VECTOR_BACKEND=pgvector \
+    ONNX_CACHE_DIR=/opt/models/fastembed \
+    RERANKER_CACHE_DIR=/opt/models/flashrank \
+    ONNX_EMBED_MODEL=BAAI/bge-small-en-v1.5 \
+    ONNX_EMBED_DIM=384 \
+    # ONNX and the reranker are already parallelised internally; letting each
+    # spawn a thread pool per uvicorn worker oversubscribes small cloud CPUs and
+    # makes p95 worse, not better.
+    OMP_NUM_THREADS=1 \
+    TOKENIZERS_PARALLELISM=false
+
+COPY --from=builder /wheels /wheels
+COPY requirements.txt requirements-cloud.txt ./
+RUN pip install --no-cache-dir --no-index --find-links=/wheels \
+        -r requirements.txt -r requirements-cloud.txt \
+    && rm -rf /wheels
+
+RUN useradd -m -u 1000 appuser
+
+COPY --from=models --chown=appuser:appuser /opt/models /opt/models
+
+RUN mkdir -p /app/storage /app/datasets && chown -R appuser:appuser /app /opt/models
+
+COPY --chown=appuser:appuser app/ ./app/
+COPY --chown=appuser:appuser alembic.ini ./
+COPY --chown=appuser:appuser alembic/ ./alembic/
+COPY --chown=appuser:appuser scripts/ ./scripts/
+
+USER appuser
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+
+# Migrations run on boot (alembic upgrade is idempotent); the seed is opt-in via
+# SEED_DEMO so a redeploy never rewrites a live demo tenant.
+CMD ["sh", "-c", "alembic upgrade head && \
+     { [ \"$SEED_DEMO\" = \"true\" ] && python scripts/seed_demo.py || true; } && \
+     exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WEB_CONCURRENCY:-2}"]
