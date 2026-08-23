@@ -50,6 +50,22 @@ jobs:
           REDIS_HOST: localhost
           OLLAMA_HOST: http://localhost:11434
 
+  routing-eval:
+    name: Routing Benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install numpy flashrank
+      - name: Run routing benchmark
+        # Gates merges on routing quality, not just on tests passing.
+        # Threshold sits just under the current measured 0.728 so genuine
+        # regressions fail while normal variance does not.
+        run: python evals/run_eval.py --fail-under 0.70 --markdown "$GITHUB_STEP_SUMMARY"
+
   frontend-build:
     name: Frontend Build
     runs-on: ubuntu-latest
