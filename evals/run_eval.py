@@ -65,8 +65,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from api_surface import API_TEMPLATES, TEMPLATES_BY_NAME, cluster_of  # noqa: E402
 from benchmark_queries import TIERS, load_benchmark  # noqa: E402
 
-STAGE1_K = int(os.getenv("EVAL_STAGE1_K", "50"))
-STAGE2_K = int(os.getenv("EVAL_STAGE2_K", "5"))
+# Default to whatever PRODUCTION defaults to, so the benchmark measures the
+# pipeline that actually ships. Hard-coding a separate default here silently
+# decoupled the two: the app moved to k=25 while CI kept reporting k=50.
+# Override with EVAL_STAGE1_K only to run a sweep.
+from app.nlp.cross_encoder_reranker import (  # noqa: E402
+    STAGE1_TOP_K as _PROD_STAGE1_K,
+    STAGE2_TOP_K as _PROD_STAGE2_K,
+)
+
+STAGE1_K = int(os.getenv("EVAL_STAGE1_K", str(_PROD_STAGE1_K)))
+STAGE2_K = int(os.getenv("EVAL_STAGE2_K", str(_PROD_STAGE2_K)))
 
 
 # ===========================================================================

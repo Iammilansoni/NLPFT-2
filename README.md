@@ -70,9 +70,12 @@ python evals/run_eval.py --fail-under 0.70
 
 | Strategy | Hit@1 | Hit@3 | MRR@5 | p50 | p95 |
 |---|---|---|---|---|---|
-| `stage1_only` — vector similarity only | 0.617 | 0.861 | 0.740 | 0.4ms | 0.7ms |
-| `v1_heuristic` — what v1 shipped | 0.444 | 0.717 | 0.581 | 0.4ms | 0.7ms |
-| **`v2_cross_encoder`** — current | **0.728** | **0.906** | **0.823** | 264.6ms | 370.1ms |
+| `stage1_only` — vector similarity only | 0.617 | 0.861 | 0.740 | 0.3ms | 0.4ms |
+| `v1_heuristic` — what v1 shipped | 0.444 | 0.717 | 0.581 | 0.3ms | 0.4ms |
+| **`v2_cross_encoder`** — current | **0.728** | **0.906** | **0.823** | 122ms | 176ms |
+
+Accuracy figures are deterministic and reproduce exactly. Latency is CPU-bound
+and machine-dependent — 120–265ms p50 observed across runs on a laptop.
 
 **Hit@1 by difficulty tier**
 
@@ -259,9 +262,9 @@ contact with its own code.
   figure.
 - **20 templates is a small catalogue.** Hit@1 will fall as it grows. Re-run
   before quoting numbers at a different scale.
-- **Reranking dominates latency** at p50 264ms — measured on CPU, unbatched, on a
-  laptop. This is the strongest argument for the Stage 0 cache, and the main
-  reason cloud mode is worth its complexity.
+- **Reranking dominates latency** — 120–265ms p50 on CPU, unbatched, on a laptop,
+  against sub-millisecond vector search. This is the strongest argument for the
+  Stage 0 cache, and the main reason cloud mode is worth its complexity.
 - **Hit@1 on hard negatives is 0.525.** Better than the 0.400 baseline, not
   solved. Sibling endpoints that differ by *authentication state* rather than
   vocabulary remain the dominant error class.
