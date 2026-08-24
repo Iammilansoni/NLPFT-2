@@ -9,6 +9,9 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 
+// Backend Swagger UI URL, derived from the public API base so it works in all environments.
+const SWAGGER_URL = `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:19000').replace(/\/$/, '')}/docs`
+
 const SECTIONS = [
   { id: 'getting-started', label: 'Getting Started', icon: Zap },
   { id: 'templates', label: 'Templates', icon: FileCode },
@@ -122,7 +125,7 @@ export default function DocsPage() {
             <Link href="/help" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
               <ArrowRight className="h-3.5 w-3.5" /> Help Center
             </Link>
-            <a href="http://localhost:19000/docs" target="_blank" rel="noopener noreferrer"
+            <a href={SWAGGER_URL} target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mt-1.5">
               <ExternalLink className="h-3.5 w-3.5" /> Swagger UI
             </a>
@@ -238,6 +241,11 @@ Authorization: Bearer <token>
                 <p className="text-sm text-muted-foreground">After generation, embed with:</p>
                 <CodeBlock code={`POST /api/v1/datasets/db/{dataset_id}/embed
 Authorization: Bearer <token>`} />
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  <strong>Note:</strong> Browser clients authenticate via HttpOnly cookies set at login —
+                  no <code>Authorization</code> header is needed. The <code>Bearer &lt;token&gt;</code> header
+                  shown above is supported only as a legacy fallback for non-browser API clients.
+                </p>
               </div>
             )}
 
@@ -305,8 +313,8 @@ Authorization: Bearer <token>
                   <h2 className="text-2xl font-bold text-foreground mb-2">API Reference</h2>
                   <p className="text-muted-foreground">
                     Full interactive docs available at{' '}
-                    <a href="http://localhost:19000/docs" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
-                      localhost:19000/docs <ExternalLink className="h-3 w-3" />
+                    <a href={SWAGGER_URL} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
+                      {SWAGGER_URL.replace(/^https?:\/\//, '')} <ExternalLink className="h-3 w-3" />
                     </a>
                   </p>
                 </div>

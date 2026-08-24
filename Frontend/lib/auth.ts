@@ -111,8 +111,13 @@ class AuthService {
 
   getUser(): User | null {
     if (typeof window !== 'undefined') {
-      const raw = localStorage.getItem(this.USER_KEY);
-      return raw ? JSON.parse(raw) : null;
+      try {
+        const raw = localStorage.getItem(this.USER_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch {
+        // Corrupted/malformed storage — treat as no cached user.
+        return null;
+      }
     }
     return null;
   }

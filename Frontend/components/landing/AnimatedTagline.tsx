@@ -255,6 +255,8 @@ export function AnimatedTagline() {
               <button
                 key={p.word}
                 onClick={() => { setIndex(i); setProgress(0) }}
+                aria-label={`Show "${p.word}" tagline`}
+                aria-pressed={i === index}
                 className="text-xs px-3 py-1 rounded-full border transition-all duration-300 font-medium"
                 style={{
                   borderColor: i === index ? `${p.color}66` : 'transparent',

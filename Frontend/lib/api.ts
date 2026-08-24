@@ -280,12 +280,12 @@ class ApiClient {
     }>;
     error?: string;
   }> {
-    return this.request('/api/v1/ranking/semantic-retrieve', {
+    return this.request('/api/v1/query/semantic-search', {
       method: 'POST',
       body: JSON.stringify({
         query,
         top_k: topK,
-        intent_type: intentType,
+        intent: intentType,
         include_alternatives: includeAlternatives,
         include_slot_extraction: includeSlotExtraction
       }),

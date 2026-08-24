@@ -65,8 +65,8 @@ async function handleResponse<T>(response: Response): Promise<T> {
     const errorData = await response.json().catch(() => ({}))
     const errorMessage = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`
 
-    // Check for invalid token format error
-    if (response.status === 401 && errorMessage.includes('Token format invalid')) {
+    // Any 401 means the session is invalid or expired; redirect on status alone
+    if (response.status === 401) {
       // Redirect to login — cookies will be cleared server-side on /logout
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth')) {
         window.location.href = '/auth/login';

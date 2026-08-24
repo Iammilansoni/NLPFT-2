@@ -23,15 +23,6 @@ def extract_password_from_url(url: str) -> str | None:
     return match.group(1) if match else None
 
 
-async def ensure_password_matches(url: str):
-    """
-    Uses a direct psycopg2 (sync) connection via Unix socket workaround.
-    Instead, we reset via asyncpg connecting as the same user.
-    If this fails, we skip silently (password already correct).
-    """
-    pass  # Handled by the ALTER USER below if needed
-
-
 async def main():
     print("=" * 55)
     print("NLPForge DB Initialization")

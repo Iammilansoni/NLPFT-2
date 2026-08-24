@@ -1,0 +1,135 @@
+# docker-compose.observability.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# NLPForge Observability Stack — Add with:
+#   docker-compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+#
+# Services:
+#   prometheus      — Metrics collection   → http://localhost:9090
+#   grafana         — Dashboards           → http://localhost:3100  (admin/admin)
+#   loki            — Log aggregation      → http://localhost:3200
+#   promtail        — Log shipper          → (scrapes docker container logs)
+#   alertmanager    — Alert routing        → http://localhost:9093
+#
+# All data is persisted in named volumes so restarts are safe.
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: "3.9"
+
+services:
+
+  # ── Prometheus ─────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.2
+    container_name: nlpforge-prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+      - "--web.enable-admin-api"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - nlpforge-network
+    depends_on:
+      - alertmanager
+    labels:
+      - "com.nlpforge.service=prometheus"
+
+  # ── AlertManager ───────────────────────────────────────────────────────────
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: nlpforge-alertmanager
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    volumes:
+      - ./observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
+    networks:
+      - nlpforge-network
+    labels:
+      - "com.nlpforge.service=alertmanager"
+
+  # ── Grafana ────────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: nlpforge-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_SERVER_HTTP_PORT: 3100
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-piechart-panel
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3100:3100"
+    networks:
+      - nlpforge-network
+    depends_on:
+      - prometheus
+      - loki
+    labels:
+      - "com.nlpforge.service=grafana"
+
+  # ── Loki (Log Aggregation) ─────────────────────────────────────────────────
+  loki:
+    image: grafana/loki:2.9.8
+    container_name: nlpforge-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/loki.yml
+    volumes:
+      - ./observability/loki/loki.yml:/etc/loki/loki.yml:ro
+      - loki_data:/loki
+    ports:
+      - "3200:3100"
+    networks:
+      - nlpforge-network
+    labels:
+      - "com.nlpforge.service=loki"
+
+  # ── Promtail (Log Shipper — scrapes Docker container logs) ────────────────
+  promtail:
+    image: grafana/promtail:2.9.8
+    container_name: nlpforge-promtail
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/promtail.yml
+    volumes:
+      - ./observability/promtail/promtail.yml:/etc/promtail/promtail.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - nlpforge-network
+    depends_on:
+      - loki
+    labels:
+      - "com.nlpforge.service=promtail"
+
+volumes:
+  prometheus_data:
+    name: nlpforge-prometheus-data
+  alertmanager_data:
+    name: nlpforge-alertmanager-data
+  grafana_data:
+    name: nlpforge-grafana-data
+  loki_data:
+    name: nlpforge-loki-data
+
+networks:
+  nlpforge-network:
+    external: true
+    name: nlpft-2_nlpforge-network

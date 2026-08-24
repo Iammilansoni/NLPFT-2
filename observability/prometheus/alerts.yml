@@ -1,0 +1,197 @@
+# observability/prometheus/alerts.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# NLPForge Alert Rules — Prometheus AlertManager
+# ─────────────────────────────────────────────────────────────────────────────
+groups:
+
+  # ── API Health ─────────────────────────────────────────────────────────────
+  - name: api_health
+    interval: 30s
+    rules:
+
+      - alert: HighErrorRate5xx
+        expr: |
+          (
+            sum(rate(nlpforge_http_requests_total{status_code=~"5.."}[5m]))
+            /
+            sum(rate(nlpforge_http_requests_total[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "High 5xx error rate detected"
+          description: "More than 5% of requests are returning 5xx errors over the last 5 minutes. Current rate: {{ $value | humanizePercentage }}"
+          runbook: "Check backend logs → docker-compose logs backend | tail -100"
+          business_impact: "Users are experiencing failures across core features"
+          recovery: "Check DB connectivity, review recent deployments, consider rolling back"
+
+      - alert: HighP99Latency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(nlpforge_http_request_duration_ms_bucket[5m])) by (le, path)
+          ) > 5000
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High API latency (P99 > 5s)"
+          description: "The 99th percentile API response time for {{ $labels.path }} exceeds 5 seconds."
+          recovery: "Profile slow endpoints, check DB query performance, check LLM provider latency"
+
+      - alert: ServiceDown
+        expr: up{job="nlpforge-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: devops
+        annotations:
+          summary: "NLPForge backend is DOWN"
+          description: "The backend service has been unreachable for more than 1 minute."
+          recovery: "docker-compose restart backend"
+
+  # ── Database ───────────────────────────────────────────────────────────────
+  - name: database
+    rules:
+
+      - alert: DatabaseConnectionPoolExhausted
+        expr: nlpforge_db_pool_size_gauge - nlpforge_db_pool_available_gauge > 0.9 * nlpforge_db_pool_size_gauge
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "PostgreSQL connection pool near exhaustion"
+          description: "Connection pool is >90% utilized. Risk of connection timeouts."
+          recovery: "Increase pool_size in postgres config, kill idle connections, scale DB"
+
+      - alert: DatabaseUnavailable
+        expr: nlpforge_health_check_status{service="database"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: devops
+        annotations:
+          summary: "PostgreSQL is unavailable"
+          description: "The backend cannot connect to PostgreSQL."
+          recovery: "Check postgres container: docker-compose logs postgres"
+
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  - name: redis
+    rules:
+
+      - alert: RedisUnavailable
+        expr: nlpforge_health_check_status{service="redis"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "Redis is unavailable"
+          description: "Vector search and embedding caching features are degraded."
+          recovery: "Check redis container: docker-compose logs redis"
+
+      - alert: RedisHighMemory
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "Redis memory usage above 85%"
+          description: "Redis is using more than 85% of its allocated memory. Risk of OOM evictions."
+          recovery: "Increase Redis maxmemory, review eviction policy, clear stale keys"
+
+  # ── Workers / AI ───────────────────────────────────────────────────────────
+  - name: workers
+    rules:
+
+      - alert: CeleryTaskQueueBacklog
+        expr: nlpforge_celery_queue_length_gauge > 100
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Celery task queue backlog > 100 tasks"
+          description: "{{ $value }} tasks are queued. Dataset generation is significantly delayed."
+          recovery: "Scale Celery workers, check for stuck tasks, review LLM provider latency"
+
+      - alert: CeleryHighFailureRate
+        expr: |
+          (
+            sum(rate(nlpforge_celery_tasks_total{status="failure"}[10m]))
+            /
+            sum(rate(nlpforge_celery_tasks_total[10m]))
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: error
+          team: backend
+        annotations:
+          summary: "High Celery task failure rate (>10%)"
+          description: "More than 10% of background tasks are failing. Dataset generation is impacted."
+          recovery: "Check worker logs: docker-compose logs celery-worker"
+
+      - alert: LLMProviderHighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(nlpforge_llm_request_duration_ms_bucket[10m])) by (le, provider)
+          ) > 30000
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "LLM provider {{ $labels.provider }} P95 latency > 30s"
+          description: "AI generation is very slow. Users may experience timeouts."
+          recovery: "Check provider status page, consider switching to alternative model"
+
+  # ── Security ───────────────────────────────────────────────────────────────
+  - name: security
+    rules:
+
+      - alert: AuthBruteForce
+        expr: |
+          sum(rate(nlpforge_auth_events_total{event="login_failure"}[1m])) by (client_ip) > 20
+        for: 1m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Possible brute-force attack from {{ $labels.client_ip }}"
+          description: "More than 20 failed logins per minute from a single IP."
+          recovery: "Review logs, block IP at firewall/reverse proxy level"
+
+      - alert: HighRateLimitViolations
+        expr: sum(rate(nlpforge_http_requests_total{status_code="429"}[5m])) > 50
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "High rate-limit violation rate"
+          description: "More than 50 rate-limit rejections per 5 minutes. Possible abuse."
+          recovery: "Review API usage patterns, consider tightening rate limits"
+
+  # ── Infrastructure ─────────────────────────────────────────────────────────
+  - name: infrastructure
+    rules:
+
+      - alert: HighMemoryUsage
+        expr: |
+          (
+            container_memory_usage_bytes{name=~"nlpforge-.*"}
+            /
+            container_spec_memory_limit_bytes{name=~"nlpforge-.*"}
+          ) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "Container {{ $labels.name }} memory > 85%"
+          description: "Container is using {{ $value | humanizePercentage }} of its memory limit. Risk of OOM kill."
+          recovery: "Increase container memory limit or investigate memory leak"
