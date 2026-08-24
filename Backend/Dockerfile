@@ -42,6 +42,11 @@ COPY --chown=appuser:appuser app/ ./app/
 COPY --chown=appuser:appuser alembic.ini ./
 COPY --chown=appuser:appuser alembic/ ./alembic/
 
+# Operational scripts. seed_demo.py is the documented one-click demo path
+# (`docker compose exec backend python scripts/seed_demo.py`), so it has to be
+# present in the local image too — Dockerfile.cloud already copies this.
+COPY --chown=appuser:appuser scripts/ ./scripts/
+
 # Copy additional files
 COPY --chown=appuser:appuser *.py ./
 COPY --chown=appuser:appuser *.json ./ 
@@ -53,6 +58,7 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
-# Run DB init then start the application
+# Run DB init, seed admin user, then start the application
 # init_db_direct.py creates all tables from SQLAlchemy models (idempotent - safe to run every time)
-CMD python init_db_direct.py && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WEB_CONCURRENCY:-1}
+# seed_admin.py creates a default admin user if the users table is empty (idempotent)
+CMD python init_db_direct.py && python seed_admin.py && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WEB_CONCURRENCY:-1}
