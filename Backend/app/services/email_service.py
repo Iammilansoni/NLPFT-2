@@ -7,10 +7,10 @@ Supports multiple email providers:
 - AWS SES (future)
 """
 
-import smtplib
 import random
-from email.mime.text import MIMEText
+import smtplib
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 from app.core.logger import logger
 

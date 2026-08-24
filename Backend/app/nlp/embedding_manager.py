@@ -7,9 +7,10 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
+
 import numpy as np
 import redis
-from redis.commands.search.field import VectorField, TextField, NumericField
+from redis.commands.search.field import NumericField, TextField, VectorField
 from redis.commands.search.indexDefinition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 

@@ -5,71 +5,31 @@ All request/response validation schemas organized by domain
 
 # Auth schemas
 from .auth_schemas import (
+    ChangePasswordRequest,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+    Token,
+    TokenData,
     UserBase,
     UserCreate,
     UserLogin,
     UserResponse,
-    Token,
-    TokenData,
-    ForgotPasswordRequest,
-    ResetPasswordRequest,
-    ChangePasswordRequest,
     VerifyEmailRequest,
 )
 
-# Template schemas
-from .template_schemas import (
-    TemplateCreate,
-    TemplateUpdate,
-    TemplateResponse,
-    ParameterCreate,
-    ParameterResponse,
-    ExpectedResponseCreate,
-    ExpectedResponseResponse,
-    MetadataCreate,
-    MetadataResponse,
+# Common schemas
+from .common_schemas import (
+    ErrorResponse,
+    HealthResponse,
+    MessageResponse,
 )
 
 # CSV Data schemas
 from .csv_data_schemas import (
-    CSVDataCreate,
-    CSVDataUpdate,
-    CSVDataResponse,
     CSVDataBulkCreate,
-)
-
-# Embedding schemas
-from .embedding_schemas import (
-    # Basic CRUD
-    EmbeddingCreate,
-    EmbeddingResponse,
-    VectorSearchRequest,
-    VectorSearchResult,
-    # Enums
-    EmbeddingStatus,
-    ErrorCode,
-    # Error responses
-    ModelMismatchError,
-    EmbeddingError,
-    # Dataset models
-    DatasetInfo,
-    DatasetEmbeddingStatus,
-    # Request models
-    ReembedDatasetRequest,
-    SearchDatasetRequest,
-    # Response models
-    ReembedDatasetResponse,
-    SearchResult,
-    SearchDatasetResponse,
-    EmbedProgressResponse,
-    # Internal models
-    EmbeddingTask,
-)
-
-# Search schemas
-from .search_schemas import (
-    SearchRequest,
-    SearchResponse,
+    CSVDataCreate,
+    CSVDataResponse,
+    CSVDataUpdate,
 )
 
 # Dataset schemas
@@ -78,35 +38,75 @@ from .dataset_schemas import (
     UploadResponse,
 )
 
-# Common schemas
-from .common_schemas import (
-    ErrorResponse,
-    MessageResponse,
-    HealthResponse,
+# Embedding schemas
+from .embedding_schemas import (
+    DatasetEmbeddingStatus,
+    # Dataset models
+    DatasetInfo,
+    # Basic CRUD
+    EmbeddingCreate,
+    EmbeddingError,
+    EmbeddingResponse,
+    # Enums
+    EmbeddingStatus,
+    # Internal models
+    EmbeddingTask,
+    EmbedProgressResponse,
+    ErrorCode,
+    # Error responses
+    ModelMismatchError,
+    # Request models
+    ReembedDatasetRequest,
+    # Response models
+    ReembedDatasetResponse,
+    SearchDatasetRequest,
+    SearchDatasetResponse,
+    SearchResult,
+    VectorSearchRequest,
+    VectorSearchResult,
 )
 
 # Model schemas
 from .model_schemas import (
-    ModelResponse,
-    ModelListResponse,
     ModelConfigResponse,
     ModelFilterRequest,
+    ModelListResponse,
+    ModelResponse,
 )
 
 # Ranking schemas (Two-Stage AI Ranking Engine)
 from .ranking_schemas import (
-    RankingRequest,
-    RankedResult,
-    RankingResponse,
-    Stage1Result,
+    AlternativeAPI,
     DetailedRankedResult,
     DetailedRankingResponse,
+    RankedResult,
+    RankingRequest,
+    RankingResponse,
     RerankerInfoResponse,
+    SemanticRetrievalMetadata,
     # Semantic Retrieval Pipeline
     SemanticRetrievalRequest,
     SemanticRetrievalResponse,
-    SemanticRetrievalMetadata,
-    AlternativeAPI,
+    Stage1Result,
+)
+
+# Search schemas
+from .search_schemas import (
+    SearchRequest,
+    SearchResponse,
+)
+
+# Template schemas
+from .template_schemas import (
+    ExpectedResponseCreate,
+    ExpectedResponseResponse,
+    MetadataCreate,
+    MetadataResponse,
+    ParameterCreate,
+    ParameterResponse,
+    TemplateCreate,
+    TemplateResponse,
+    TemplateUpdate,
 )
 
 __all__ = [

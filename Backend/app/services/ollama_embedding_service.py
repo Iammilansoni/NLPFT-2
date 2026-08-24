@@ -11,10 +11,12 @@ Features:
 - User-selected model from settings
 """
 
-import httpx
 import asyncio
 import os
-from typing import List, Optional, Dict, Any, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
+import httpx
+
 from app.core.logger import logger
 
 
@@ -459,6 +461,10 @@ def get_ollama_service() -> OllamaEmbeddingService:
         try:
             if getattr(_ollama_service, "base_url", None) != base_url:
                 _ollama_service = OllamaEmbeddingService(base_url=base_url)
-        except Exception:
-            _ollama_service = OllamaEmbeddingService(base_url=base_url)
+        except AttributeError as attr_err:
+                logger.warning(
+                    f"Ollama singleton attribute error during base_url check, recreating: {attr_err}",
+                    extra={"extra": {"event_name": "ollama_singleton_recreate", "error": str(attr_err)}},
+                )
+                _ollama_service = OllamaEmbeddingService(base_url=base_url)
     return _ollama_service

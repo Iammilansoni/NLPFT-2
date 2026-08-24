@@ -29,21 +29,19 @@ Each embedding model has its own index and namespace, preventing:
 4. No Overlap: Different models never share indices
 """
 
-import redis
-import numpy as np
-from typing import List, Dict, Optional, Tuple, Any
 import uuid
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Tuple
 
-from redis.commands.search.field import VectorField, TextField, NumericField, TagField
+import numpy as np
+import redis
+from redis.commands.search.field import NumericField, TagField, TextField, VectorField
 from redis.commands.search.indexDefinition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 
-from app.core.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
+from app.core.config import REDIS_HOST, REDIS_PASSWORD, REDIS_PORT
+from app.core.embedding_model_registry import get_embedding_registry
 from app.core.logger import logger
-from app.core.embedding_model_registry import (
-    get_embedding_registry
-)
 
 
 def escape_redis_tag(value: str) -> str:

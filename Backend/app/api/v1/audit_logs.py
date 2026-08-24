@@ -9,18 +9,19 @@ Endpoints:
 Multi-tenant isolation: Users can only access their own audit logs
 """
 
-from typing import Optional, List
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from pydantic import BaseModel, Field
 
-from app.core.postgres import get_db
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.v1.auth import get_current_user
-from app.models.database_models import AuditLog, User
 from app.core.logger import logger
+from app.core.postgres import get_db
+from app.models.database_models import AuditLog, User
 
 router = APIRouter(prefix="/audit", tags=["Audit Logs"])
 

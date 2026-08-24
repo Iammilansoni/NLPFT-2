@@ -182,7 +182,7 @@ export default function HelpPage() {
           </div>
           <h2 className="text-xl font-semibold text-foreground mb-2">Still need help?</h2>
           <p className="text-muted-foreground mb-6 max-w-md mx-auto text-sm">
-            Can't find what you're looking for? Reach out via GitHub or check the full documentation.
+            Can&apos;t find what you&apos;re looking for? Reach out via GitHub or check the full documentation.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link href="/docs"
@@ -191,7 +191,7 @@ export default function HelpPage() {
               <BookOpen className="h-4 w-4" />
               Read the Docs
             </Link>
-            <a href="https://github.com" target="_blank" rel="noopener noreferrer"
+            <a href={process.env.NEXT_PUBLIC_ISSUES_URL || 'https://github.com/affina-group/nlpforge/issues'} target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-border bg-card text-foreground text-sm font-medium hover:bg-muted/60 transition-colors"
             >
               <Github className="h-4 w-4" />

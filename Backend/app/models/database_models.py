@@ -42,11 +42,12 @@ Tables (as per diagram):
 8. EMBEDDINGS - Vector metadata (redis_key, model_name, dimension, redis_namespace, auto_generated)
 """
 
-from sqlalchemy import Column, Text, Integer, TIMESTAMP, ForeignKey, Index, Numeric
-from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
 import uuid
+from datetime import datetime, timezone
+
+from sqlalchemy import TIMESTAMP, Column, ForeignKey, Index, Integer, Numeric, Text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import relationship
 
 from app.core.postgres import Base
 

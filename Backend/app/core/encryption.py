@@ -22,17 +22,16 @@ Usage:
     decrypted = encryptor.decrypt(encrypted)
 """
 
-import os
 import base64
-from typing import Optional
+import os
 from functools import lru_cache
+from typing import Optional
 
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from app.core.logger import logger
-
 
 # =============================================================================
 # EXCEPTIONS

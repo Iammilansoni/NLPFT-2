@@ -12,22 +12,22 @@ All endpoints require authentication.
 
 from typing import List, Optional
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.auth import get_current_user
 from app.core.logger import logger
 from app.core.postgres import get_db
-from app.api.v1.auth import get_current_user
+from app.llm.provider_factory import LLMProviderFactory
+from app.llm.providers.base import ProviderType
 from app.models.database_models import User
 from app.services.llm_config_service import (
     LLMConfigService,
     LLMProviderConfigCreate,
-    LLMProviderConfigUpdate,
     LLMProviderConfigResponse,
+    LLMProviderConfigUpdate,
 )
-from app.llm.provider_factory import LLMProviderFactory
-from app.llm.providers.base import ProviderType
-
 
 router = APIRouter(prefix="/llm-config", tags=["LLM Configuration"])
 

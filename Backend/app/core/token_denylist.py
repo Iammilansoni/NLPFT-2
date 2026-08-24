@@ -20,7 +20,7 @@ from typing import Optional
 
 import redis.asyncio as aioredis
 
-from app.core.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
+from app.core.config import REDIS_HOST, REDIS_PASSWORD, REDIS_PORT
 from app.core.logger import logger
 
 DENYLIST_PREFIX = "auth:denylist:"

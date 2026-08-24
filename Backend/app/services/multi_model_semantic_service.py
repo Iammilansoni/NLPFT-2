@@ -41,28 +41,29 @@ was used for embedding, as long as the search was done correctly.
 """
 
 import asyncio
-import uuid
 import time
-from typing import Dict, List, Any, Optional, Tuple
+import uuid
 from collections import defaultdict
 from statistics import mean
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-import numpy as np
+from typing import Any, Dict, List, Optional, Tuple
 
-from app.core.logger import logger
+import numpy as np
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.embedding_model_registry import get_embedding_registry
-from app.models.database_models import Template, Dataset
-from app.services.user_embedding_settings_service import get_user_embedding_settings_service
+from app.core.logger import logger
+from app.models.database_models import Dataset, Template
+from app.models.schemas.embedding_schemas import ErrorCode
+from app.nlp.cross_encoder_reranker import (
+    STAGE1_TOP_K,
+    STAGE2_TOP_K,
+    get_reranker,
+)
 from app.services.multi_model_redis_service import get_multi_model_redis_service
 from app.services.ollama_embedding_service import get_ollama_service
 from app.services.slot_extraction_service import get_slot_extraction_service
-from app.models.schemas.embedding_schemas import ErrorCode
-from app.nlp.cross_encoder_reranker import (
-    get_reranker,
-    STAGE1_TOP_K,
-    STAGE2_TOP_K,
-)
+from app.services.user_embedding_settings_service import get_user_embedding_settings_service
 
 
 class MultiModelSemanticRetrievalService:

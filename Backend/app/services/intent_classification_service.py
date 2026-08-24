@@ -17,8 +17,7 @@ Intent Types:
 NO LLM NEEDED - Uses simple keyword matching and HTTP method mapping.
 """
 
-from typing import Tuple, Optional
-
+from typing import Optional, Tuple
 
 # HTTP Method to Intent mapping
 METHOD_INTENT_MAP = {

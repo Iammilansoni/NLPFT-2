@@ -9,18 +9,19 @@ Note: LLM model is fixed to Llama 3.2 Instruct via Ollama (local CPU) and not us
 """
 
 from typing import Annotated, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from pydantic import BaseModel, Field
 
-from app.core.postgres import get_db
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.v1.auth import get_current_user
+from app.core.logger import logger
+from app.core.postgres import get_db
 from app.models.database_models import UserSettings
 from app.models.schemas import UserResponse
-from app.services.model_service import get_model_service, ModelService
 from app.services.audit_service import get_audit_service
-from app.core.logger import logger
+from app.services.model_service import ModelService, get_model_service
 
 router = APIRouter(prefix="/user", tags=["user-settings"])
 

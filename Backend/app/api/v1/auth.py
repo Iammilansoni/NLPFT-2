@@ -5,28 +5,37 @@ Authentication API endpoints — HttpOnly cookie-based JWT architecture
 from datetime import timedelta
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Response, Cookie
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi.security import OAuth2PasswordRequestForm
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cookie_config import (
+    ACCESS_TOKEN_COOKIE,
+    REFRESH_TOKEN_COOKIE,
+    clear_auth_cookies,
+    set_auth_cookies,
+)
+from app.core.logger import logger
 from app.core.postgres import get_db
-from app.services.auth_service import get_auth_service, AuthService, ACCESS_TOKEN_EXPIRE_MINUTES
+from app.core.token_denylist import is_token_revoked, revoke_token
+from app.models.database_models import User
 from app.models.schemas.auth_schemas import (
-    UserCreate, UserLogin, UserResponse, Token, ChangePasswordRequest,
-    ForgotPasswordRequest, ResetPasswordRequest, PromoteExpertRequest
+    AuthCookieResponse,
+    ChangePasswordRequest,
+    ForgotPasswordRequest,
+    PromoteExpertRequest,
+    ResetPasswordRequest,
+    Token,
+    UserCreate,
+    UserLogin,
+    UserResponse,
 )
 from app.models.schemas.common_schemas import MessageResponse
-from app.models.database_models import User
-from app.core.logger import logger
 from app.services.audit_service import log_audit_event
-from app.core.cookie_config import (
-    ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE,
-    set_auth_cookies, clear_auth_cookies
-)
-from app.core.token_denylist import revoke_token, is_token_revoked
+from app.services.auth_service import ACCESS_TOKEN_EXPIRE_MINUTES, AuthService, get_auth_service
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
@@ -105,7 +114,7 @@ async def require_admin(
     return current_user
 
 
-@router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=AuthCookieResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
 async def register(
     request: Request,
@@ -159,9 +168,10 @@ async def register(
         )
     
     # Send verification OTP automatically (MANDATORY)
-    from app.services.email_service import get_email_service
+    from datetime import datetime, timedelta, timezone
+
     from app.models.email_verification_models import EmailVerification
-    from datetime import datetime, timezone, timedelta
+    from app.services.email_service import get_email_service
     
     email_service = get_email_service()
     otp = email_service.generate_otp()
@@ -230,14 +240,21 @@ async def login(
     Login (OAuth2 form). Tokens are set as HttpOnly cookies — NOT returned in body.
     Response body contains only non-sensitive user info.
     """
-    user = await auth_service.authenticate_user(
-        db=db, email=form_data.username, password=form_data.password
-    )
+    user = await auth_service.get_user_by_email(db, email=form_data.username)
     if not user:
+        logger.warning(f"Login failed: Email not registered ({form_data.username})")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail="Incorrect email or password",
+                            detail="Email is not registered",
                             headers={"WWW-Authenticate": "Bearer"})
+    
+    if not auth_service.verify_password(form_data.password, user.password):
+        logger.warning(f"Login failed: Incorrect password for {form_data.username}")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Incorrect password",
+                            headers={"WWW-Authenticate": "Bearer"})
+
     if not user.email_verified:
+        logger.warning(f"Login failed: Email not verified ({form_data.username})")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="Email not verified. Please verify your email before logging in.")
 
@@ -266,13 +283,19 @@ async def login_json(
     auth_service: AuthService = Depends(get_auth_service),
 ):
     """Login with JSON body. Tokens set as HttpOnly cookies."""
-    user = await auth_service.authenticate_user(
-        db=db, email=user_data.email, password=user_data.password
-    )
+    user = await auth_service.get_user_by_email(db, email=user_data.email)
     if not user:
+        logger.warning(f"Login failed: Email not registered ({user_data.email})")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail="Incorrect email or password")
+                            detail="Email is not registered")
+    
+    if not auth_service.verify_password(user_data.password, user.password):
+        logger.warning(f"Login failed: Incorrect password for {user_data.email}")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Incorrect password")
+
     if not user.email_verified:
+        logger.warning(f"Login failed: Email not verified ({user_data.email})")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="Email not verified. Please verify your email before logging in.")
 
@@ -434,10 +457,12 @@ async def forgot_password(
     For security, we always return success even if the email doesn't exist.
     """
     import secrets
-    from datetime import datetime, timezone, timedelta
-    from app.services.email_service import get_email_service
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import and_, select
+
     from app.models.password_reset_models import PasswordReset
-    from sqlalchemy import select, and_
+    from app.services.email_service import get_email_service
     
     # Check if user exists (but don't reveal this to the client)
     user = await auth_service.get_user_by_email(db, forgot_data.email)
@@ -538,8 +563,10 @@ async def reset_password(
     - **confirm_password**: Must match new password
     """
     from datetime import datetime, timezone
+
+    from sqlalchemy import and_, select, update
+
     from app.models.password_reset_models import PasswordReset
-    from sqlalchemy import select, update, and_
     
     # Find the reset token
     result = await db.execute(
@@ -623,8 +650,10 @@ async def verify_reset_token(
     Returns token validity status
     """
     from datetime import datetime, timezone
+
+    from sqlalchemy import and_, select
+
     from app.models.password_reset_models import PasswordReset
-    from sqlalchemy import select, and_
     
     result = await db.execute(
         select(PasswordReset).where(

@@ -2,7 +2,8 @@
 Query Schemas - Natural language query processing
 """
 
-from typing import Optional, Dict, List
+from typing import Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 

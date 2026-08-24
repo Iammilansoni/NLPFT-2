@@ -3,18 +3,15 @@ Models API - Model registry endpoints
 Provides access to supported embedding models and LLMs
 """
 
-from typing import Optional, List
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.postgres import get_db
-from app.services.model_service import get_model_service, ModelService
-from app.models.schemas import (
-    ModelResponse,
-    ModelListResponse,
-    ModelConfigResponse
-)
 from app.core.logger import logger
+from app.core.postgres import get_db
+from app.models.schemas import ModelConfigResponse, ModelListResponse, ModelResponse
+from app.services.model_service import ModelService, get_model_service
 
 router = APIRouter(prefix="/models", tags=["models"])
 

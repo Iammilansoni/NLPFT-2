@@ -11,38 +11,54 @@ KEY DESIGN: ONE EMBEDDING MODEL PER DATASET
 """
 
 import os
-import pandas as pd
-from pathlib import Path
-from datetime import datetime, timezone
-from typing import Optional, List, Dict
-from uuid import UUID
-from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException, Depends, status, Query, Request
-from fastapi.responses import FileResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from pydantic import BaseModel, Field
 import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Dict, List, Optional
+from uuid import UUID
 
-from app.core.postgres import get_db
+import pandas as pd
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.v1.auth import get_current_user
 from app.core.config import DATASETS_DIR
 from app.core.logger import logger
-from app.services.audit_service import get_audit_service
-from app.models.database_models import User, UserSettings, Template, Metadata, Parameter, ExpectedResponse, Dataset, CSVData
-from app.nlp.dataset_ingestor import ingest_csv_to_redis
-from app.nlp.dataset_generator import get_enterprise_dataset_generator
-from app.services.dataset_task_manager import get_task_manager
-from app.services.embedding_service import get_enhanced_embedding_service
-from app.core.models_config import (
-    get_all_embedding_models,
-    get_all_llms,
-    EMBEDDING_TOOLTIP
+from app.core.models_config import EMBEDDING_TOOLTIP, get_all_embedding_models, get_all_llms
+from app.core.postgres import get_db
+from app.models.database_models import (
+    CSVData,
+    Dataset,
+    ExpectedResponse,
+    Metadata,
+    Parameter,
+    Template,
+    User,
+    UserSettings,
 )
 from app.models.schemas.embedding_schemas import (
     ReembedDatasetRequest,
     ReembedDatasetResponse,
     SearchDatasetRequest,
 )
+from app.nlp.dataset_generator import get_enterprise_dataset_generator
+from app.nlp.dataset_ingestor import ingest_csv_to_redis
+from app.services.audit_service import get_audit_service
+from app.services.dataset_task_manager import get_task_manager
+from app.services.multi_model_embedding_service import get_multi_model_embedding_service
 
 router = APIRouter(prefix="/datasets", tags=["Datasets"])
 os.makedirs(DATASETS_DIR, exist_ok=True)
@@ -267,37 +283,20 @@ def process_upload_task(task_id: str, file_path: str, user_id: str = None, templ
             # AUTO-EMBED CSV DATASET (Using sync function - no Celery needed)
             # =====================================================================
             if user_id and result["count"] > 0:
-                try:
-                    from app.services.embedding_service import create_embedding_task
-                    
-                    # Use template_id if provided, otherwise generate a unique one for this upload
-                    embed_template_id = template_id or f"upload-{task_id}"
-                    
-                    logger.info(f"Auto-embedding started for uploaded CSV: {file_path}")
-                    
-                    # Run embedding synchronously (within BackgroundTask context)
-                    embedding_result = create_embedding_task(
-                        csv_path=file_path,
-                        user_id=str(user_id),
-                        template_id=str(embed_template_id)
-                    )
-                    
-                    if embedding_result.get("status") == "completed":
-                        logger.info(f"Embedding completed: {embedding_result.get('task_id')}")
-                        task_manager.update_task(
-                            task_id,
-                            embedding_task_id=embedding_result.get("task_id"),
-                            auto_embed_status="completed"
-                        )
-                    else:
-                        logger.warning(f"Embedding failed: {embedding_result.get('message')}")
-                        task_manager.update_task(
-                            task_id,
-                            auto_embed_status="failed",
-                            auto_embed_error=embedding_result.get("message")
-                        )
-                except Exception as embed_error:
-                    logger.warning(f"Auto-embedding for upload failed: {embed_error}")
+                # Auto-embed on upload is not wired up: this code path has no
+                # dataset_id to embed against, so the upload is marked skipped
+                # and the caller embeds explicitly via POST /db/{id}/embed.
+                #
+                # What stood here was a `run_embed()` coroutine that was defined
+                # but never awaited, opened a session it never used, and carried
+                # three contradictory comments reasoning about how to obtain the
+                # dataset_id. It did nothing; this records the same outcome
+                # without implying otherwise.
+                task_manager.update_task(
+                    task_id,
+                    auto_embed_status="skipped",
+                    auto_embed_error="Auto-embed requires dataset_id; embed explicitly."
+                )
         else:
             task_manager.update_task(
                 task_id,
@@ -415,11 +414,10 @@ async def _run_generation_background(
     decoupled from the request lifecycle.
     """
     import asyncio
+
     from app.core.postgres import AsyncSessionLocal
-    from app.nlp.dataset_generator import get_enterprise_dataset_generator
-    from app.services.dataset_task_manager import get_task_manager
-    from app.services.audit_service import get_audit_service
     from app.models.schemas.embedding_schemas import EmbeddingStatus
+    from app.services.dataset_task_manager import get_task_manager
 
     task_manager = get_task_manager()
 
@@ -784,6 +782,7 @@ async def get_task_status(
       FAILURE   → "failed"
     """
     from celery.result import AsyncResult
+
     from app.worker.celery_app import celery_app
 
     async_result = AsyncResult(task_id, app=celery_app)
@@ -868,7 +867,7 @@ async def list_tasks(
     
     Tasks are automatically filtered to include only those created within max_age_hours.
     """
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta, timezone
     
     task_manager = get_task_manager()
     # Get all tasks for this user (enforces multi-tenant isolation)
@@ -1187,8 +1186,8 @@ async def delete_dataset_from_db(
         # 1. Clean up Redis vectors BEFORE deleting from DB
         vectors_deleted = 0
         try:
-            from app.services.multi_model_redis_service import get_multi_model_redis_service
             from app.core.embedding_model_registry import get_embedding_registry
+            from app.services.multi_model_redis_service import get_multi_model_redis_service
             
             redis_service = get_multi_model_redis_service()
             registry = get_embedding_registry()
@@ -1331,7 +1330,6 @@ async def embed_dataset_to_redis(
     
     This ensures vectors are stored in the same location that semantic search looks.
     """
-    from app.services.multi_model_embedding_service import get_multi_model_embedding_service
     
     try:
         embedding_service = get_multi_model_embedding_service()
@@ -1405,8 +1403,9 @@ async def preview_dataset_by_task(
         raise HTTPException(status_code=404, detail="Dataset file not found")
     
     try:
-        import pandas as pd
         import json
+
+        import pandas as pd
         df = pd.read_csv(csv_path)
         
         total = len(df)
@@ -1620,7 +1619,8 @@ async def download_dataset_file(
 @router.get("/embeddings/stats/{template_id}")
 async def get_embedding_statistics(
     template_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Get embedding statistics for a template
@@ -1632,14 +1632,27 @@ async def get_embedding_statistics(
     - HNSW index name
     - Redis namespace
     """
-    from app.services.embedding_service import get_enhanced_embedding_service
     
-    embedding_service = get_enhanced_embedding_service()
-    stats = embedding_service.get_embedding_stats(
-        user_id=current_user.u_id,
-        template_id=UUID(template_id)
+    embedding_service = get_multi_model_embedding_service()
+    
+    # Try to find the dataset for this template
+    dataset_result = await db.execute(
+        select(Dataset).where(
+            Dataset.t_id == UUID(template_id),
+            Dataset.u_id == current_user.u_id
+        )
     )
+    dataset = dataset_result.scalar_one_or_none()
     
+    if dataset:
+        stats = await embedding_service.get_embedding_status(
+            db=db,
+            user_id=current_user.u_id,
+            dataset_id=dataset.dataset_id
+        )
+    else:
+        stats = {"error": "No dataset found for this template"}
+        
     return {
         "template_id": template_id,
         "user_id": str(current_user.u_id),
@@ -1661,10 +1674,6 @@ async def search_similar_test_cases(
     
     NOTE: Use POST /datasets/{dataset_id}/search for model-validated search
     """
-    from app.services.embedding_service import get_enhanced_embedding_service
-    
-    embedding_service = get_enhanced_embedding_service()
-    
     # Get dataset for the template (legacy support)
     dataset_result = await db.execute(
         select(Dataset).where(
@@ -1675,15 +1684,29 @@ async def search_similar_test_cases(
     dataset = dataset_result.scalar_one_or_none()
     
     if dataset:
-        # Use new dataset-based search with model validation
-        results = await embedding_service.search_similar_test_cases(
-            user_id=current_user.u_id,
-            dataset_id=dataset.dataset_id,
-            query=request.query,
-            top_k=request.top_k,
-            db=db
+        # Same dead call as /{dataset_id}/search below: `search_similar_test_cases`
+        # exists on no service. Routed to the semantic service instead.
+        from app.services.multi_model_semantic_service import (
+            get_multi_model_semantic_service,
         )
-        return results
+
+        search = await get_multi_model_semantic_service().semantic_search(
+            db=db,
+            user_id=current_user.u_id,
+            user_query=request.query,
+            top_k=request.top_k,
+            dataset_id=dataset.dataset_id,
+            include_slot_extraction=False,
+        )
+        if not search.get("success"):
+            return search
+        rows = search.get("stage1_vector_search", [])
+        return {
+            "query": request.query,
+            "template_id": request.template_id,
+            "total_results": len(rows),
+            "results": rows,
+        }
     else:
         # Legacy: No dataset found, return empty results
         return {
@@ -1799,7 +1822,7 @@ async def get_user_settings(
     )
     settings = result.scalar_one_or_none()
     
-    from app.core.models_config import DEFAULT_EMBEDDING_MODEL, DEFAULT_DATASET_LLM
+    from app.core.models_config import DEFAULT_DATASET_LLM, DEFAULT_EMBEDDING_MODEL
     
     return {
         "user_id": str(current_user.u_id),
@@ -1944,11 +1967,18 @@ async def get_dataset_embedding_status(
     - Timing info (started_at, estimated_completion)
     - Task ID
     """
-    embedding_service = get_enhanced_embedding_service()
-    return await embedding_service.get_dataset_embedding_status(
+    # get_enhanced_embedding_service came from embedding_service.py, deleted in
+    # the v2 refactor. This endpoint has been raising NameError on every call
+    # since. multi_model_embedding_service carries the surviving implementation.
+    from app.services.multi_model_embedding_service import (
+        get_multi_model_embedding_service,
+    )
+
+    embedding_service = get_multi_model_embedding_service()
+    return await embedding_service.get_embedding_status(
+        db=db,
         user_id=current_user.u_id,
         dataset_id=UUID(dataset_id),
-        db=db
     )
 
 
@@ -1977,14 +2007,22 @@ async def reembed_dataset(
         force: Force re-embed even if already embedded with same model
         chunk_size: Rows per batch (10-500, default 100)
     """
-    embedding_service = get_enhanced_embedding_service()
+    # See note on the embedding-status endpoint above: the enhanced service was
+    # deleted in the v2 refactor and this call has been dead since.
+    # `force` has no counterpart on the surviving implementation, which always
+    # re-embeds when asked, so it is accepted and ignored rather than silently
+    # changing behaviour.
+    from app.services.multi_model_embedding_service import (
+        get_multi_model_embedding_service,
+    )
+
+    embedding_service = get_multi_model_embedding_service()
     result = await embedding_service.reembed_dataset(
+        db=db,
         user_id=current_user.u_id,
         dataset_id=UUID(dataset_id),
-        db=db,
-        new_model=request.model,
-        force=request.force,
-        chunk_size=request.chunk_size
+        new_model_id=request.model,
+        batch_size=request.chunk_size
     )
     
     if not result.get("success"):
@@ -2021,16 +2059,42 @@ async def search_dataset(
         Success: List of similar test cases with similarity scores
         Mismatch: MODEL_MISMATCH error with embedded_model, current_model, actions
     """
-    embedding_service = get_enhanced_embedding_service()
-    result = await embedding_service.search_similar_test_cases(
-        user_id=current_user.u_id,
-        dataset_id=UUID(dataset_id),
-        query=request.query,
-        top_k=request.top_k,
-        db=db,
-        filter_scenario_type=request.filter_scenario_type,
-        filter_test_category=request.filter_test_category
+    # `search_similar_test_cases` never existed on any service - this endpoint
+    # raised NameError on every call. The multi-model semantic service already
+    # implements this exact contract, MODEL_MISMATCH error shape included, so
+    # the endpoint is wired to it rather than deleted.
+    from app.services.multi_model_semantic_service import (
+        get_multi_model_semantic_service,
     )
+
+    semantic_service = get_multi_model_semantic_service()
+    search = await semantic_service.semantic_search(
+        db=db,
+        user_id=current_user.u_id,
+        user_query=request.query,
+        top_k=request.top_k,
+        dataset_id=UUID(dataset_id),
+        include_slot_extraction=False,
+    )
+
+    if not search.get("success"):
+        result = search
+    else:
+        rows = search.get("stage1_vector_search", [])
+        # Post-filter: these are TagField filters in the vector store, but the
+        # rows carry the same fields, so filtering here keeps the endpoint's
+        # documented behaviour without widening the service's signature.
+        if request.filter_scenario_type:
+            rows = [r for r in rows if r.get("scenario_type") == request.filter_scenario_type]
+        if request.filter_test_category:
+            rows = [r for r in rows if r.get("test_category") == request.filter_test_category]
+        result = {
+            "success": True,
+            "results": rows,
+            "count": len(rows),
+            "query": request.query,
+            "embedding_model": search.get("metadata", {}).get("embedding_model"),
+        }
     
     # If result contains an error, return it with appropriate status code
     if "error" in result:

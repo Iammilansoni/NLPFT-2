@@ -7,12 +7,15 @@ login, refresh, logout, and get_current_user.
 
 import os
 
+# Single source of truth for the access-token lifetime (matches the JWT expiry).
+from app.services.auth_service import ACCESS_TOKEN_EXPIRE_MINUTES
+
 # ── Cookie names ──────────────────────────────────────────────────────────────
 ACCESS_TOKEN_COOKIE  = "nlpf_access"
 REFRESH_TOKEN_COOKIE = "nlpf_refresh"
 
 # ── Lifetimes (seconds) ───────────────────────────────────────────────────────
-ACCESS_TOKEN_MAX_AGE  = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")) * 60
+ACCESS_TOKEN_MAX_AGE  = ACCESS_TOKEN_EXPIRE_MINUTES * 60
 REFRESH_TOKEN_MAX_AGE = 60 * 60 * 24 * 7   # 7 days
 
 # ── Security flags ────────────────────────────────────────────────────────────

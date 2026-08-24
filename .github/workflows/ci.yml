@@ -23,7 +23,10 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: pip install -r requirements.txt
-      - run: pip install ruff
+      # PINNED. Unpinned, CI installed whatever ruff released most recently, so
+      # the same source went from passing to 2010 errors without a code change.
+      # Bump this deliberately, with the fixes in the same commit.
+      - run: pip install ruff==0.16.4
       - run: ruff check app/
 
   backend-test:

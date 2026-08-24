@@ -34,7 +34,7 @@ from typing import Any, Dict, Optional
 from celery import Task
 from celery.utils.log import get_task_logger
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.worker.celery_app import celery_app
 
@@ -62,7 +62,12 @@ def _get_sync_db_url() -> str:
     if not async_url:
         # Fall back to building from parts
         user = os.getenv("POSTGRES_USER", "nlpforge")
-        pw = os.getenv("POSTGRES_PASSWORD", "")
+        pw = os.getenv("POSTGRES_PASSWORD")
+        if not pw:
+            raise RuntimeError(
+                "POSTGRES_PASSWORD environment variable is not set. "
+                "It must be explicitly provided to build the worker database URL."
+            )
         host = os.getenv("POSTGRES_HOST", "postgres")
         port = os.getenv("POSTGRES_PORT", "5432")
         db = os.getenv("POSTGRES_DB", "nlpforge")
@@ -267,8 +272,8 @@ async def _run_generation_and_audit_async(
     Called via ONE asyncio.run() in generate_dataset_task to avoid
     creating multiple event loops (and asyncpg pools) per task execution.
     """
-    from app.nlp.dataset_generator import get_enterprise_dataset_generator
     from app.core.postgres import AsyncSessionLocal
+    from app.nlp.dataset_generator import get_enterprise_dataset_generator
     from app.services.audit_service import get_audit_service
 
     task.push_progress(10, "Loading LLM provider configuration...", "load_provider")
@@ -327,9 +332,11 @@ def _store_csv_to_postgresql_sync(
     Returns the new dataset_id UUID.
     """
     import json
-    import pandas as pd
     from datetime import datetime, timezone
-    from app.models.database_models import Dataset, CSVData
+
+    import pandas as pd
+
+    from app.models.database_models import CSVData, Dataset
 
     df = pd.read_csv(csv_path)
     if "query" in df.columns:

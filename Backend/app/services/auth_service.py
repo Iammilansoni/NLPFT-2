@@ -2,21 +2,21 @@
 Authentication Service - User management and JWT tokens
 """
 
+import base64
+import hashlib
+import os
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-import uuid
-import os
-import hashlib
-import base64
 
 import bcrypt
 from jose import JWTError, jwt
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.database_models import User
-from app.core.logger import logger
 from app.core.config import settings
+from app.core.logger import logger
+from app.models.database_models import User
 
 # Configuration - Use the same secret key as the rest of the application
 SECRET_KEY = settings.secret_key

@@ -1,0 +1,54 @@
+#  NLPForge — Fly.io deployment (cloud mode)
+#
+#  Deploy:
+#     fly launch --no-deploy --copy-config     # first time only, claims an app name
+#     fly secrets set ...                      # see DEPLOYMENT.md
+#     fly deploy
+#     fly ssh console -C "python scripts/seed_demo.py"
+#
+#  Sizing note: the image bakes in bge-small (~130MB) and the FlashRank
+#  cross-encoder (~34MB) alongside onnxruntime. 512MB boots but leaves no
+#  headroom; 1GB is the practical floor. See DEPLOYMENT.md.
+
+app = "nlpforge"
+primary_region = "iad"          # change to your nearest region
+
+[build]
+  dockerfile = "Backend/Dockerfile.cloud"
+
+[env]
+  EXECUTION_MODE = "cloud"
+  VECTOR_BACKEND = "pgvector"
+  # Measured -0.083 Hit@1 against bge-small; see evals/README.md finding 2.
+  RERANKER_ENABLED = "false"
+  PORT = "8000"
+  WEB_CONCURRENCY = "1"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+
+  # Scale to zero when idle. This is what keeps a portfolio deploy free, and it
+  # is safe here because the ONNX models are baked into the image rather than
+  # fetched on boot — a cold start is a container start, not a 160MB download.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 20
+    hard_limit = 40
+
+  # Fly's own health check. Independent of the Dockerfile HEALTHCHECK, which
+  # Fly ignores.
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "40s"        # covers alembic upgrade + model warm on boot
+    method = "GET"
+    path = "/api/v1/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

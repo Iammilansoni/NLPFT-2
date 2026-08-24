@@ -14,6 +14,7 @@ Usage from FastAPI (triggering):
 """
 
 import os
+
 from celery import Celery
 
 # ---------------------------------------------------------------------------
@@ -22,7 +23,12 @@ from celery import Celery
 # DB 1 → Celery broker queue
 # DB 2 → Celery task result backend
 # ---------------------------------------------------------------------------
-_redis_password = os.getenv("REDIS_PASSWORD", "nlpforgeRedis2024")
+_redis_password = os.getenv("REDIS_PASSWORD")
+if not _redis_password:
+    raise RuntimeError(
+        "REDIS_PASSWORD environment variable is not set. "
+        "It must be explicitly provided to start the Celery application."
+    )
 _redis_host = os.getenv("REDIS_HOST", "redis")
 _redis_port = os.getenv("REDIS_PORT", "6379")
 

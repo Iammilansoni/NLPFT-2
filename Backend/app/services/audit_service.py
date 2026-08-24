@@ -5,9 +5,9 @@ Logs security-relevant events (login, password change, role changes, key rotatio
 to both the application logger and the database AuditLog table.
 """
 
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
-import uuid
 
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession

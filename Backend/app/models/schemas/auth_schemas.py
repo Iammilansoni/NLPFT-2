@@ -5,6 +5,7 @@ Matches: users table
 
 from datetime import datetime
 from typing import Optional
+
 from pydantic import BaseModel, EmailStr, Field, validator
 
 
@@ -84,6 +85,11 @@ class Token(BaseModel):
     access_token: str
     refresh_token: Optional[str] = None
     token_type: str = "bearer"
+    user: UserResponse
+
+
+class AuthCookieResponse(BaseModel):
+    """Response for cookie-based auth: tokens are in HttpOnly cookies, body has user only."""
     user: UserResponse
 
 

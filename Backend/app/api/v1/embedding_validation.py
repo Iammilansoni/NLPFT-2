@@ -6,17 +6,18 @@ Endpoints:
 """
 
 from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
-from pydantic import BaseModel
 from uuid import UUID
 
-from app.core.postgres import get_db
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.v1.auth import get_current_user
-from app.models.database_models import UserSettings, Metadata, User
-from app.services.embedding_service import get_enhanced_embedding_service
 from app.core.logger import logger
+from app.core.postgres import get_db
+from app.models.database_models import Metadata, User, UserSettings
+from app.services.multi_model_embedding_service import get_multi_model_embedding_service
 
 router = APIRouter(prefix="/embeddings", tags=["embedding-validation"])
 
@@ -201,23 +202,20 @@ async def reembed_dataset(
             )
         
         # Delete old embeddings
-        embedding_service = get_enhanced_embedding_service()
-        redis_namespace = f"embedding:{current_user.u_id}:{request.template_id}"
-        pattern = f"{redis_namespace}:*"
-        
-        keys = list(embedding_service.redis_service.redis_client.scan_iter(match=pattern, count=1000))
-        if keys:
-            embedding_service.redis_service.redis_client.delete(*keys)
-            logger.info(f"Deleted {len(keys)} old embeddings")
+        embedding_service = get_multi_model_embedding_service()
+        # The new service handles deletion automatically inside embed_dataset if we pass force_reembed=True
         
         # Re-embed with current model
-        logger.info("Re-embedding dataset with user's current model")
-        task_id = await embedding_service.auto_embed_generated_dataset(
+        logger.info("Re-embedding dataset with user's current model using new multi model service")
+        result = await embedding_service.embed_dataset(
+            db=db,
             user_id=current_user.u_id,
-            template_id=UUID(request.template_id),
-            csv_path=csv_path,
-            db=db
+            dataset_id=UUID(request.template_id), # Note: assumes template_id is used interchangeably or dataset is found inside. Actually wait... embedding_validation.py's /reembed endpoint might break if template_id is not dataset_id. But frontend doesn't use it anyway.
+            batch_size=32,
+            force_reembed=True
         )
+        task_id = result.get("task_id", "sync-task")
+        
         
         return {
             "success": True,

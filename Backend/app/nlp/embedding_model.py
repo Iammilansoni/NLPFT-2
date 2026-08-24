@@ -7,6 +7,7 @@ No HuggingFace/SentenceTransformers dependency - uses HTTP API instead
 
 import asyncio
 from typing import List, Optional
+
 from app.core.logger import logger
 
 # Default Ollama embedding model

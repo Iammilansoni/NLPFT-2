@@ -2,14 +2,15 @@
 Model Service - Model registry management and queries
 """
 
-from typing import List, Optional, Dict, Any
 import json
 from pathlib import Path
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from typing import Any, Dict, List, Optional
 
-from app.models.database_models import Model
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.logger import logger
+from app.models.database_models import Model
 
 
 class ModelService:

@@ -3,17 +3,17 @@ Admin API endpoints - System administration operations
 Requires expert (admin) privileges.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.postgres import get_db
 from app.api.v1.auth import get_current_user, require_admin
-from app.models.database_models import User, LLMProviderConfig
-from app.core.encryption import get_encryption_service, APIKeyEncryption
+from app.core.encryption import APIKeyEncryption, get_encryption_service
 from app.core.logger import logger
+from app.core.postgres import get_db
+from app.models.database_models import LLMProviderConfig, User
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -28,7 +28,7 @@ class RotateKeyRequest(BaseModel):
     Generate a key with:
         python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     """
-    new_key: str = Field(..., min_length=32, description="New Fernet key (generated locally)")
+    new_key: str = Field(..., min_length=44, max_length=44, description="New Fernet key (generated locally)")
 
 
 @router.post("/rotate-encryption-key")

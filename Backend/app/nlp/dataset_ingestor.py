@@ -3,11 +3,13 @@ Dataset Ingestor - Ingests CSV datasets into Redis vector database
 Supports both old format (api column) and new format (intent column)
 """
 
-import pandas as pd
 import json
 from typing import Dict, List
-from app.nlp.embedding_manager import get_embedding_manager
+
+import pandas as pd
+
 from app.core.logger import logger
+from app.nlp.embedding_manager import get_embedding_manager
 
 
 def ingest_csv_to_redis(csv_path: str, clear_existing: bool = False) -> Dict:

@@ -7,22 +7,27 @@ Endpoints:
 - POST /api/v1/auth/resend-otp - Resend OTP
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
-from pydantic import BaseModel, EmailStr
-from datetime import datetime, timezone, timedelta
+import os
+from datetime import datetime, timedelta, timezone
 
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, EmailStr
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.logger import logger
 from app.core.postgres import get_db
 from app.models.database_models import User
 from app.models.email_verification_models import EmailVerification
-from app.services.email_service import get_email_service, EmailService
-from app.core.logger import logger
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+from app.services.email_service import EmailService, get_email_service
 
 router = APIRouter(prefix="/auth", tags=["email-verification"])
 limiter = Limiter(key_func=get_remote_address)
+
+# Dev-only endpoints are hidden from the OpenAPI schema in production
+_DEV_MODE = os.getenv("ENVIRONMENT", "development").lower() != "production"
 
 
 # --- Schemas ---
@@ -387,7 +392,7 @@ async def check_verification_status(
 # DEV-ONLY ENDPOINTS — Blocked in production (ENVIRONMENT=production)
 # =============================================================================
 
-@router.get("/dev/otp/{email}", include_in_schema=True)
+@router.get("/dev/otp/{email}", include_in_schema=_DEV_MODE)
 async def dev_get_otp(
     email: str,
     db: AsyncSession = Depends(get_db)
@@ -436,7 +441,7 @@ async def dev_get_otp(
     }
 
 
-@router.post("/dev/verify-direct", include_in_schema=True)
+@router.post("/dev/verify-direct", include_in_schema=_DEV_MODE)
 async def dev_verify_direct(
     request_data: SendOTPRequest,
     db: AsyncSession = Depends(get_db)
