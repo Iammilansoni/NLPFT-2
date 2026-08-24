@@ -6,12 +6,12 @@ Stage 1 recall@25: **1.000**
 
 | Strategy | Hit@1 | Hit@3 | MRR@5 | p50 | p95 |
 |---|---|---|---|---|---|
-| `stage1_only` | 0.822 | 0.983 | 0.896 | 174.9ms | 296.4ms |
+| `stage1_only` | 0.822 | 0.983 | 0.896 | 167.4ms | 262.7ms |
 | `bm25_only` | 0.600 | 0.861 | 0.727 | 0.2ms | 0.4ms |
-| `v1_heuristic` | 0.589 | 0.828 | 0.705 | 174.9ms | 296.4ms |
-| `hybrid_rrf` | 0.806 | 0.956 | 0.880 | 158.2ms | 241.5ms |
-| `v2_cross_encoder` | 0.739 | 0.944 | 0.836 | 327.0ms | 616.3ms |
-| `hybrid_rrf_cross_encoder` | 0.733 | 0.917 | 0.830 | 293.7ms | 604.0ms |
+| `v1_heuristic` | 0.589 | 0.828 | 0.705 | 167.4ms | 262.7ms |
+| `hybrid_rrf` | 0.806 | 0.956 | 0.880 | 147.8ms | 222.4ms |
+| `v2_cross_encoder` | 0.739 | 0.944 | 0.836 | 320.9ms | 589.6ms |
+| `hybrid_rrf_cross_encoder` | 0.733 | 0.917 | 0.830 | 273.4ms | 550.3ms |
 
 **Hit@1 by difficulty tier**
 

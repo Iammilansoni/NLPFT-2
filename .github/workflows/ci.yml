@@ -59,12 +59,25 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - run: pip install numpy flashrank
+      - run: pip install numpy flashrank fastembed
       - name: Run routing benchmark
         # Gates merges on routing quality, not just on tests passing.
-        # Threshold sits just under the current measured 0.728 so genuine
-        # regressions fail while normal variance does not.
-        run: python evals/run_eval.py --fail-under 0.70 --markdown "$GITHUB_STEP_SUMMARY"
+        #
+        # Runs the PRODUCTION embedder (bge-small-en-v1.5), not the tfidf CI
+        # baseline. That distinction turned out to matter enormously: measured
+        # against tfidf the cross-encoder looked like a +0.111 win, and against
+        # bge-small it is a -0.083 regression. Gating on the wrong embedder
+        # would have locked in the wrong conclusion.
+        #
+        # Gates on stage1_only because that is the shipped configuration
+        # (RERANKER_ENABLED defaults to false). Threshold sits below the
+        # measured 0.822 to catch genuine regressions without failing on noise.
+        run: >
+          python evals/run_eval.py
+          --embedder onnx
+          --gate-strategy stage1_only
+          --fail-under 0.78
+          --markdown "$GITHUB_STEP_SUMMARY"
 
   frontend-build:
     name: Frontend Build

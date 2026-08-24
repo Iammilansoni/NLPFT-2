@@ -62,6 +62,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "Backend"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+# The harness MEASURES the reranker, so it forces it on regardless of the
+# shipped default (which is now off - see cross_encoder_reranker.py). This must
+# happen before the app import, since the module reads the flag at import time.
+os.environ.setdefault("RERANKER_ENABLED", "true")
+
 from api_surface import API_TEMPLATES, TEMPLATES_BY_NAME, cluster_of  # noqa: E402
 from benchmark_queries import TIERS, load_benchmark  # noqa: E402
 
@@ -73,6 +78,8 @@ from app.nlp.cross_encoder_reranker import (  # noqa: E402
     STAGE1_TOP_K as _PROD_STAGE1_K,
     STAGE2_TOP_K as _PROD_STAGE2_K,
 )
+from app.nlp.fusion import fuse_result_rows  # noqa: E402
+from app.nlp.lexical_bm25 import BM25Index  # noqa: E402
 
 STAGE1_K = int(os.getenv("EVAL_STAGE1_K", str(_PROD_STAGE1_K)))
 STAGE2_K = int(os.getenv("EVAL_STAGE2_K", str(_PROD_STAGE2_K)))
@@ -191,12 +198,17 @@ def build_embedder(kind: str, model: str) -> Embedder:
 # ===========================================================================
 
 class UtteranceIndex:
-    """Flat exact-cosine index over every template utterance."""
+    """
+    Flat exact-cosine index over every template utterance, plus a parallel BM25
+    index over the same rows so hybrid fusion can be measured against the
+    identical corpus.
+    """
 
     def __init__(self, embedder: Embedder):
         self.embedder = embedder
         self.rows: List[Dict[str, Any]] = []
         self.matrix: Optional[np.ndarray] = None
+        self.bm25: Optional[BM25Index] = None
 
     def build(self) -> None:
         for tpl in API_TEMPLATES:
@@ -212,10 +224,16 @@ class UtteranceIndex:
                         "confidence_score": 0.7,   # v1 default (see audit gap 1)
                     }
                 )
+        # Every row carries a stable id so the two retrievers' outputs can be
+        # fused by identity rather than by position.
+        for i, row in enumerate(self.rows):
+            row["row_key"] = f"r{i}"
+
         corpus = [r["query"] for r in self.rows]
         if isinstance(self.embedder, TfidfEmbedder):
             self.embedder.fit(corpus)
         self.matrix = self.embedder.encode(corpus)
+        self.bm25 = BM25Index().build(corpus)
 
     def search(self, query: str, top_k: int = STAGE1_K) -> Tuple[List[Dict[str, Any]], float]:
         assert self.matrix is not None
@@ -232,18 +250,87 @@ class UtteranceIndex:
             out.append(row)
         return out, (time.perf_counter() - t0) * 1000.0
 
+    def search_lexical(
+        self, query: str, top_k: int = STAGE1_K
+    ) -> Tuple[List[Dict[str, Any]], float]:
+        """BM25 arm. Returns the same row shape as `search` for uniform fusion."""
+        assert self.bm25 is not None
+        t0 = time.perf_counter()
+        hits = self.bm25.search(query, top_k=top_k)
+        out = []
+        for i, score in hits:
+            row = dict(self.rows[i])
+            row["bm25_score"] = score
+            # Fusion is rank-based, but downstream aggregation reads `similarity`.
+            # Rows found only by BM25 have no cosine, so seed it at 0.0 rather
+            # than inventing a comparable value.
+            row.setdefault("similarity", 0.0)
+            out.append(row)
+        return out, (time.perf_counter() - t0) * 1000.0
+
+    def search_hybrid(
+        self, query: str, top_k: int = STAGE1_K
+    ) -> Tuple[List[Dict[str, Any]], float]:
+        """
+        Dense + lexical, fused by RRF.
+
+        Both arms retrieve top_k independently, so the fused pool is up to 2*top_k
+        wide before truncation. That is the point: fusion can only promote a
+        document that at least one arm surfaced.
+        """
+        t0 = time.perf_counter()
+        vec_rows, _ = self.search(query, top_k=top_k)
+        lex_rows, _ = self.search_lexical(query, top_k=top_k)
+
+        # Carry the real cosine onto rows that both arms found, so the vector
+        # score is not lost when a row arrives via the lexical list.
+        cosine_by_key = {r["row_key"]: r["similarity"] for r in vec_rows}
+        for r in lex_rows:
+            if r["row_key"] in cosine_by_key:
+                r["similarity"] = cosine_by_key[r["row_key"]]
+
+        fused = fuse_result_rows(
+            vector_rows=vec_rows,
+            lexical_rows=lex_rows,
+            id_key="row_key",
+            top_k=top_k,
+        )
+        return fused, (time.perf_counter() - t0) * 1000.0
+
 
 # ===========================================================================
 # Ranking strategies
 # ===========================================================================
 
-def rank_stage1_only(rows: Sequence[Dict[str, Any]]) -> List[str]:
-    """Vector similarity, max-pooled per template."""
+def rank_by_score(rows: Sequence[Dict[str, Any]], score_key: str) -> List[str]:
+    """Max-pool `score_key` per template and rank descending."""
     best: Dict[str, float] = {}
     for r in rows:
         t = r["t_id"]
-        best[t] = max(best.get(t, -1.0), r["similarity"])
+        best[t] = max(best.get(t, -1e9), float(r.get(score_key, 0.0)))
     return [t for t, _ in sorted(best.items(), key=lambda kv: -kv[1])]
+
+
+def rank_stage1_only(rows: Sequence[Dict[str, Any]]) -> List[str]:
+    """Vector similarity, max-pooled per template."""
+    return rank_by_score(rows, "similarity")
+
+
+def rank_bm25_only(rows: Sequence[Dict[str, Any]]) -> List[str]:
+    """BM25 score, max-pooled per template."""
+    return rank_by_score(rows, "bm25_score")
+
+
+def rank_rrf(rows: Sequence[Dict[str, Any]]) -> List[str]:
+    """
+    Fused rank, max-pooled per template.
+
+    Rows arrive already carrying `rrf_score` from fuse_result_rows. Max-pooling
+    matches the aggregation the production reranker uses, so the comparison
+    isolates the retrieval change rather than confounding it with an
+    aggregation change.
+    """
+    return rank_by_score(rows, "rrf_score")
 
 
 _ACTION_KEYWORDS = (
@@ -375,24 +462,41 @@ async def run(args: argparse.Namespace) -> int:
 
     records: List[Dict[str, Any]] = []
     stage1_recall_hits = 0
+    hybrid_recall_hits = 0
     degraded_count = 0
 
     for n, case in enumerate(cases, start=1):
         query, expected, tier = case["query"], case["expected_api"], case["tier"]
         rows, s1_ms = index.search(query, top_k=STAGE1_K)
+        lex_rows, lex_ms = index.search_lexical(query, top_k=STAGE1_K)
+        hyb_rows, hyb_ms = index.search_hybrid(query, top_k=STAGE1_K)
 
-        # Stage 1 recall ceiling: can Stage 2 possibly succeed?
+        # Recall ceilings: what each Stage 1 hands to Stage 2. If hybrid recall
+        # exceeds dense recall, fusion has surfaced templates dense retrieval
+        # never had - a gain no reranker could have produced.
         if expected in {r["t_id"] for r in rows}:
             stage1_recall_hits += 1
+        if expected in {r["t_id"] for r in hyb_rows}:
+            hybrid_recall_hits += 1
 
         variants: List[Tuple[str, List[str], float, bool]] = [
             ("stage1_only", rank_stage1_only(rows), s1_ms, False),
             ("v1_heuristic", rank_v1_heuristic(query, rows), s1_ms, False),
+            ("bm25_only", rank_bm25_only(lex_rows), lex_ms, False),
+            ("hybrid_rrf", rank_rrf(hyb_rows), hyb_ms, False),
         ]
         ce_ranked, ce_ms, degraded = await rank_cross_encoder(reranker, query, rows)
         if degraded:
             degraded_count += 1
         variants.append(("v2_cross_encoder", ce_ranked, s1_ms + ce_ms, degraded))
+
+        # The candidate: fuse first, then cross-encode the fused pool.
+        hce_ranked, hce_ms, hce_degraded = await rank_cross_encoder(
+            reranker, query, hyb_rows
+        )
+        variants.append(
+            ("hybrid_rrf_cross_encoder", hce_ranked, hyb_ms + hce_ms, hce_degraded)
+        )
 
         for strategy, ranked, latency, deg in variants:
             records.append(
@@ -416,11 +520,19 @@ async def run(args: argparse.Namespace) -> int:
         if n % 30 == 0:
             print(f"  ...{n}/{len(cases)}")
 
-    strategies = ["stage1_only", "v1_heuristic", "v2_cross_encoder"]
+    strategies = [
+        "stage1_only",
+        "bm25_only",
+        "v1_heuristic",
+        "hybrid_rrf",
+        "v2_cross_encoder",
+        "hybrid_rrf_cross_encoder",
+    ]
     summaries = {s: summarise(records, s) for s in strategies}
     recall_at_k = stage1_recall_hits / len(cases)
+    hybrid_recall = hybrid_recall_hits / len(cases)
 
-    _print_report(summaries, recall_at_k, degraded_count, len(cases))
+    _print_report(summaries, recall_at_k, hybrid_recall, degraded_count, len(cases))
 
     outdir = Path(args.outdir)
     outdir.mkdir(parents=True, exist_ok=True)
@@ -430,7 +542,8 @@ async def run(args: argparse.Namespace) -> int:
                 "embedder": embedder.name,
                 "reranker": reranker.model_name if ce_ready else None,
                 "cases": len(cases),
-                f"stage1_recall@{STAGE1_K}": recall_at_k,
+                f"dense_recall@{STAGE1_K}": recall_at_k,
+                f"hybrid_recall@{STAGE1_K}": hybrid_recall,
                 "summaries": summaries,
             },
             indent=2,
@@ -449,11 +562,15 @@ async def run(args: argparse.Namespace) -> int:
         print(f"  wrote {args.markdown}")
 
     if args.fail_under is not None:
-        got = summaries["v2_cross_encoder"]["overall"]["hit@1"]
-        if got < args.fail_under:
-            print(f"\n  FAIL: Hit@1 {got:.3f} < threshold {args.fail_under:.3f}")
+        gate = args.gate_strategy
+        if gate not in summaries or not summaries[gate]:
+            print(f"\n  FAIL: unknown --gate-strategy {gate!r}")
             return 1
-        print(f"\n  PASS: Hit@1 {got:.3f} >= threshold {args.fail_under:.3f}")
+        got = summaries[gate]["overall"]["hit@1"]
+        if got < args.fail_under:
+            print(f"\n  FAIL: {gate} Hit@1 {got:.3f} < threshold {args.fail_under:.3f}")
+            return 1
+        print(f"\n  PASS: {gate} Hit@1 {got:.3f} >= threshold {args.fail_under:.3f}")
     return 0
 
 
@@ -467,11 +584,17 @@ def _fmt_row(label: str, m: Dict[str, float]) -> str:
 
 
 def _print_report(
-    summaries: Dict[str, Dict[str, Any]], recall: float, degraded: int, total: int
+    summaries: Dict[str, Dict[str, Any]],
+    recall: float,
+    hybrid_recall: float,
+    degraded: int,
+    total: int,
 ) -> None:
     print(f"\n{'=' * 74}\n RESULTS\n{'=' * 74}")
     print(f"\n  Stage 1 recall@{STAGE1_K}: {recall:.3f}  "
           f"<- the ceiling Stage 2 can never exceed")
+    print(f"  hybrid recall@{STAGE1_K}: {hybrid_recall:.3f}  "
+          f"({hybrid_recall - recall:+.3f} from adding the lexical arm)")
     if degraded:
         print(f"  WARNING: {degraded}/{total} queries ran DEGRADED "
               f"(cross-encoder unavailable) — v2 numbers are not meaningful.")
@@ -543,7 +666,10 @@ def main() -> int:
     p.add_argument("--model", default="nomic-embed-text", help="ollama model name")
     p.add_argument("--outdir", default=str(Path(__file__).parent / "results"))
     p.add_argument("--markdown", help="write a README-ready markdown table here")
-    p.add_argument("--fail-under", type=float, help="exit 1 if v2 Hit@1 below this")
+    p.add_argument("--fail-under", type=float,
+                   help="exit 1 if the gated strategy Hit@1 falls below this")
+    p.add_argument("--gate-strategy", default="stage1_only",
+                   help="which strategy --fail-under gates on; defaults to the shipped config (dense-only, reranker off)")
     args = p.parse_args()
     return asyncio.run(run(args))
 

@@ -31,7 +31,7 @@ structured, executable output:
   "authenticate with email dana@shop.io and password Passw0rd"
                             │
      Stage 1  RECALL     ───┤  bi-encoder → pgvector HNSW, k=25
-     Stage 2  PRECISION  ───┤  cross-encoder rerank → top template
+     Stage 2  RANKING    ───┤  max-pool rows → top template
      Stage 3  EXTRACTION ───┤  schema-constrained decode → Pydantic validate
                             ▼
   {
@@ -59,54 +59,76 @@ instead.
 
 Accuracy is measured, not asserted. `evals/` holds **180 held-out queries** over
 **20 API templates** in four difficulty tiers. It needs no PostgreSQL, Redis or
-Ollama, so it runs in CI on every push.
+Ollama, so it runs in CI on every push and gates merges.
 
 ```bash
-python evals/run_eval.py --fail-under 0.70
+python evals/run_eval.py --embedder onnx          # the numbers below
+python evals/run_eval.py                          # tfidf smoke mode, no downloads
 ```
 
-`embedder tfidf-char3` · `reranker ms-marco-MiniLM-L-12-v2` · `STAGE1_TOP_K=25`
-· Stage 1 recall@25 **0.978**
+`embedder bge-small-en-v1.5` · `STAGE1_TOP_K=25` · dense recall@25 **1.000**
 
-| Strategy | Hit@1 | Hit@3 | MRR@5 | p50 | p95 |
-|---|---|---|---|---|---|
-| `stage1_only` — vector similarity only | 0.617 | 0.861 | 0.740 | 0.3ms | 0.4ms |
-| `v1_heuristic` — what v1 shipped | 0.444 | 0.717 | 0.581 | 0.3ms | 0.4ms |
-| **`v2_cross_encoder`** — current | **0.728** | **0.906** | **0.823** | 122ms | 176ms |
-
-Accuracy figures are deterministic and reproduce exactly. Latency is CPU-bound
-and machine-dependent — 120–265ms p50 observed across runs on a laptop.
+| Strategy | Hit@1 | Hit@3 | MRR@5 | Ships? |
+|---|---|---|---|---|
+| **`stage1_only`** — dense vector only | **0.822** | **0.983** | **0.896** | ✅ **default** |
+| `hybrid_rrf` — dense + BM25 fused | 0.806 | 0.956 | 0.880 | available |
+| `v2_cross_encoder` — + cross-encoder | 0.739 | 0.944 | 0.836 | off by default |
+| `bm25_only` — lexical only | 0.600 | 0.861 | 0.727 | — |
+| `v1_heuristic` — what v1 shipped | 0.589 | 0.850 | 0.712 | removed |
 
 **Hit@1 by difficulty tier**
 
 | Strategy | direct | paraphrase | colloquial | hard_negative |
 |---|---|---|---|---|
-| `stage1_only` | 0.950 | 0.400 | 0.825 | 0.400 |
-| `v1_heuristic` | 0.700 | 0.300 | 0.575 | 0.275 |
-| `v2_cross_encoder` | 0.950 | **0.650** | 0.825 | **0.525** |
+| `stage1_only` | 0.950 | **0.900** | 0.800 | 0.600 |
+| `hybrid_rrf` | **1.000** | 0.717 | **0.900** | **0.650** |
+| `v2_cross_encoder` | 0.975 | 0.683 | 0.800 | 0.525 |
+
+Accuracy is deterministic and reproduces exactly. Latency: dense retrieval is
+sub-millisecond; the cross-encoder adds 120–265ms p50 on CPU.
 
 ### What the benchmark found
 
-**v1's reranker was actively harmful.** It scored **0.444 against a 0.617
-baseline** — 17 points *worse* than doing nothing. It computed
+**v1's reranker was actively harmful.** It scored **0.589 against a 0.822
+baseline** — 23 points *worse* than doing nothing. It computed
 `0.7·avg_similarity + 0.15·avg_confidence + 0.15·intent_alignment`, where
 `avg_similarity` was Stage 1's own cosine score. It could only re-sort Stage 1's
 ordering, and the `intent_alignment` term (keyword substring matching, where
 `"please"` implied `action`) injected noise uncorrelated with relevance.
-Deleting it outright would have improved routing.
 
-**Every routing error is a precision failure.** Stage 1 recall@50 is **1.000** —
-the correct template is *always* retrieved. That is what justifies spending
-latency on reranking rather than on better recall.
+**The cross-encoder was also a regression — and finding that required fixing the
+benchmark first.** Measured against a char-trigram TF-IDF baseline it looked like
+a clear +0.111 Hit@1 win, and it shipped on that basis. Re-measured against the
+actual production embedder it is **−0.083** (0.822 → 0.739), losing at every
+retrieval depth:
 
-**Deeper retrieval is not better.** k=50 has perfect recall and *worse* Hit@1
-(0.717) than k=25 (0.728), at double the latency. More marginal candidates give
-the cross-encoder more chances to be confidently wrong. Recall is the ceiling,
-not the objective.
+| `STAGE1_TOP_K` | dense only | + cross-encoder |
+|---|---|---|
+| 5 | 0.822 | 0.756 |
+| 10 | 0.822 | 0.750 |
+| 25 | 0.822 | 0.739 |
 
-**The 4MB reranker is not a substitute.** `ms-marco-TinyBERT-L-2-v2` is 6×
-faster and scores 0.400 on hard negatives — identical to no reranking at all. It
-reorders easy queries and cannot discriminate sibling endpoints.
+Not a tuning problem. `ms-marco-MiniLM` is trained on web-search queries against
+prose passages; this corpus is short imperative commands matched against short
+utterances, which is off-distribution for it. `bge-small` is trained for exactly
+that shape and wins outright. **The earlier gain was an artefact of a weak
+baseline** — TF-IDF left room to recover; a good embedder leaves none.
+
+`RERANKER_ENABLED` therefore defaults to `false`. The code, the benchmark arm and
+the measurement all remain, so the decision is re-checkable against any new
+embedder rather than inherited on faith.
+
+**Hybrid retrieval wins the hardest tier but not overall.** BM25 fused by
+Reciprocal Rank Fusion takes hard negatives from 0.600 → **0.650** and direct
+queries to a perfect 1.000, at sub-millisecond cost — but costs 0.822 → 0.806
+overall, because it dilutes the paraphrase tier where dense retrieval is strongest
+(0.900 → 0.717). On n=180 that overall delta is within noise. Shipped as
+available, not as default, on the principle that an unproven gain does not become
+a default.
+
+**Every routing error is a precision failure.** Dense recall@25 is **1.000** —
+the correct template is always retrieved. No amount of recall tuning can help;
+all remaining headroom is in ranking.
 
 Full methodology, tier definitions and caveats: **[`evals/README.md`](evals/README.md)**
 
@@ -125,10 +147,12 @@ Full methodology, tier definitions and caveats: **[`evals/README.md`](evals/READ
                     │ RLS + hnsw.iterative_scan               │
                     └────────────────┬────────────────────────┘
                     ┌────────────────▼────────────────────────┐
-                    │ Stage 2 · PRECISION       k=5           │
-                    │ FlashRank ms-marco-MiniLM-L-12-v2       │
-                    │ cross-encode(query, utterance)          │
-                    │ → aggregate to template by MAX          │
+                    │ Stage 2 · RANKING                       │
+                    │ max-pool utterance rows → template      │
+                    │                                         │
+                    │ optional, OFF by default, measured:     │
+                    │   · BM25 + RRF fusion   (hybrid)        │
+                    │   · FlashRank cross-encoder  (−0.083)   │
                     └────────────────┬────────────────────────┘
                     ┌────────────────▼────────────────────────┐
                     │ Stage 3 · EXTRACTION                    │
@@ -140,15 +164,18 @@ Full methodology, tier definitions and caveats: **[`evals/README.md`](evals/READ
 
 ### Design decisions worth explaining
 
-**Cross-encode utterances, not template descriptions.** Templates carry 500+ word
-descriptions that exceed the 512-token window and sit off the distribution
-`ms-marco` was trained on. Retrieved rows carry short natural-language text —
-exactly the passage shape the model expects.
-
 **Aggregate rows→template by MAX, not mean.** A template with one perfect match
 among ten mediocre ones is a better route than one with eleven lukewarm matches.
-Mean-pooling (v1's behaviour) ranks it lower. This was a larger accuracy lever
-than the cross-encoder itself.
+Mean-pooling (v1's behaviour) ranks it lower. This turned out to be a larger
+accuracy lever than the cross-encoder — which was negative.
+
+**Optional ranking stages stay in the tree, switched off.** The cross-encoder and
+the BM25/RRF hybrid are both fully implemented, both wired into the benchmark as
+comparison arms, and both default to off because measurement said so. Deleting
+them would discard the ability to re-check that decision when the embedder
+changes; enabling them by default would repeat the mistake of shipping an
+unmeasured assumption. `RERANKER_ENABLED=true` and `VECTOR_BACKEND` make either
+one a config change, not a code change.
 
 **Tenant isolation is enforced by PostgreSQL, not by application code.** v1 relied
 on 32+ hand-written `u_id ==` filters across the routers; one omission is a
@@ -256,20 +283,23 @@ the delta is the point of the rewrite.
 Stated plainly, because the previous README's central claim did not survive
 contact with its own code.
 
-- **Benchmark numbers are TF-IDF character-trigram**, the zero-dependency CI
-  baseline. Absolute values shift under `--embedder onnx`. The *relative ordering*
-  of the three strategies is the finding; the absolute Hit@1 is not a production
-  figure.
-- **20 templates is a small catalogue.** Hit@1 will fall as it grows. Re-run
-  before quoting numbers at a different scale.
-- **Reranking dominates latency** — 120–265ms p50 on CPU, unbatched, on a laptop,
-  against sub-millisecond vector search. This is the strongest argument for the
-  Stage 0 cache, and the main reason cloud mode is worth its complexity.
-- **Hit@1 on hard negatives is 0.525.** Better than the 0.400 baseline, not
-  solved. Sibling endpoints that differ by *authentication state* rather than
-  vocabulary remain the dominant error class.
-- **Hybrid lexical + vector retrieval with RRF is designed but not built.** It is
-  the next accuracy lever, and the eval harness is in place to measure it.
+- **Benchmark conclusions are embedder-specific.** The cross-encoder result
+  reversed sign between two embedders. Any claim here holds for
+  `bge-small-en-v1.5` and must be re-measured for another. `--embedder tfidf`
+  remains as a zero-dependency smoke mode; its *absolute* numbers are not
+  production figures.
+- **20 templates is a small catalogue**, and n=180 makes deltas under ~0.03
+  indistinguishable from noise — which is why the hybrid arm is not shipped as
+  default. Hit@1 will fall as the catalogue grows. Re-run before quoting numbers
+  at a different scale.
+- **Hit@1 on hard negatives is 0.600** (0.650 with hybrid). Sibling endpoints
+  that differ by *authentication state* rather than vocabulary — reset-request vs
+  reset-confirm vs change-password — remain the dominant error class, and no
+  ranking strategy tested here solves them.
+- **A reranker trained on this distribution has not been tried.** The failure of
+  `ms-marco` is a domain-mismatch result, not evidence that reranking cannot
+  help. Fine-tuning a cross-encoder on the generated dataset is the obvious next
+  experiment, and the harness will measure it.
 - **The frontend is functional, not polished.** Effort went to the retrieval
   pipeline and the data layer.
 

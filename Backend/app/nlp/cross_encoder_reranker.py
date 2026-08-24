@@ -69,7 +69,31 @@ from app.core.logger import logger
 # cold-start-sensitive cloud deploys and justify the swap with eval numbers.
 RERANKER_MODEL = os.getenv("RERANKER_MODEL", "ms-marco-MiniLM-L-12-v2")
 RERANKER_CACHE_DIR = os.getenv("RERANKER_CACHE_DIR", "/opt/models/flashrank")
-RERANKER_ENABLED = os.getenv("RERANKER_ENABLED", "true").lower() in ("1", "true", "yes")
+
+# DEFAULT OFF. This reverses the Phase 1 default, on evidence.
+#
+# Phase 1 measured the cross-encoder against a char-trigram TF-IDF baseline and
+# recorded +0.111 Hit@1. That gain did not survive contact with a real semantic
+# embedder. Re-measured on bge-small-en-v1.5 (evals/run_eval.py --embedder onnx,
+# 180 held-out queries):
+#
+#     strategy                        Hit@1    hard_negative
+#     dense only (bge-small)          0.822    0.600
+#     dense + cross-encoder           0.739    0.525      <- WORSE
+#
+# It loses at every retrieval depth (k=5 0.756, k=10 0.750, k=25 0.739), so it
+# is not a k-tuning problem.
+#
+# Why: ms-marco-MiniLM is trained on MS MARCO - web-search queries against prose
+# passages. This corpus is short imperative commands matched against short
+# utterances ("cancel order 8820"), which is off-distribution for it. bge-small
+# is trained for exactly that shape, and already wins outright.
+#
+# The Phase 1 result was an artefact of a weak baseline: TF-IDF left room the
+# cross-encoder could recover. A good embedder leaves none.
+#
+# Turn it on only for an embedder you have re-measured it against.
+RERANKER_ENABLED = os.getenv("RERANKER_ENABLED", "false").lower() in ("1", "true", "yes")
 
 # Stage 1 over-retrieval depth. Recall@k is the ceiling Stage 2 can ever achieve -
 # the reranker can only reorder what recall handed it, never add to it.
