@@ -2,9 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    # v2-ai-harness carries the active refactor, so it needs the same gates as
+    # main. Without it here the branch pushed with zero CI coverage.
+    branches: [main, develop, v2-ai-harness]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   backend-lint:
