@@ -102,9 +102,17 @@ services:
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/2
       # Unlocked — in-memory task state removed, Celery result backend is shared
       WEB_CONCURRENCY: 4
-      # Seed admin user (created only when users table is empty)
+      # Seed admin user (created only when users table is empty).
+      # SEED_ADMIN_PASSWORD is deliberately NOT given a fallback here: a
+      # hardcoded default in this file would apply unconditionally on every
+      # deployment built from this compose file, which defeats seed_admin.py's
+      # own guard (it refuses to seed a default password outside
+      # EXECUTION_MODE=local specifically to avoid a public default admin
+      # credential). Set it in Backend/.env to seed a chosen admin password;
+      # leave it unset in local mode to get seed_admin.py's own throwaway
+      # local-only default.
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@nlpforge.dev}
-      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-NlpForge@Auth$9982}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
       SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-admin}
 
     extra_hosts:
@@ -141,6 +149,13 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ""
+        # next.config.js's rewrites() (the API proxy) is evaluated once at
+        # `next build` time and baked into .next/routes-manifest.json -- it
+        # is NOT re-read from the runtime environment. BACKEND_INTERNAL_URL
+        # was previously only ever set in this file's `environment:` block
+        # below (runtime), so the rewrite was permanently empty in every
+        # image built from this Dockerfile regardless of that value.
+        BACKEND_INTERNAL_URL: http://backend:8000
     image: nlpforge-frontend:latest
     container_name: nlpforge-frontend
     

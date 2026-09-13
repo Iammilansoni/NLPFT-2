@@ -46,10 +46,15 @@ RUN find node_modules -path "*/.bin" -prune -o -type f -name "postinstall.js" -d
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_API_BASE_URL
 ARG NEXT_PUBLIC_WS_URL
+# next.config.js's rewrites() reads this to build the API-proxy rule, and
+# `next build` bakes its result into .next/routes-manifest.json -- it has to
+# be present at BUILD time, not just passed to the container at runtime.
+ARG BACKEND_INTERNAL_URL
 
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
+ENV BACKEND_INTERNAL_URL=$BACKEND_INTERNAL_URL
 
 RUN npm run build
 
@@ -73,6 +78,15 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/package.json ./package.json
+# `next start` reads next.config.js from the working directory at runtime --
+# without it, this stage silently ran on Next's defaults, which drops the
+# rewrites() proxy rule entirely. That rule is what lets the browser call a
+# same-origin relative path (/api/v1/...) which Next then forwards
+# server-side to BACKEND_INTERNAL_URL; without it, every request the
+# frontend makes with NEXT_PUBLIC_API_URL empty (this compose file's own
+# "dynamic host detection" default) 404s against Next's own router instead
+# of ever reaching the backend.
+COPY --from=builder /app/next.config.js ./next.config.js
 
 # Remove potential malicious artifacts
 RUN rm -rf node_modules/.bin/* && \
