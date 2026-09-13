@@ -48,6 +48,14 @@ def semantic_service(mock_registry, mock_embedder, mock_pgvector_store, mock_slo
     async def _fake_tenant_session(user_id):
         yield AsyncMock()
 
+    # `tenant_session` is opened fresh inside semantic_search() itself (it
+    # can't be cached on the instance like the other dependencies below,
+    # since a context manager is meant to be entered/exited once per call),
+    # so this patch has to stay active for the whole test, not just
+    # construction -- a `with:` block that returns before the test body runs
+    # would undo it immediately and let the real tenant_session() open a real
+    # DB session, which happens to work against the real Postgres used
+    # locally but breaks against CI's SQLite ("no such function: set_config").
     with patch("app.services.multi_model_semantic_service.get_embedding_registry", return_value=mock_registry), \
          patch("app.services.multi_model_semantic_service.get_embedder", return_value=mock_embedder), \
          patch("app.services.multi_model_semantic_service.get_pgvector_store", return_value=mock_pgvector_store), \
@@ -55,7 +63,7 @@ def semantic_service(mock_registry, mock_embedder, mock_pgvector_store, mock_slo
          patch("app.services.multi_model_semantic_service.get_slot_extraction_service", return_value=mock_slot_extractor):
 
         service = MultiModelSemanticRetrievalService()
-        return service
+        yield service
 
 @pytest.fixture
 def mock_db():
