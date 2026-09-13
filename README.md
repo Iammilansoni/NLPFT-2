@@ -267,14 +267,23 @@ merge gate.
 
 ## Version history
 
-| Tag / branch | What it is |
-|---|---|
-| **`v1.0-internship`** | Internship delivery, Sep 2025 – Feb 2026. Two-stage retrieval prototype: FastAPI + Redis HNSW + Celery + Ollama, 8 LLM providers, Docker Compose. |
-| **`v2-ai-harness`** | Current. Real cross-encoder, measured routing, pgvector + RLS, dual runtime, structured extraction. |
+| Tag / branch | What it is | Authorship |
+|---|---|---|
+| **`v1.0-internship`** | Internship delivery, Sep 2025 – Feb 2026. Two-stage retrieval prototype: FastAPI + Redis HNSW + Celery + Ollama, 8 LLM providers, Docker Compose. | Team: Milan Soni, Avadhi Singhal, Abhilash Joshi |
+| **`v2-ai-harness`** (now `main`) | Current. Real cross-encoder, measured routing, pgvector + RLS, dual runtime, structured extraction — every fix and finding documented in this README. | Individual: Milan Soni |
 
 `v1.0-internship` is preserved deliberately. The measured regression it exhibits
 (`v1_heuristic` at 0.444 vs a 0.617 baseline) is reproducible from that tag, and
 the delta is the point of the rewrite.
+
+Every commit from `v1.0-internship` onward — the entire v2 rewrite described in
+this README — is individual work by Milan Soni. Reproducible directly from the
+repository, no need to take this on faith:
+
+```bash
+git log v1.0-internship..main --format='%an' | sort -u
+#   Milan Soni
+```
 
 ---
 
