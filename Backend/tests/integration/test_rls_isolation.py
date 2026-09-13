@@ -198,8 +198,9 @@ async def _ensure_user(db, user_id: uuid.UUID) -> None:
     """Users are FK targets for vector_rows; insert bypassing RLS on users."""
     await db.execute(
         text(
-            "INSERT INTO users (u_id, email, password_hash, created_at) "
-            "VALUES (CAST(:u AS uuid), :e, 'x', now()) ON CONFLICT DO NOTHING"
+            "INSERT INTO users (u_id, email, password, is_active, is_expert, "
+            "is_admin, email_verified, created_at) "
+            "VALUES (CAST(:u AS uuid), :e, 'x', 1, 0, 0, 1, now()) ON CONFLICT DO NOTHING"
         ),
         {"u": str(user_id), "e": f"{user_id}@test.local"},
     )

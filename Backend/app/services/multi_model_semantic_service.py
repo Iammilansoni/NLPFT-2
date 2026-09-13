@@ -92,6 +92,10 @@ class MultiModelSemanticRetrievalService:
         self.redis_service = get_multi_model_redis_service()
         self.ollama_service = get_ollama_service()
         self.slot_extractor = get_slot_extraction_service()
+        # Stage 1 recall (pgvector) and its embedder. Process-wide singletons,
+        # same lifetime as everything else grabbed here.
+        self.embedder = get_embedder()
+        self.pgvector_store = get_pgvector_store()
         # Stage 2 cross-encoder. Process-wide singleton; the ONNX model is loaded
         # once, lazily, and every inference is offloaded off the event loop.
         self.reranker = get_reranker()
@@ -166,7 +170,7 @@ class MultiModelSemanticRetrievalService:
         # there is no per-user model to resolve here — every row was written
         # with get_embedder()'s (model, dimension), and the query is embedded
         # the same way.
-        embedder = get_embedder()
+        embedder = self.embedder
         effective_model = embedder.model_id
         dimension = embedder.dimension
 
@@ -274,7 +278,7 @@ class MultiModelSemanticRetrievalService:
         # on this transaction — pgvector_store's own contract requires it; a
         # bare session both skips that tuning and, per RLS, sees no rows.
         async with tenant_session(user_id) as tdb:
-            vector_result = await get_pgvector_store().search(
+            vector_result = await self.pgvector_store.search(
                 tdb,
                 query_vector,
                 embedding_model=effective_model,
