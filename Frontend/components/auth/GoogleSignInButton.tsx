@@ -68,7 +68,6 @@ export default function GoogleSignInButton({ onError }: GoogleSignInButtonProps)
           const searchParams = new URLSearchParams(window.location.search);
           const from = searchParams.get('from');
           router.push(from || '/dashboard');
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
           onError?.(
             err?.response?.data?.detail || 'Google sign-in failed. Please try again.'
