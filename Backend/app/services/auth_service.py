@@ -107,6 +107,12 @@ class AuthService:
         return result.scalar_one_or_none()
     
     @staticmethod
+    async def get_user_by_google_id(db: AsyncSession, google_id: str) -> Optional[User]:
+        """Get user by Google's stable per-account "sub" claim"""
+        result = await db.execute(select(User).where(User.google_id == google_id))
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def get_user_by_id(db: AsyncSession, user_id: uuid.UUID) -> Optional[User]:
         """Get user by ID"""
         result = await db.execute(select(User).where(User.u_id == user_id))

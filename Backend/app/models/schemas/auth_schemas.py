@@ -46,6 +46,12 @@ class UserLogin(BaseModel):
     password: str
 
 
+class GoogleAuthRequest(BaseModel):
+    """Body for POST /auth/google: the ID token from Google Identity Services'
+    Sign In With Google button (the `credential` field of its callback)."""
+    credential: str = Field(..., min_length=1)
+
+
 class UserResponse(BaseModel):
     """User response schema"""
     user_id: str

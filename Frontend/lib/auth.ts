@@ -54,6 +54,17 @@ class AuthService {
     return response.data;
   }
 
+  /**
+   * Sign in with Google. `credential` is the ID token from Google Identity
+   * Services' Sign In With Google button -- verified server-side, never
+   * trusted as-is. Backend sets HttpOnly cookies just like /login/json.
+   */
+  async loginWithGoogle(credential: string): Promise<AuthResponse> {
+    const response = await apiClient.post<AuthResponse>('/api/v1/auth/google', { credential });
+    this.setUser(response.data.user);
+    return response.data;
+  }
+
   /** Logout. Backend clears both cookies; we clear the local user profile. */
   async logout(): Promise<void> {
     try {

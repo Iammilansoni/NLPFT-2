@@ -37,6 +37,7 @@ numpy>=1.26.0  # Numerical computing (1.26+ for Python 3.12 support)
 pandas>=2.1.0  # Data manipulation (2.1+ for Python 3.12 support)
 httpx>=0.25.2  # HTTP client for Ollama API
 google-generativeai>=0.8.3  # Gemini API support
+google-auth>=2.35.0  # Verifies Google Sign-In ID tokens (/auth/google)
 
 # System monitoring
 psutil==5.9.6  # System resource monitoring

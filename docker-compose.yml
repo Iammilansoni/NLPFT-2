@@ -156,6 +156,10 @@ services:
         # below (runtime), so the rewrite was permanently empty in every
         # image built from this Dockerfile regardless of that value.
         BACKEND_INTERNAL_URL: http://backend:8000
+        # Public Google OAuth client ID for the "Sign In With Google" button.
+        # Baked in at build time like every other NEXT_PUBLIC_* var. Leave
+        # unset to keep the button rendered as disabled ("not configured").
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     image: nlpforge-frontend:latest
     container_name: nlpforge-frontend
     

@@ -20,6 +20,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (data: LoginRequest) => Promise<AuthResponse>;
+  loginWithGoogle: (credential: string) => Promise<AuthResponse>;
   register: (data: RegisterRequest) => Promise<AuthResponse>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -70,6 +71,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return response;
   };
 
+  // ── Google sign-in ────────────────────────────────────────────────────────
+  const loginWithGoogle = async (credential: string): Promise<AuthResponse> => {
+    const response = await authService.loginWithGoogle(credential);   // sets cookies + caches user
+    setUser(response.user);
+    return response;
+  };
+
   // ── Register ──────────────────────────────────────────────────────────────
   const register = async (data: RegisterRequest): Promise<AuthResponse> => {
     const response = await authService.register(data);
@@ -100,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       isAuthenticated: !!user,
       login,
+      loginWithGoogle,
       register,
       logout,
       refreshUser,

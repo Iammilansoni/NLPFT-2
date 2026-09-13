@@ -26,6 +26,7 @@ from app.models.schemas.auth_schemas import (
     AuthCookieResponse,
     ChangePasswordRequest,
     ForgotPasswordRequest,
+    GoogleAuthRequest,
     PromoteExpertRequest,
     ResetPasswordRequest,
     Token,
@@ -247,6 +248,12 @@ async def login(
                             detail="Email is not registered",
                             headers={"WWW-Authenticate": "Bearer"})
     
+    if not user.password:
+        logger.warning(f"Login failed: no password set (Google-only account) ({form_data.username})")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="This account signs in with Google. Use 'Continue with Google'.",
+                            headers={"WWW-Authenticate": "Bearer"})
+
     if not auth_service.verify_password(form_data.password, user.password):
         logger.warning(f"Login failed: Incorrect password for {form_data.username}")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
@@ -289,6 +296,12 @@ async def login_json(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="Email is not registered")
     
+    if not user.password:
+        # Google-only account: no local password hash to check against.
+        logger.warning(f"Login failed: no password set (Google-only account) ({user_data.email})")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="This account signs in with Google. Use 'Continue with Google'.")
+
     if not auth_service.verify_password(user_data.password, user.password):
         logger.warning(f"Login failed: Incorrect password for {user_data.email}")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
@@ -307,6 +320,103 @@ async def login_json(
 
     logger.info(f"User logged in: {user.email}")
     await log_audit_event(db, action="login_json", user_id=user.u_id,
+                          ip_address=request.client.host if request.client else None,
+                          resource_type="user", resource_id=str(user.u_id))
+
+    response = JSONResponse(content={"user": UserResponse.model_validate(user).model_dump(mode="json")})
+    set_auth_cookies(response, access_token, refresh_token)
+    return response
+
+
+@router.post("/google")
+@limiter.limit("10/minute")
+async def google_auth(
+    request: Request,
+    body: GoogleAuthRequest,
+    db: AsyncSession = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """
+    Sign in (or sign up) with a Google Identity Services ID token.
+
+    `body.credential` is the JWT from Google's "Sign In With Google" button
+    (its callback's `credential` field) -- verified here, never trusted
+    as-is. An existing account with a matching Google id logs straight in;
+    an existing account with a matching, Google-verified email gets linked
+    (google_id set) rather than duplicated; otherwise a new account is
+    created with no local password.
+    """
+    import uuid
+    from datetime import datetime, timezone
+
+    from google.auth.transport import requests as google_requests
+    from google.oauth2 import id_token as google_id_token
+
+    from app.core.config import settings
+
+    if not settings.google_client_id:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google sign-in is not configured on this server.",
+        )
+
+    try:
+        idinfo = google_id_token.verify_oauth2_token(
+            body.credential, google_requests.Request(), settings.google_client_id
+        )
+    except ValueError as e:
+        logger.warning(f"Google sign-in: token verification failed ({e})")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Invalid Google credential")
+
+    google_user_id = idinfo["sub"]
+    email = idinfo.get("email")
+    if not email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Google account has no email")
+    if not idinfo.get("email_verified"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Google email is not verified")
+
+    user = await auth_service.get_user_by_google_id(db, google_user_id)
+    if not user:
+        # Link to an existing local account with the same (Google-verified)
+        # email rather than creating a duplicate; otherwise sign up fresh.
+        user = await auth_service.get_user_by_email(db, email=email)
+        if user:
+            if not user.google_id:
+                user.google_id = google_user_id
+                if not user.email_verified:
+                    user.email_verified = True
+                await db.commit()
+                await db.refresh(user)
+        else:
+            username = (idinfo.get("name") or email.split("@")[0])[:50]
+            user = User(
+                u_id=uuid.uuid4(),
+                email=email,
+                password=None,
+                user_name=username,
+                google_id=google_user_id,
+                email_verified=True,
+                created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            )
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+            logger.info(f"User registered via Google: {user.email}")
+
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is disabled")
+
+    access_token = auth_service.create_access_token(
+        data={"sub": str(user.u_id)},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+    refresh_token = auth_service.create_refresh_token(data={"sub": str(user.u_id)})
+
+    logger.info(f"User logged in via Google: {user.email}")
+    await log_audit_event(db, action="login_google", user_id=user.u_id,
                           ip_address=request.client.host if request.client else None,
                           resource_type="user", resource_id=str(user.u_id))
 

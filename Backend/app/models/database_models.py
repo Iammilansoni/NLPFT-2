@@ -75,7 +75,12 @@ class User(Base):
     u_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_name = Column(Text, nullable=True)
     email = Column(Text, unique=True, nullable=False, index=True)
-    password = Column(Text, nullable=False)
+    # Nullable: an account created via Google sign-in has no local password
+    # until the user sets one (see /auth/google).
+    password = Column(Text, nullable=True)
+    # Google's stable per-account subject id ("sub" claim). Unique but
+    # nullable -- most rows won't have one.
+    google_id = Column(Text, unique=True, nullable=True, index=True)
     is_active = Column(Integer, nullable=False, default=1)  # 0=disabled, 1=active
     is_expert = Column(Integer, nullable=False, default=0)  # 0=regular user, 1=expert (can approve templates)
     is_admin = Column(Integer, nullable=False, default=0)  # 0=regular user, 1=admin (grants roles, rotates keys)
