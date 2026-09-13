@@ -11,23 +11,23 @@ For new development, use multi_model_redis_service.py which:
 This service is retained for backward compatibility only.
 """
 
-import warnings
-import redis
-import numpy as np
-from typing import List, Dict, Optional, Tuple
 import uuid
+import warnings
 from datetime import datetime, timezone
+from typing import Dict, List, Optional, Tuple
 
-from redis.commands.search.field import VectorField, TextField
+import numpy as np
+import redis
+from redis.commands.search.field import TextField, VectorField
 from redis.commands.search.indexDefinition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 
-from app.core.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
+from app.core.config import REDIS_HOST, REDIS_PASSWORD, REDIS_PORT
 from app.core.logger import logger
 from app.core.redis_security import (
-    RedisKeyValidator, 
-    validate_embedding_access, 
-    RedisAccessDeniedError
+    RedisAccessDeniedError,
+    RedisKeyValidator,
+    validate_embedding_access,
 )
 
 # Issue deprecation warning at import time

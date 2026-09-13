@@ -9,10 +9,11 @@ Handles:
 - IP address tracking for security
 """
 
-from sqlalchemy import Column, Text, TIMESTAMP, Integer, Boolean
-from sqlalchemy.dialects.postgresql import UUID
-from datetime import datetime, timezone
 import uuid
+from datetime import datetime, timezone
+
+from sqlalchemy import TIMESTAMP, Boolean, Column, Integer, Text
+from sqlalchemy.dialects.postgresql import UUID
 
 from app.core.postgres import Base
 

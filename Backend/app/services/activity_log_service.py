@@ -17,8 +17,8 @@ Categories:
 """
 
 import re
-from typing import Dict, Any, Tuple
 from enum import Enum
+from typing import Any, Dict, Tuple
 
 
 class LogCategory(str, Enum):

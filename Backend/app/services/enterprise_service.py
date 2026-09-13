@@ -1,14 +1,14 @@
 """Enterprise Service - Multi-tenant CRUD operations"""
 
-from typing import List, Optional
 import uuid
 from datetime import datetime, timezone
+from typing import List, Optional
 
+from sqlalchemy import and_, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func, delete
 
-from app.models.database_models import Template, CSVData, Embedding
 from app.core.logger import logger
+from app.models.database_models import CSVData, Embedding, Template
 
 
 class EnterpriseService:

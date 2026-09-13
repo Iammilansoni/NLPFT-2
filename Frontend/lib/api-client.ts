@@ -1,156 +1,95 @@
+/**
+ * api-client.ts — Axios instance with HttpOnly cookie auth + silent refresh.
+ *
+ * Security model:
+ *  - NO tokens are stored in localStorage or JS-accessible memory.
+ *  - credentials: 'include' (withCredentials) sends cookies automatically.
+ *  - On 401 the interceptor hits /auth/refresh once; all concurrent 401s
+ *    are queued and replayed after a single successful refresh (single-flight).
+ *  - If refresh fails, user is redirected to /auth/login.
+ */
+
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { getApiBase } from './runtime-config';
 
 export const apiClient: AxiosInstance = axios.create({
   timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  withCredentials: true,          // send HttpOnly cookies on every request
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Track if a token refresh is in progress to prevent concurrent refreshes
+// ── Single-flight refresh state ───────────────────────────────────────────────
 let isRefreshing = false;
 let failedQueue: Array<{
-  resolve: (token: string) => void;
+  resolve: () => void;
   reject: (error: unknown) => void;
 }> = [];
 
-function processQueue(error: unknown, token: string | null = null) {
+function processQueue(error: unknown): void {
   failedQueue.forEach(({ resolve, reject }) => {
-    if (error) {
-      reject(error);
-    } else if (token) {
-      resolve(token);
-    } else {
-      // Neither error nor valid token — reject to prevent hanging promises
-      reject(new Error('Failed to refresh token: no token available'));
-    }
+    error ? reject(error) : resolve();
   });
   failedQueue = [];
 }
 
-// Request interceptor: Set dynamic baseURL at request time (not module load time)
-// This ensures window.location.hostname is available
+// ── Request interceptor: dynamic baseURL ──────────────────────────────────────
 apiClient.interceptors.request.use(
   (config) => {
-    if (!config.baseURL) {
-      config.baseURL = getApiBase();
-    }
+    if (!config.baseURL) config.baseURL = getApiBase();
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Request interceptor: Add auth token to requests
-apiClient.interceptors.request.use(
-  (config) => {
-    // Get token from localStorage
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('nlpforge_access_token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor: Handle 401 with token refresh
+// ── Response interceptor: 401 → silent refresh → retry ───────────────────────
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      // Don't try to refresh if the failed request was the refresh endpoint itself
-      if (originalRequest.url?.includes('/auth/refresh')) {
-        return Promise.reject(error);
-      }
-
-      if (typeof window === 'undefined') {
-        return Promise.reject(error);
-      }
-
-      const refreshToken = localStorage.getItem('nlpforge_refresh_token');
-      if (!refreshToken) {
-        // No refresh token - clear auth and redirect
-        localStorage.removeItem('nlpforge_access_token');
-        localStorage.removeItem('nlpforge_user');
-        if (!window.location.pathname.startsWith('/auth')) {
-          window.location.href = '/auth/login';
-        }
-        return Promise.reject(error);
-      }
-
-      if (isRefreshing) {
-        // Queue this request while refresh is in progress
-        return new Promise((resolve, reject) => {
-          failedQueue.push({
-            resolve: (token: string) => {
-              originalRequest.headers.Authorization = `Bearer ${token}`;
-              resolve(apiClient(originalRequest));
-            },
-            reject,
-          });
-        });
-      }
-
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        // Attempt token refresh
-        const response = await apiClient.post('/api/v1/auth/refresh', {
-          refresh_token: refreshToken,
-        });
-
-        const newAccessToken = response.data.access_token;
-        const newRefreshToken = response.data.refresh_token;
-
-        // Validate token before persisting — abort refresh if missing/empty
-        if (!newAccessToken || typeof newAccessToken !== 'string') {
-          const tokenError = new Error('Refresh response missing valid access_token');
-          processQueue(tokenError, null);
-          localStorage.removeItem('nlpforge_access_token');
-          localStorage.removeItem('nlpforge_refresh_token');
-          localStorage.removeItem('nlpforge_user');
-          if (!window.location.pathname.startsWith('/auth')) {
-            window.location.href = '/auth/login';
-          }
-          return Promise.reject(tokenError);
-        }
-
-        localStorage.setItem('nlpforge_access_token', newAccessToken);
-        if (newRefreshToken) {
-          localStorage.setItem('nlpforge_refresh_token', newRefreshToken);
-        }
-
-        // Retry queued requests
-        processQueue(null, newAccessToken);
-
-        // Retry original request
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-        return apiClient(originalRequest);
-      } catch (refreshError) {
-        processQueue(refreshError, null);
-
-        // Refresh failed - clear auth and redirect
-        localStorage.removeItem('nlpforge_access_token');
-        localStorage.removeItem('nlpforge_refresh_token');
-        localStorage.removeItem('nlpforge_user');
-        if (!window.location.pathname.startsWith('/auth')) {
-          window.location.href = '/auth/login';
-        }
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
-      }
+    // Only handle 401 once per request; skip if it was the refresh call itself
+    if (
+      error.response?.status !== 401 ||
+      originalRequest._retry ||
+      originalRequest.url?.includes('/auth/refresh') ||
+      originalRequest.url?.includes('/auth/login')
+    ) {
+      return Promise.reject(error);
     }
 
-    return Promise.reject(error);
+    if (typeof window === 'undefined') return Promise.reject(error);
+
+    // If a refresh is already in-flight, queue this request
+    if (isRefreshing) {
+      return new Promise((resolve, reject) => {
+        failedQueue.push({
+          resolve: () => resolve(apiClient(originalRequest)),
+          reject,
+        });
+      });
+    }
+
+    originalRequest._retry = true;
+    isRefreshing = true;
+
+    try {
+      // Hit the refresh endpoint — backend reads the HttpOnly refresh cookie
+      // and sets a new access cookie. No body needed.
+      await apiClient.post('/api/v1/auth/refresh');
+
+      processQueue(null);
+      return apiClient(originalRequest);        // replay original request
+    } catch (refreshError) {
+      processQueue(refreshError);
+
+      // Refresh token is expired / invalid — force logout
+      if (!window.location.pathname.startsWith('/auth')) {
+        window.location.href = '/auth/login';
+      }
+      return Promise.reject(refreshError);
+    } finally {
+      isRefreshing = false;
+    }
   }
 );
 

@@ -1,0 +1,86 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # ── NLPForge Backend ───────────────────────────────────────────────────────
+  - job_name: nlpforge-backend
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: label
+            values: ["com.docker.compose.service=backend"]
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'service'
+    pipeline_stages:
+      - docker: {}
+      # Parse JSON log lines emitted by our JSONFormatter
+      - json:
+          expressions:
+            timestamp: timestamp
+            severity: severity
+            message: message
+            request_id: request_id
+            trace_id: trace_id
+            user_id: user_id
+            event_name: event_name
+            event_category: event_category
+            execution_time_ms: execution_time_ms
+      - labels:
+          severity:
+          event_category:
+          event_name:
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      # Drop DEBUG logs in production (set to drop DEBUG only)
+      - drop:
+          expression: '`"severity":"DEBUG"`'
+          drop_counter_reason: debug_logs_excluded
+
+  # ── NLPForge Worker ───────────────────────────────────────────────────────
+  - job_name: nlpforge-worker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["nlpforge-celery*"]
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+    pipeline_stages:
+      - docker: {}
+      - json:
+          expressions:
+            severity: severity
+            message: message
+            task_id: task_id
+            correlation_id: correlation_id
+      - labels:
+          severity:
+
+  # ── PostgreSQL ────────────────────────────────────────────────────────────
+  - job_name: postgres
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["nlpforge-postgres"]
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'

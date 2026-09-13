@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { motion, useInView, useMotionValue, useSpring } from 'framer-motion'
 import { useEffect, useRef } from 'react'
@@ -66,7 +66,7 @@ function AnimatedCounter({ value, suffix, duration }: { value: number; suffix: s
 
 export function MetricsProof() {
   return (
-    <section className="py-20 md:py-32 bg-muted/30 border-t">
+    <section className="py-12 md:py-16 bg-muted/30 border-t">
       <div className="container mx-auto px-4">
         {/* Stats */}
         <motion.div

@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch, AsyncMock
 import sys
 import os
 import json
+import re
 import tempfile
 
 # Add Backend to path
@@ -84,10 +85,27 @@ async def test_dynamic_dataset_generation(mock_client):
         assert result_fixed["success"] is True
         assert result_fixed["requested"] == 50
 
-        # Verify prompt contains the fixed count
-        call_args_fixed = mock_client.generate_content.call_args
-        prompt_fixed = call_args_fixed[0][0]
-        assert "Generate exactly 50 test cases" in prompt_fixed
+        # Generation BATCHES: 50 examples at BATCH_SIZE=10 is five calls, each
+        # asking for a batch, never one call asking for 50. This previously
+        # asserted "Generate exactly 50 test cases" appeared in the prompt, which
+        # the batching design has never produced -- the assertion was testing a
+        # behaviour that did not exist, not catching a regression.
+        assert mock_client.generate_content.call_count == 5, (
+            f"expected 5 batches of 10, got {mock_client.generate_content.call_count} calls"
+        )
+
+        # Every batch prompt carries an explicit per-batch count, and the counts
+        # sum to what the caller asked for.
+        requested_per_batch = []
+        for call in mock_client.generate_content.call_args_list:
+            batch_prompt = call[0][0]
+            match = re.search(r"Generate exactly (\d+) test cases", batch_prompt)
+            assert match, f"batch prompt missing an explicit count: {batch_prompt[:200]}"
+            requested_per_batch.append(int(match.group(1)))
+
+        assert sum(requested_per_batch) == 50, (
+            f"batch counts {requested_per_batch} do not sum to the requested 50"
+        )
 
 if __name__ == "__main__":
     import asyncio

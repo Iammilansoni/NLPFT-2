@@ -3,17 +3,18 @@
 """
 Performance Telemetry API - Track and return real performance metrics
 """
+import json
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional
+
+import redis
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from typing import List, Optional
-from datetime import datetime, timezone, timedelta
-import redis
-import json
 
 from app.api.v1.auth import get_current_user
-from app.models.database_models import User
-from app.core.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
+from app.core.config import REDIS_HOST, REDIS_PASSWORD, REDIS_PORT
 from app.core.logger import logger
+from app.models.database_models import User
 
 router = APIRouter(prefix="/telemetry", tags=["Performance Telemetry"])
 

@@ -1,10 +1,12 @@
 """PostgreSQL Database Configuration - Core Infrastructure"""
 
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+import os
+
+from dotenv import load_dotenv
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.pool import StaticPool
-import os
-from dotenv import load_dotenv
+
 from app.core.logger import logger
 
 load_dotenv()
@@ -66,6 +68,16 @@ async def get_db():
 async def init_db():
     """Initialize database - create all tables"""
     try:
+        # Ensure ALL model files are imported so their tables are registered with
+        # Base.metadata before create_all runs. Models in separate files (like
+        # email_verification_models and password_reset_models) won't be picked up
+        # unless they're explicitly imported here.
+        from app.models import (
+            database_models,  # noqa: F401 - registers all main tables
+            email_verification_models,  # noqa: F401
+            password_reset_models,  # noqa: F401
+        )
+
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         logger.info("✅ PostgreSQL database initialized")

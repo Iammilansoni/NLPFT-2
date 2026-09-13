@@ -4,7 +4,8 @@ All configuration loaded from environment via config.py
 """
 
 import redis
-from app.core.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
+
+from app.core.config import REDIS_HOST, REDIS_PASSWORD, REDIS_PORT
 
 print(f"Using Redis at {REDIS_HOST}:{REDIS_PORT}")
 

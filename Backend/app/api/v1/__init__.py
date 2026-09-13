@@ -6,27 +6,25 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1 import (
+    admin,
+    audit_logs,
     auth,
-    email_verification,
     datasets,
-    embeddings,
+    email_verification,
     embedding_validation,
+    llm_config,
+    model_validation,
     models,
-    ranking,
+    multi_model_query,
+    telemetry,
+    template_builder,
     user_data,
     user_settings,
-    template_builder,
-    audit_logs,
-    telemetry,
-    model_validation,
-    multi_model_query,
-    llm_config,
-    admin,
 )
-from app.core.postgres import get_db
 from app.api.v1.auth import get_current_user
-from app.models.database_models import User
 from app.core.logger import logger
+from app.core.postgres import get_db
+from app.models.database_models import User
 
 router = APIRouter(prefix="/v1")
 
@@ -38,13 +36,9 @@ router.include_router(user_data.router, prefix="/user-data", tags=["User Data"])
 # Template Builder
 router.include_router(template_builder.router, tags=["Template Builder"])
 
-# Datasets & Embeddings
+# Datasets
 router.include_router(datasets.router, tags=["Datasets"])
-router.include_router(embeddings.router, prefix="/embeddings", tags=["Embeddings"])
 router.include_router(embedding_validation.router, tags=["Embedding Validation"])
-
-# AI Ranking Engine
-router.include_router(ranking.router, prefix="/ranking", tags=["AI Ranking Engine"])
 
 # Configuration
 router.include_router(models.router, tags=["Models"])
@@ -81,10 +75,11 @@ async def get_user_dashboard_stats(
     - intents: Intent type distribution {intent: count}
     """
     try:
-        from app.services.multi_model_redis_service import get_multi_model_redis_service
+        from sqlalchemy import distinct, func, select
+
         from app.core.embedding_model_registry import get_embedding_registry
         from app.models.database_models import CSVData
-        from sqlalchemy import select, func, distinct
+        from app.services.multi_model_redis_service import get_multi_model_redis_service
 
         # Count vectors across all registered models
         embedding_count = 0

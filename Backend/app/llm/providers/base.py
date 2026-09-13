@@ -14,14 +14,13 @@ Architecture:
         └── CustomHTTPProvider
 """
 
+import asyncio
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
 from enum import Enum
-import asyncio
+from typing import Any, Dict, List, Optional
 
 from app.core.logger import logger
-
 
 # =============================================================================
 # ENUMS

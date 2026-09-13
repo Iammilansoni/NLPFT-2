@@ -25,33 +25,31 @@ Usage:
     result = await service.test_connection(config.config_id)
 """
 
-from typing import List, Optional, Dict, Any
-from uuid import UUID
+import re
 from datetime import datetime, timezone
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_
-from sqlalchemy.exc import IntegrityError
-
-from app.core.logger import logger
-from app.core.encryption import (
-    encrypt_api_key,
-    decrypt_api_key,
-    mask_api_key,
-    is_encryption_configured,
-)
-from app.models.database_models import LLMProviderConfig, UserSettings
-from app.llm.provider_factory import LLMProviderFactory
-from app.llm.providers.base import (
-    ConnectionTestResult,
-)
-
+from typing import Any, Dict, List, Optional
+from uuid import UUID
 
 # =============================================================================
 # PYDANTIC SCHEMAS
 # =============================================================================
-
 from pydantic import BaseModel, Field, field_validator
-import re
+from sqlalchemy import and_, delete, select, update
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.encryption import (
+    decrypt_api_key,
+    encrypt_api_key,
+    is_encryption_configured,
+    mask_api_key,
+)
+from app.core.logger import logger
+from app.llm.provider_factory import LLMProviderFactory
+from app.llm.providers.base import (
+    ConnectionTestResult,
+)
+from app.models.database_models import LLMProviderConfig, UserSettings
 
 
 class LLMProviderConfigCreate(BaseModel):

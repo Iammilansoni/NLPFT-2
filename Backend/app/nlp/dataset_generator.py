@@ -11,14 +11,15 @@ Features:
 - DYNAMIC PROVIDER SUPPORT: Uses user's configured LLM provider from database
 """
 
-import os
+import asyncio
+import csv
 import json
 import math
-import csv
-import asyncio
+import os
 from datetime import datetime
-from typing import Dict, List, Optional, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from uuid import UUID
+
 import pandas as pd
 
 from app.core.config import DATASETS_DIR
@@ -37,8 +38,9 @@ def _init_gemini_fallback():
     """Initialize Gemini as fallback provider if GEMINI_API_KEY is set"""
     global _gemini_available, _gemini_client
     try:
-        from app.core.config import GEMINI_API_KEY
         import google.generativeai as genai
+
+        from app.core.config import GEMINI_API_KEY
         if GEMINI_API_KEY:
             genai.configure(api_key=GEMINI_API_KEY)
             _gemini_client = genai.GenerativeModel(_gemini_model)
@@ -662,9 +664,10 @@ Return ONLY the JSON array, nothing else."""
 
     async def _load_provider_async(self, db, user_id: str) -> Optional[Dict[str, Any]]:
         """Load LLM provider using an existing async database session."""
-        from sqlalchemy import select, and_
-        from app.llm.provider_factory import LLMProviderFactory
+        from sqlalchemy import and_, select
+
         from app.core.encryption import decrypt_api_key
+        from app.llm.provider_factory import LLMProviderFactory
         from app.models.database_models import LLMProviderConfig
 
         user_uuid = UUID(user_id) if isinstance(user_id, str) else user_id

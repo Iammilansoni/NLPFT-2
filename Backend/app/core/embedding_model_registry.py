@@ -22,14 +22,13 @@ Architecture:
 Thread-safe singleton pattern for production use.
 """
 
-from typing import Dict, List, Optional, Any
-from enum import Enum
-from dataclasses import dataclass
-from functools import lru_cache
 import threading
+from dataclasses import dataclass
+from enum import Enum
+from functools import lru_cache
+from typing import Any, Dict, List, Optional
 
 from app.core.logger import logger
-
 
 # =============================================================================
 # ENUMS

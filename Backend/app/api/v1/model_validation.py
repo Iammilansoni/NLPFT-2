@@ -30,21 +30,21 @@ When mismatch detected, show modal with:
 - Button 2: "Re-embed with Selected Model" -> Update Settings, redirect to re-embed
 """
 
-from typing import Annotated, Optional, List
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel, Field
 import uuid
+from typing import Annotated, List, Optional
 
-from app.core.postgres import get_db
-from app.api.v1.auth import get_current_user
-from app.models.schemas import UserResponse
-from app.core.embedding_model_registry import get_embedding_registry
-from app.services.user_embedding_settings_service import get_user_embedding_settings_service
-from app.models.database_models import Dataset
-from app.core.logger import logger
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.auth import get_current_user
+from app.core.embedding_model_registry import get_embedding_registry
+from app.core.logger import logger
+from app.core.postgres import get_db
+from app.models.database_models import Dataset
+from app.models.schemas import UserResponse
+from app.services.user_embedding_settings_service import get_user_embedding_settings_service
 
 router = APIRouter(prefix="/model-validation", tags=["model-validation"])
 

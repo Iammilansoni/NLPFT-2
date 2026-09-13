@@ -52,11 +52,9 @@ export function ActiveTasksPanel({ onTaskComplete, className }: ActiveTasksPanel
 
   const fetchTasks = useCallback(async () => {
     try {
-      const token = localStorage.getItem('nlpforge_access_token')
+      // SECURITY: auth via HttpOnly cookie - no localStorage tokens.
       const response = await fetch(`${API_BASE}/api/v1/datasets/tasks?max_age_hours=2`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        credentials: 'include',
       })
       
       if (!response.ok) {

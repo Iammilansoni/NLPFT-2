@@ -8,9 +8,10 @@ Embedding Model System:
 - Strict model-dataset compatibility enforcement
 """
 
-from typing import List, Dict
-from pydantic import BaseModel
 from enum import Enum
+from typing import Dict, List
+
+from pydantic import BaseModel
 
 
 class ModelSpeed(str, Enum):

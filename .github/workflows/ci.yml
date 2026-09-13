@@ -2,9 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    # v2-ai-harness carries the active refactor, so it needs the same gates as
+    # main. Without it here the branch pushed with zero CI coverage.
+    branches: [main, develop, v2-ai-harness]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   backend-lint:
@@ -20,7 +23,10 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: pip install -r requirements.txt
-      - run: pip install ruff
+      # PINNED. Unpinned, CI installed whatever ruff released most recently, so
+      # the same source went from passing to 2010 errors without a code change.
+      # Bump this deliberately, with the fixes in the same commit.
+      - run: pip install ruff==0.16.4
       - run: ruff check app/
 
   backend-test:
@@ -49,6 +55,35 @@ jobs:
           SMTP_PASSWORD: test-placeholder
           REDIS_HOST: localhost
           OLLAMA_HOST: http://localhost:11434
+
+  routing-eval:
+    name: Routing Benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install numpy flashrank fastembed
+      - name: Run routing benchmark
+        # Gates merges on routing quality, not just on tests passing.
+        #
+        # Runs the PRODUCTION embedder (bge-small-en-v1.5), not the tfidf CI
+        # baseline. That distinction turned out to matter enormously: measured
+        # against tfidf the cross-encoder looked like a +0.111 win, and against
+        # bge-small it is a -0.083 regression. Gating on the wrong embedder
+        # would have locked in the wrong conclusion.
+        #
+        # Gates on stage1_only because that is the shipped configuration
+        # (RERANKER_ENABLED defaults to false). Threshold sits below the
+        # measured 0.822 to catch genuine regressions without failing on noise.
+        run: >
+          python evals/run_eval.py
+          --embedder onnx
+          --gate-strategy stage1_only
+          --fail-under 0.78
+          --markdown "$GITHUB_STEP_SUMMARY"
 
   frontend-build:
     name: Frontend Build

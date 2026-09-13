@@ -1,7 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: 'standalone',
+  // NOT output: 'standalone'. The Dockerfile copies the full node_modules
+  // and runs plain `next start` (not `node .next/standalone/server.js`),
+  // which is the layout a non-standalone build produces. Next.js warns
+  // outright that `next start` doesn't work with `output: 'standalone'`,
+  // and in practice request handling was silently wrong under the mismatch
+  // -- rewrites() (the API proxy to BACKEND_INTERNAL_URL) never applied,
+  // 404ing every request instead.
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts', 'framer-motion'],
   },

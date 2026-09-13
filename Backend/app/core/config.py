@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Load .env from Backend directory (where this config file resides)
@@ -44,6 +45,10 @@ class Settings:
     smtp_from_email: str = os.getenv("SMTP_FROM_EMAIL", "")
     smtp_from_name: str = os.getenv("SMTP_FROM_NAME", "NLPForge")
     frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+    # Google sign-in (ID token verification). Empty means the feature is off
+    # -- /auth/google refuses rather than verifying against no audience.
+    google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
     
     # PostgreSQL Configuration - read from env
     postgres_host = os.getenv("POSTGRES_HOST", "")

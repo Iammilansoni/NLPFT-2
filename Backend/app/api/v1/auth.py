@@ -1,79 +1,121 @@
 """
-Authentication API endpoints
-Handles user registration, login, and token management
+Authentication API endpoints — HttpOnly cookie-based JWT architecture
 """
 
 from datetime import timedelta
-from typing import Annotated
+from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
+from fastapi.security import OAuth2PasswordRequestForm
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cookie_config import (
+    ACCESS_TOKEN_COOKIE,
+    REFRESH_TOKEN_COOKIE,
+    clear_auth_cookies,
+    set_auth_cookies,
+)
+from app.core.logger import logger
 from app.core.postgres import get_db
-from app.services.auth_service import get_auth_service, AuthService, ACCESS_TOKEN_EXPIRE_MINUTES
+from app.core.token_denylist import is_token_revoked, revoke_token
+from app.models.database_models import User
 from app.models.schemas.auth_schemas import (
-    UserCreate, UserLogin, UserResponse, Token, ChangePasswordRequest,
-    ForgotPasswordRequest, ResetPasswordRequest, RefreshTokenRequest
+    AuthCookieResponse,
+    ChangePasswordRequest,
+    ForgotPasswordRequest,
+    GoogleAuthRequest,
+    PromoteExpertRequest,
+    ResetPasswordRequest,
+    Token,
+    UserCreate,
+    UserLogin,
+    UserResponse,
 )
 from app.models.schemas.common_schemas import MessageResponse
-from app.models.database_models import User
-from app.core.logger import logger
 from app.services.audit_service import log_audit_event
+from app.services.auth_service import ACCESS_TOKEN_EXPIRE_MINUTES, AuthService, get_auth_service
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
-
 
 async def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)],
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    auth_service: AuthService = Depends(get_auth_service)
+    auth_service: AuthService = Depends(get_auth_service),
 ) -> User:
-    """Get current authenticated user from token"""
+    """
+    Resolve the authenticated user from the HttpOnly access cookie.
+    Falls back to Authorization: Bearer header for API clients / Swagger.
+    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
+    # 1. Prefer HttpOnly cookie
+    token: Optional[str] = request.cookies.get(ACCESS_TOKEN_COOKIE)
+
+    # 2. Fall back to Authorization header (Swagger UI / API clients)
+    if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+
+    if not token:
+        raise credentials_exception
+
     payload = auth_service.decode_token(token)
-    if payload is None:
+    if payload is None or payload.get("type") != "access":
         raise credentials_exception
-    
-    # Reject non-access tokens (e.g. refresh tokens used as access tokens)
-    token_type = payload.get("type")
-    if token_type != "access":
+
+    # SECURITY: reject tokens revoked via logout / rotation
+    if await is_token_revoked(payload.get("jti")):
         raise credentials_exception
-    
+
     user_id: str = payload.get("sub")
-    if user_id is None:
+    if not user_id:
         raise credentials_exception
-    
+
     import uuid
     try:
         user_uuid = uuid.UUID(user_id)
     except ValueError:
-        # Token has email instead of UUID - old token format
-        logger.warning(f"Invalid token format - 'sub' is not a UUID: {user_id}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token format invalid. Please log in again.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     user = await auth_service.get_user_by_id(db, user_uuid)
     if user is None:
         raise credentials_exception
-    
     return user
 
 
-@router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
+async def require_admin(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    """
+    Dependency: allow only administrators.
+
+    Admin (system privilege) is distinct from expert (domain privilege).
+    The admin role can only be granted via scripts/make_admin.py - there is
+    deliberately no API path to self-assign it.
+    """
+    if not bool(getattr(current_user, "is_admin", 0)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrator privileges required",
+        )
+    return current_user
+
+
+@router.post("/register", response_model=AuthCookieResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
 async def register(
     request: Request,
@@ -127,13 +169,14 @@ async def register(
         )
     
     # Send verification OTP automatically (MANDATORY)
-    from app.services.email_service import get_email_service
+    from datetime import datetime, timedelta, timezone
+
     from app.models.email_verification_models import EmailVerification
-    from datetime import datetime, timezone, timedelta
+    from app.services.email_service import get_email_service
     
     email_service = get_email_service()
     otp = email_service.generate_otp()
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=10)).replace(tzinfo=None)  # TIMESTAMP WITHOUT TIME ZONE
     
     # Store OTP
     verification = EmailVerification(
@@ -179,140 +222,207 @@ async def register(
         data={"sub": str(user.u_id)}
     )
 
-    return Token(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        token_type="bearer",
-        user=UserResponse.model_validate(user)
+    response = JSONResponse(
+        content={"user": UserResponse.model_validate(user).model_dump(mode="json")}
     )
+    set_auth_cookies(response, access_token, refresh_token)
+    return response
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login")
 @limiter.limit("10/minute")
 async def login(
     request: Request,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: AsyncSession = Depends(get_db),
-    auth_service: AuthService = Depends(get_auth_service)
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """
-    Login with email and password (OAuth2 form)
-    
-    RATE LIMIT: 10 login attempts per minute per IP
-    
-    Returns JWT access token for authenticated requests
-    
-    Note: Email must be verified before login is allowed
+    Login (OAuth2 form). Tokens are set as HttpOnly cookies — NOT returned in body.
+    Response body contains only non-sensitive user info.
     """
-    user = await auth_service.authenticate_user(
-        db=db,
-        email=form_data.username,  # OAuth2 uses 'username' field
-        password=form_data.password
-    )
-    
+    user = await auth_service.get_user_by_email(db, email=form_data.username)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        logger.warning(f"Login failed: Email not registered ({form_data.username})")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Email is not registered",
+                            headers={"WWW-Authenticate": "Bearer"})
     
-    # Check if email is verified
+    if not user.password:
+        logger.warning(f"Login failed: no password set (Google-only account) ({form_data.username})")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="This account signs in with Google. Use 'Continue with Google'.",
+                            headers={"WWW-Authenticate": "Bearer"})
+
+    if not auth_service.verify_password(form_data.password, user.password):
+        logger.warning(f"Login failed: Incorrect password for {form_data.username}")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Incorrect password",
+                            headers={"WWW-Authenticate": "Bearer"})
+
     if not user.email_verified:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Email not verified. Please verify your email before logging in.",
-        )
-    
-    # Create access token
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        logger.warning(f"Login failed: Email not verified ({form_data.username})")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Email not verified. Please verify your email before logging in.")
+
     access_token = auth_service.create_access_token(
         data={"sub": str(user.u_id)},
-        expires_delta=access_token_expires
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
-    
+    refresh_token = auth_service.create_refresh_token(data={"sub": str(user.u_id)})
+
     logger.info(f"User logged in: {user.email}")
+    await log_audit_event(db, action="login", user_id=user.u_id,
+                          ip_address=request.client.host if request.client else None,
+                          resource_type="user", resource_id=str(user.u_id))
 
-    await log_audit_event(
-        db, action="login", user_id=user.u_id,
-        ip_address=request.client.host if request.client else None,
-        resource_type="user", resource_id=str(user.u_id),
-    )
-
-    refresh_token = auth_service.create_refresh_token(
-        data={"sub": str(user.u_id)}
-    )
-
-    return Token(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        token_type="bearer",
-        user=UserResponse.model_validate(user)
-    )
+    response = JSONResponse(content={"user": UserResponse.model_validate(user).model_dump(mode="json")})
+    set_auth_cookies(response, access_token, refresh_token)
+    return response
 
 
-@router.post("/login/json", response_model=Token)
+@router.post("/login/json")
 @limiter.limit("10/minute")
 async def login_json(
     request: Request,
     user_data: UserLogin,
     db: AsyncSession = Depends(get_db),
-    auth_service: AuthService = Depends(get_auth_service)
+    auth_service: AuthService = Depends(get_auth_service),
 ):
-    """
-    Login with JSON payload (alternative to form data)
-    
-    RATE LIMIT: 10 login attempts per minute per IP
-    
-    - **email**: User email
-    - **password**: User password
-    
-    Note: Email must be verified before login is allowed
-    """
-    user = await auth_service.authenticate_user(
-        db=db,
-        email=user_data.email,
-        password=user_data.password
-    )
-    
+    """Login with JSON body. Tokens set as HttpOnly cookies."""
+    user = await auth_service.get_user_by_email(db, email=user_data.email)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password"
-        )
+        logger.warning(f"Login failed: Email not registered ({user_data.email})")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Email is not registered")
     
-    # Check if email is verified
+    if not user.password:
+        # Google-only account: no local password hash to check against.
+        logger.warning(f"Login failed: no password set (Google-only account) ({user_data.email})")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="This account signs in with Google. Use 'Continue with Google'.")
+
+    if not auth_service.verify_password(user_data.password, user.password):
+        logger.warning(f"Login failed: Incorrect password for {user_data.email}")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Incorrect password")
+
     if not user.email_verified:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Email not verified. Please verify your email before logging in.",
-        )
-    
-    # Create access token
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        logger.warning(f"Login failed: Email not verified ({user_data.email})")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Email not verified. Please verify your email before logging in.")
+
     access_token = auth_service.create_access_token(
         data={"sub": str(user.u_id)},
-        expires_delta=access_token_expires
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
-    
+    refresh_token = auth_service.create_refresh_token(data={"sub": str(user.u_id)})
+
     logger.info(f"User logged in: {user.email}")
+    await log_audit_event(db, action="login_json", user_id=user.u_id,
+                          ip_address=request.client.host if request.client else None,
+                          resource_type="user", resource_id=str(user.u_id))
 
-    await log_audit_event(
-        db, action="login_json", user_id=user.u_id,
-        ip_address=request.client.host if request.client else None,
-        resource_type="user", resource_id=str(user.u_id),
-    )
+    response = JSONResponse(content={"user": UserResponse.model_validate(user).model_dump(mode="json")})
+    set_auth_cookies(response, access_token, refresh_token)
+    return response
 
-    refresh_token = auth_service.create_refresh_token(
-        data={"sub": str(user.u_id)}
-    )
 
-    return Token(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        token_type="bearer",
-        user=UserResponse.model_validate(user)
+@router.post("/google")
+@limiter.limit("10/minute")
+async def google_auth(
+    request: Request,
+    body: GoogleAuthRequest,
+    db: AsyncSession = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """
+    Sign in (or sign up) with a Google Identity Services ID token.
+
+    `body.credential` is the JWT from Google's "Sign In With Google" button
+    (its callback's `credential` field) -- verified here, never trusted
+    as-is. An existing account with a matching Google id logs straight in;
+    an existing account with a matching, Google-verified email gets linked
+    (google_id set) rather than duplicated; otherwise a new account is
+    created with no local password.
+    """
+    import uuid
+    from datetime import datetime, timezone
+
+    from google.auth.transport import requests as google_requests
+    from google.oauth2 import id_token as google_id_token
+
+    from app.core.config import settings
+
+    if not settings.google_client_id:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google sign-in is not configured on this server.",
+        )
+
+    try:
+        idinfo = google_id_token.verify_oauth2_token(
+            body.credential, google_requests.Request(), settings.google_client_id
+        )
+    except ValueError as e:
+        logger.warning(f"Google sign-in: token verification failed ({e})")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Invalid Google credential")
+
+    google_user_id = idinfo["sub"]
+    email = idinfo.get("email")
+    if not email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Google account has no email")
+    if not idinfo.get("email_verified"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Google email is not verified")
+
+    user = await auth_service.get_user_by_google_id(db, google_user_id)
+    if not user:
+        # Link to an existing local account with the same (Google-verified)
+        # email rather than creating a duplicate; otherwise sign up fresh.
+        user = await auth_service.get_user_by_email(db, email=email)
+        if user:
+            if not user.google_id:
+                user.google_id = google_user_id
+                if not user.email_verified:
+                    user.email_verified = True
+                await db.commit()
+                await db.refresh(user)
+        else:
+            username = (idinfo.get("name") or email.split("@")[0])[:50]
+            user = User(
+                u_id=uuid.uuid4(),
+                email=email,
+                password=None,
+                user_name=username,
+                google_id=google_user_id,
+                email_verified=True,
+                created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            )
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+            logger.info(f"User registered via Google: {user.email}")
+
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is disabled")
+
+    access_token = auth_service.create_access_token(
+        data={"sub": str(user.u_id)},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
+    refresh_token = auth_service.create_refresh_token(data={"sub": str(user.u_id)})
+
+    logger.info(f"User logged in via Google: {user.email}")
+    await log_audit_event(db, action="login_google", user_id=user.u_id,
+                          ip_address=request.client.host if request.client else None,
+                          resource_type="user", resource_id=str(user.u_id))
+
+    response = JSONResponse(content={"user": UserResponse.model_validate(user).model_dump(mode="json")})
+    set_auth_cookies(response, access_token, refresh_token)
+    return response
 
 
 @router.get("/me", response_model=UserResponse)
@@ -329,34 +439,50 @@ async def get_current_user_info(
 
 @router.post("/promote-expert", response_model=UserResponse)
 async def promote_to_expert(
-    current_user: Annotated[User, Depends(get_current_user)],
-    db: AsyncSession = Depends(get_db)
+    promote_data: PromoteExpertRequest,
+    current_user: Annotated[User, Depends(require_admin)],
+    db: AsyncSession = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """
-    Promote current user to expert status
-    
-    This is a development/testing endpoint that allows users to
-    become experts so they can approve/reject templates.
-    
-    In production, this would require admin privileges.
+    Promote a user to expert status (ADMIN ONLY).
+
+    Experts can approve/reject templates. Only administrators may grant
+    this role.
+
+    SECURITY: this endpoint previously allowed ANY authenticated user to
+    promote themselves (privilege escalation). It is now admin-gated and
+    targets a user by email instead of the caller.
+
+    - **email**: Email address of the user to promote
     """
     from sqlalchemy import update
-    
+
+    target = await auth_service.get_user_by_email(db, promote_data.email)
+    if target is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
     await db.execute(
-        update(User).where(User.u_id == current_user.u_id).values(is_expert=1)
+        update(User).where(User.u_id == target.u_id).values(is_expert=1)
     )
     await db.commit()
-    await db.refresh(current_user)
-    
-    logger.info(f"User promoted to expert: {current_user.email}")
+    await db.refresh(target)
+
+    logger.info(
+        f"User promoted to expert: {target.email} "
+        f"(by admin: {current_user.email})"
+    )
 
     await log_audit_event(
         db, action="promote_to_expert", user_id=current_user.u_id,
         resource_type="user",
-        resource_id=str(current_user.u_id),
+        resource_id=str(target.u_id),
     )
 
-    return UserResponse.model_validate(current_user)
+    return UserResponse.model_validate(target)
 
 
 @router.post("/change-password", response_model=MessageResponse)
@@ -441,10 +567,12 @@ async def forgot_password(
     For security, we always return success even if the email doesn't exist.
     """
     import secrets
-    from datetime import datetime, timezone, timedelta
-    from app.services.email_service import get_email_service
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import and_, select
+
     from app.models.password_reset_models import PasswordReset
-    from sqlalchemy import select, and_
+    from app.services.email_service import get_email_service
     
     # Check if user exists (but don't reveal this to the client)
     user = await auth_service.get_user_by_email(db, forgot_data.email)
@@ -496,7 +624,11 @@ async def forgot_password(
             )
         
         # Build reset URL (frontend URL)
-        frontend_url = request.headers.get("Origin", "http://localhost:3000")
+        # SECURITY: build the reset URL from server-side config only.
+        # Never derive it from Origin/Host request headers — an attacker could
+        # inject their own domain and capture a valid reset token (host header injection).
+        from app.core.config import settings
+        frontend_url = settings.frontend_url.rstrip("/")
         reset_url = f"{frontend_url}/auth/reset-password?token={reset_token}"
         
         # Send email
@@ -541,8 +673,10 @@ async def reset_password(
     - **confirm_password**: Must match new password
     """
     from datetime import datetime, timezone
+
+    from sqlalchemy import and_, select, update
+
     from app.models.password_reset_models import PasswordReset
-    from sqlalchemy import select, update, and_
     
     # Find the reset token
     result = await db.execute(
@@ -626,8 +760,10 @@ async def verify_reset_token(
     Returns token validity status
     """
     from datetime import datetime, timezone
+
+    from sqlalchemy import and_, select
+
     from app.models.password_reset_models import PasswordReset
-    from sqlalchemy import select, and_
     
     result = await db.execute(
         select(PasswordReset).where(
@@ -648,103 +784,93 @@ async def verify_reset_token(
     return {"valid": True, "email": reset_record.email}
 
 
-@router.post("/refresh", response_model=Token)
+@router.post("/refresh")
 @limiter.limit("30/minute")
 async def refresh_access_token(
     request: Request,
-    refresh_data: RefreshTokenRequest,
     db: AsyncSession = Depends(get_db),
-    auth_service: AuthService = Depends(get_auth_service)
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """
-    Refresh access token using a refresh token
-
-    RATE LIMIT: 30 refreshes per minute per IP
-
-    - **refresh_token**: Valid refresh token from login/register
-
-    Returns new access token and refresh token pair
+    Silent token rotation. Reads refresh_token from HttpOnly cookie.
+    Issues a new access_token (and rotated refresh_token) as cookies.
+    RATE LIMIT: 30/minute per IP.
     """
-    # Decode refresh token
-    payload = auth_service.decode_token(refresh_data.refresh_token)
-    if payload is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired refresh token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    _unauth = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Invalid or expired refresh token")
 
-    # Verify it's a refresh token
-    if payload.get("type") != "refresh":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token type",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    raw = request.cookies.get(REFRESH_TOKEN_COOKIE)
+    if not raw:
+        raise _unauth
+
+    payload = auth_service.decode_token(raw)
+    if payload is None or payload.get("type") != "refresh":
+        raise _unauth
+
+    # SECURITY: reject refresh tokens revoked via logout / prior rotation
+    if await is_token_revoked(payload.get("jti")):
+        raise _unauth
 
     user_id = payload.get("sub")
-    if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    if not user_id:
+        raise _unauth
 
     import uuid
     try:
         user_uuid = uuid.UUID(user_id)
     except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token format",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise _unauth
 
-    # Get user
     user = await auth_service.get_user_by_id(db, user_uuid)
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise _unauth
 
-    # Issue new tokens
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    new_access_token = auth_service.create_access_token(
+    new_access  = auth_service.create_access_token(
         data={"sub": str(user.u_id)},
-        expires_delta=access_token_expires
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
-    new_refresh_token = auth_service.create_refresh_token(
-        data={"sub": str(user.u_id)}
-    )
+    new_refresh = auth_service.create_refresh_token(data={"sub": str(user.u_id)})
 
-    logger.info(f"Token refreshed for user: {user.email}")
+    # SECURITY: refresh tokens are one-time use - revoke the one just spent
+    # so a stolen (already-used) refresh token cannot mint new sessions.
+    if payload.get("jti") and payload.get("exp"):
+        await revoke_token(payload["jti"], payload["exp"])
 
-    return Token(
-        access_token=new_access_token,
-        refresh_token=new_refresh_token,
-        token_type="bearer",
-        user=UserResponse.model_validate(user)
-    )
+    logger.info(f"Token rotated for user: {user.email}")
+
+    response = JSONResponse(content={"user": UserResponse.model_validate(user).model_dump(mode="json")})
+    set_auth_cookies(response, new_access, new_refresh)
+    return response
 
 
-@router.post("/logout", response_model=MessageResponse)
-async def revoke_token(
-    current_user: Annotated[User, Depends(get_current_user)]
+@router.post("/logout")
+async def logout(
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_user)],
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """
-    Logout endpoint — signals the client to discard all tokens.
-
-    Note: JWTs are stateless, so this endpoint does NOT revoke or blacklist
-    tokens. Tokens remain valid until they expire. The client should delete
-    stored tokens upon receiving the response.
+    Logout: expires both HttpOnly auth cookies AND revokes the tokens
+    server-side via the Redis denylist, so they cannot be replayed even
+    if captured before logout.
     """
-    # TODO: Implement a token blacklist (e.g., store invalidated JTIs in Redis
-    # with TTL matching the token's remaining lifetime) for true revocation.
-    logger.info(f"Token revoked for user: {current_user.email}")
-    return MessageResponse(
-        message="Logout successful \u2014 please discard your tokens. "
-        "Tokens remain valid until expiration unless a server-side blacklist is implemented."
-    )
+    # Collect both tokens (cookie first, Bearer fallback for access)
+    access_raw = request.cookies.get(ACCESS_TOKEN_COOKIE)
+    if not access_raw:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            access_raw = auth_header[7:]
+    refresh_raw = request.cookies.get(REFRESH_TOKEN_COOKIE)
+
+    for raw in (access_raw, refresh_raw):
+        if not raw:
+            continue
+        payload = auth_service.decode_token(raw)
+        if payload and payload.get("jti") and payload.get("exp"):
+            await revoke_token(payload["jti"], payload["exp"])
+
+    logger.info(f"User logged out (tokens revoked): {current_user.email}")
+    response = JSONResponse(content={"message": "Logged out successfully."})
+    clear_auth_cookies(response)
+    return response
 

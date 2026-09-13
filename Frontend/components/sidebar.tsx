@@ -19,17 +19,19 @@ import {
   Zap,
   Shield,
   HelpCircle,
+  BookOpen,
 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { useSidebar } from '@/contexts/sidebar-context'
 import { useAuth } from '@/contexts/AuthContext'
-import { HelpButton } from '@/components/help/HelpButton'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Templates', href: '/templates', icon: FileCode },
   { name: 'Datasets', href: '/datasets', icon: Database },
   { name: 'Settings', href: '/settings', icon: Settings },
+  { name: 'Docs', href: '/docs', icon: BookOpen },
+  { name: 'Help', href: '/help', icon: HelpCircle },
 ]
 
 /**
@@ -88,11 +90,6 @@ export function Sidebar() {
               <Moon className="absolute inset-0 h-full w-full rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" />
             </div>
           </button>
-
-          {/* Help */}
-          <div className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-            <HelpButton className="!h-auto !w-auto p-0 hover:bg-transparent" />
-          </div>
 
           {/* User Avatar */}
           {isAuthenticated && user && (
@@ -292,15 +289,6 @@ export function Sidebar() {
               )}
             </div>
           )}
-
-          {/* Help Button */}
-          <div className={cn(
-            'flex items-center rounded-sm transition-colors hover:bg-accent',
-            isExpanded ? 'px-2 py-1.5' : 'p-1 justify-center'
-          )}>
-            <HelpButton className="!h-auto !w-auto p-0 hover:bg-transparent" />
-            {isExpanded && <span className="text-xs text-muted-foreground ml-2">Help</span>}
-          </div>
 
           {/* Theme Toggle */}
           <button

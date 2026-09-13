@@ -137,6 +137,7 @@ export default function DatasetGeneratorPage() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [sessionExpired, setSessionExpired] = useState(false)
 
   // New state for persistent datasets
   const [persistentDatasets, setPersistentDatasets] = useState<PersistentDataset[]>([])
@@ -152,6 +153,13 @@ export default function DatasetGeneratorPage() {
 
   const RAW_API_BASE = getApiBase()
   const API_BASE = RAW_API_BASE ? RAW_API_BASE.replace(/\/$/, '') : ''
+  const withSession = useCallback((options: RequestInit = {}): RequestInit => ({
+    ...options,
+    credentials: 'include',
+    headers: {
+      ...(options.headers || {}),
+    },
+  }), [])
 
   // Format date in unambiguous format with local timezone: "Dec 10, 2025, 7:28 PM"
   const formatDateTime = (dateString: string | undefined): string => {
@@ -196,14 +204,9 @@ export default function DatasetGeneratorPage() {
 
   const fetchPreview = useCallback(async (taskId: string, limit: number = 100, offset: number = 0) => {
     try {
-      const token = localStorage.getItem('nlpforge_access_token')
       const response = await fetch(
         `${API_BASE}/api/v1/datasets/preview/task/${taskId}?limit=${limit}&offset=${offset}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
+        withSession()
       )
       const data = await response.json()
       setPreviewData(data)
@@ -212,16 +215,17 @@ export default function DatasetGeneratorPage() {
       console.error('Error fetching preview:', err)
       setError(formatError(err))
     }
-  }, [API_BASE, pageSize])
+  }, [API_BASE, pageSize, withSession])
 
   const fetchAllTasks = useCallback(async () => {
     try {
-      const token = localStorage.getItem('nlpforge_access_token')
-      const response = await fetch(`${API_BASE}/api/v1/datasets`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+      const response = await fetch(`${API_BASE}/api/v1/datasets`, withSession())
+      if (response.status === 401) {
+        // JWT expired — stop all polls, show re-login message
+        setSessionExpired(true)
+        setIsLoading(false)
+        return
+      }
       if (!response.ok) throw new Error('Failed to fetch')
       const data = await response.json()
       // Now datasets come from PostgreSQL (persistent)
@@ -232,7 +236,7 @@ export default function DatasetGeneratorPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [API_BASE])
+  }, [API_BASE, withSession])
 
   const isMountedRef = useRef(true)
   useEffect(() => {
@@ -242,12 +246,7 @@ export default function DatasetGeneratorPage() {
 
   const fetchTaskStatus = useCallback(async (taskId: string) => {
     try {
-      const token = localStorage.getItem('nlpforge_access_token')
-      const response = await fetch(`${API_BASE}/api/v1/datasets/status/${taskId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+      const response = await fetch(`${API_BASE}/api/v1/datasets/status/${taskId}`, withSession())
 
       if (!isMountedRef.current) return
 
@@ -256,6 +255,13 @@ export default function DatasetGeneratorPage() {
           // Task no longer exists (server restart or task expired)
           setIsGenerating(false)
           setCurrentTask(null)
+          return
+        }
+        if (response.status === 401) {
+          // JWT token expired — stop polling immediately, prompt re-login
+          setIsGenerating(false)
+          setCurrentTask(null)
+          setError('Session expired. Please log in again to continue.')
           return
         }
         throw new Error(`Request failed with status ${response.status}`)
@@ -279,7 +285,7 @@ export default function DatasetGeneratorPage() {
       console.error('Error fetching task status:', err)
       setError(formatError(err))
     }
-  }, [API_BASE, fetchPreview, fetchAllTasks])
+  }, [API_BASE, fetchPreview, fetchAllTasks, withSession])
 
   useEffect(() => {
     // Only fetch on client side
@@ -289,13 +295,12 @@ export default function DatasetGeneratorPage() {
         console.log('Backend not available:', err)
       })
       // Fetch only APPROVED templates for dataset generation
-      const token = localStorage.getItem('nlpforge_access_token')
-      fetch(`${API_BASE}/api/v1/templates?status_filter=approved`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+      fetch(`${API_BASE}/api/v1/templates?status_filter=approved`, withSession())
         .then(async (res) => {
+          if (res.status === 401) {
+            setSessionExpired(true)
+            return []
+          }
           if (!res.ok) throw new Error('Failed to fetch templates')
           return res.json()
         })
@@ -314,7 +319,7 @@ export default function DatasetGeneratorPage() {
           setTemplates([])
         })
     }
-  }, [fetchAllTasks, API_BASE])
+  }, [fetchAllTasks, API_BASE, withSession])
 
   useEffect(() => {
     if (currentTask && currentTask.status === 'running') {
@@ -331,13 +336,14 @@ export default function DatasetGeneratorPage() {
       d => d.embedding_status === 'in_progress'
     )
 
-    if (hasEmbeddingInProgress) {
+    // Do not poll if session has expired — avoids 401 log flood
+    if (hasEmbeddingInProgress && !sessionExpired) {
       const interval = setInterval(() => {
         fetchAllTasks()
       }, 3000) // Poll every 3 seconds
       return () => clearInterval(interval)
     }
-  }, [persistentDatasets, fetchAllTasks])
+  }, [persistentDatasets, fetchAllTasks, sessionExpired])
 
   const handleGenerate = async () => {
     if (!templateId) {
@@ -356,19 +362,17 @@ export default function DatasetGeneratorPage() {
     setPreviewData(null)
 
     try {
-      const token = localStorage.getItem('nlpforge_access_token')
-      const response = await fetch(`${API_BASE}/api/v1/datasets/generate`, {
+      const response = await fetch(`${API_BASE}/api/v1/datasets/generate`, withSession({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           template_id: templateId,
           num_examples: parseInt(numExamples) || 100,
           user_prompt: userPrompt,
         }),
-      })
+      }))
 
       const data = await response.json()
 
@@ -387,12 +391,7 @@ export default function DatasetGeneratorPage() {
 
   const handleDownload = async (taskId: string, format: string) => {
     try {
-      const token = localStorage.getItem('nlpforge_access_token')
-      const response = await fetch(`${API_BASE}/api/v1/datasets/download/${taskId}/${format}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+      const response = await fetch(`${API_BASE}/api/v1/datasets/download/${taskId}/${format}`, withSession())
       if (response.ok) {
         const blob = await response.blob()
         const url = window.URL.createObjectURL(blob)
@@ -422,14 +421,10 @@ export default function DatasetGeneratorPage() {
       const formData = new FormData()
       formData.append('file', uploadedFile)
 
-      const token = localStorage.getItem('nlpforge_access_token')
-      const response = await fetch(`${API_BASE}/api/v1/datasets/upload`, {
+      const response = await fetch(`${API_BASE}/api/v1/datasets/upload`, withSession({
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
         body: formData,
-      })
+      }))
 
       const data = await response.json()
 
@@ -466,10 +461,9 @@ export default function DatasetGeneratorPage() {
     setViewPage(0)
     setIsViewLoading(true)
     try {
-      const token = localStorage.getItem('nlpforge_access_token')
       const response = await fetch(
         `${API_BASE}/api/v1/datasets/db/${dataset.dataset_id}/rows?skip=0&limit=50`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
+        withSession()
       )
       const data = await response.json()
       setViewingRows(data.rows || [])
@@ -488,10 +482,9 @@ export default function DatasetGeneratorPage() {
     setViewPage(newPage)
     const newSkip = newPage * 50
     try {
-      const token = localStorage.getItem('nlpforge_access_token')
       const response = await fetch(
         `${API_BASE}/api/v1/datasets/db/${viewingDataset.dataset_id}/rows?skip=${newSkip}&limit=50`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
+        withSession()
       )
       const data = await response.json()
       setViewingRows(data.rows || [])
@@ -513,12 +506,10 @@ export default function DatasetGeneratorPage() {
     })
 
     try {
-      const token = localStorage.getItem('nlpforge_access_token')
       const url = `${API_BASE}/api/v1/datasets/db/${datasetId}/embed${forceReembed ? '?force_reembed=true' : ''}`
-      const response = await fetch(url, {
+      const response = await fetch(url, withSession({
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
+      }))
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
@@ -551,17 +542,15 @@ export default function DatasetGeneratorPage() {
   const handleRenameDataset = async () => {
     if (!renamingDataset || !newDatasetName.trim()) return
     try {
-      const token = localStorage.getItem('nlpforge_access_token')
       const response = await fetch(
         `${API_BASE}/api/v1/datasets/db/${renamingDataset.dataset_id}/rename`,
-        {
+        withSession({
           method: 'PATCH',
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ name: newDatasetName.trim() })
-        }
+        })
       )
       if (!response.ok) throw new Error('Failed to rename')
       setRenamingDataset(null)
@@ -576,11 +565,9 @@ export default function DatasetGeneratorPage() {
   const handleDeleteDataset = async (datasetId: string) => {
     if (!confirm('Are you sure you want to delete this dataset? This action cannot be undone.')) return
     try {
-      const token = localStorage.getItem('nlpforge_access_token')
-      const response = await fetch(`${API_BASE}/api/v1/datasets/db/${datasetId}`, {
+      const response = await fetch(`${API_BASE}/api/v1/datasets/db/${datasetId}`, withSession({
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
+      }))
       if (!response.ok) throw new Error('Failed to delete')
       await fetchAllTasks()
     } catch (err) {
@@ -591,11 +578,10 @@ export default function DatasetGeneratorPage() {
   // Handler: Download dataset as CSV
   const handleDownloadDatasetById = async (dataset: PersistentDataset) => {
     try {
-      const token = localStorage.getItem('nlpforge_access_token')
       // Use the dataset rows endpoint to get all rows
       const response = await fetch(
         `${API_BASE}/api/v1/datasets/db/${dataset.dataset_id}/rows?skip=0&limit=${dataset.total_rows}`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
+        withSession()
       )
       const data = await response.json()
 

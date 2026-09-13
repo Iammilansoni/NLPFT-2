@@ -3,18 +3,22 @@ User Data API - Authenticated CRUD operations for user's templates and CSV data
 Handles multi-tenant data management with proper user isolation
 """
 
-from typing import Annotated, List
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
+from typing import Annotated, List
 
-from app.core.postgres import get_db
-from app.services.enterprise_service import get_enterprise_service, EnterpriseService
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.v1.auth import get_current_user
+from app.core.postgres import get_db
 from app.models.schemas import (
-    UserResponse, TemplateCreate, TemplateResponse,
-    CSVDataCreate, CSVDataResponse
+    CSVDataCreate,
+    CSVDataResponse,
+    TemplateCreate,
+    TemplateResponse,
+    UserResponse,
 )
+from app.services.enterprise_service import EnterpriseService, get_enterprise_service
 
 router = APIRouter()
 

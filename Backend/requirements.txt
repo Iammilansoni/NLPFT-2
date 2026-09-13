@@ -18,10 +18,17 @@ alembic==1.13.0  # Database migrations
 # Redis dependencies
 redis==4.6.0  # Redis client
 redis[hiredis]==4.6.0  # Redis with C parser for performance
+celery[redis]==5.3.6   # Distributed task queue (broker + result backend via Redis)
 
 # Authentication and Security
 python-jose[cryptography]==3.3.0  # JWT tokens
 passlib[bcrypt]==1.7.4  # Password hashing
+# passlib 1.7.4 (2020) probes bcrypt.__about__.__version__ to detect the
+# backend version; bcrypt>=4.1 removed that attribute, so the probe throws
+# and passlib falls back into a broken config that rejects any password
+# ("password cannot be longer than 72 bytes") in short-lived processes
+# (e.g. scripts/seed_demo.py). Pin below that break.
+bcrypt==4.0.1
 python-multipart==0.0.6  # Form uploads
 
 # NLP and ML dependencies (Ollama + Gemini)
@@ -30,6 +37,7 @@ numpy>=1.26.0  # Numerical computing (1.26+ for Python 3.12 support)
 pandas>=2.1.0  # Data manipulation (2.1+ for Python 3.12 support)
 httpx>=0.25.2  # HTTP client for Ollama API
 google-generativeai>=0.8.3  # Gemini API support
+google-auth>=2.35.0  # Verifies Google Sign-In ID tokens (/auth/google)
 
 # System monitoring
 psutil==5.9.6  # System resource monitoring
@@ -44,6 +52,11 @@ tqdm==4.66.1  # Progress bars
 
 # Rate limiting
 slowapi==0.1.9  # Rate limiting with Redis backend
+
+# Observability & Monitoring
+prometheus-client>=0.20.0  # Prometheus metrics exposition
+python-json-logger>=2.0.7  # JSON log formatting for Loki/ELK ingestion
+
 
 # Development and testing
 pytest==7.4.3

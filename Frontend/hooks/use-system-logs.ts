@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getApiBase, getWsUrl } from '../lib/runtime-config';
+import apiClient from '../lib/api-client';
 
 export type LogCategory = 'info' | 'warning' | 'error' | 'success';
 export type LogSeverity = 'normal' | 'high' | 'critical';
@@ -116,19 +117,31 @@ export function useSystemLogs() {
         ));
     }, []);
 
-    const connect = useCallback(() => {
+    const connect = useCallback(async () => {
         if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-        // Get token from localStorage
-        const token = typeof window !== 'undefined' ? localStorage.getItem('nlpforge_access_token') : null;
+    // WebSockets cannot send cookies directly. Fetch a fresh access token by
+    // calling a cookie-authenticated endpoint, then pass it as a query param.
+    // If the access cookie is expired, the Axios interceptor silently refreshes it.
+    let wsToken: string | null = null;
+    try {
+      // POST /auth/refresh reads the HttpOnly refresh cookie and returns
+      // a new access cookie. We capture the raw token from the response.
+      const refreshResp = await apiClient.post<{ access_token?: string }>('/api/v1/auth/refresh');
+      wsToken = refreshResp.data?.access_token ?? null;
+    } catch {
+      // refresh failed — also try /auth/me which validates the existing access cookie
+    }
 
-        if (!token) {
-            console.log('[Logs] No token found, skipping system logs connection');
-            return;
-        }
+    // Fallback: try getting a token string from the auth/me endpoint isn't
+    // possible since tokens are HttpOnly. If we have no wsToken, skip WS.
+    if (!wsToken) {
+      console.log('[Logs] No WS token available, skipping system logs connection');
+      return;
+    }
 
         try {
-            const ws = new WebSocket(`${WS_BASE_URL}/ws/system-logs?token=${token}`);
+            const ws = new WebSocket(`${WS_BASE_URL}/ws/system-logs?token=${wsToken}`);
 
             ws.onopen = () => {
                 setIsConnected(true);
@@ -164,8 +177,12 @@ export function useSystemLogs() {
                 }
             };
 
-            ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
+            ws.onerror = () => {
+                // Browser WebSocket error events intentionally carry no detail (security policy).
+                // Meaningful diagnostics live in the onclose handler (event.code / event.reason).
+                console.warn(
+                    `[Logs] WebSocket connection failed — url: ${WS_BASE_URL}/ws/system-logs, readyState: ${ws.readyState}`
+                );
             };
 
             ws.onmessage = (event) => {

@@ -137,15 +137,9 @@ export class DatasetApiClient {
       headers: {
         'Content-Type': 'application/json',
       },
-    });
-
-    // Add auth token interceptor
-    this.client.interceptors.request.use((config) => {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      return config;
+      // SECURITY: auth via HttpOnly cookies, sent automatically by the
+      // browser. No tokens in localStorage / JS-accessible memory.
+      withCredentials: true,
     });
   }
 
@@ -191,12 +185,13 @@ export class DatasetApiClient {
    * Trigger download in browser by task ID
    */
   triggerDownload(taskId: string, filename?: string, format: string = 'csv'): void {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : '';
+    // SECURITY: the HttpOnly auth cookie is sent automatically on same-site
+    // navigation - never put tokens in URLs (they leak into history/logs).
     const url = `${getApiBaseUrl()}/api/v1/datasets/download/${taskId}/${format}`;
 
     // Create temporary link
     const link = document.createElement('a');
-    link.href = token ? `${url}?token=${token}` : url;
+    link.href = url;
     link.download = filename || `dataset_${taskId}.${format}`;
     document.body.appendChild(link);
     link.click();
@@ -207,12 +202,12 @@ export class DatasetApiClient {
    * Download dataset by filename
    */
   triggerDownloadByFilename(filename: string): void {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : '';
+    // SECURITY: cookie-based auth - no tokens in URLs.
     const url = `${getApiBaseUrl()}/api/v1/datasets/download-file/${filename}`;
 
     // Create temporary link
     const link = document.createElement('a');
-    link.href = token ? `${url}?token=${token}` : url;
+    link.href = url;
     link.download = filename;
     document.body.appendChild(link);
     link.click();

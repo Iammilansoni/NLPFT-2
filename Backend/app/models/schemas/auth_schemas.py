@@ -5,6 +5,7 @@ Matches: users table
 
 from datetime import datetime
 from typing import Optional
+
 from pydantic import BaseModel, EmailStr, Field, validator
 
 
@@ -45,12 +46,19 @@ class UserLogin(BaseModel):
     password: str
 
 
+class GoogleAuthRequest(BaseModel):
+    """Body for POST /auth/google: the ID token from Google Identity Services'
+    Sign In With Google button (the `credential` field of its callback)."""
+    credential: str = Field(..., min_length=1)
+
+
 class UserResponse(BaseModel):
     """User response schema"""
     user_id: str
     email: EmailStr
     username: str
     is_expert: bool = False
+    is_admin: bool = False
     created_at: datetime
     
     class Config:
@@ -66,10 +74,16 @@ class UserResponse(BaseModel):
                 'email': obj.email,
                 'username': obj.user_name or obj.email.split('@')[0],
                 'is_expert': bool(getattr(obj, 'is_expert', 0)),
+                'is_admin': bool(getattr(obj, 'is_admin', 0)),
                 'created_at': obj.created_at
             }
             return cls(**data)
         return super().model_validate(obj)
+
+
+class PromoteExpertRequest(BaseModel):
+    """Admin-only request to grant expert status to a user"""
+    email: EmailStr
 
 
 class Token(BaseModel):
@@ -77,6 +91,11 @@ class Token(BaseModel):
     access_token: str
     refresh_token: Optional[str] = None
     token_type: str = "bearer"
+    user: UserResponse
+
+
+class AuthCookieResponse(BaseModel):
+    """Response for cookie-based auth: tokens are in HttpOnly cookies, body has user only."""
     user: UserResponse
 
 

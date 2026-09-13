@@ -11,17 +11,16 @@ Works with the EmbeddingModelRegistry for persistent model tracking.
 """
 
 import asyncio
-from typing import List, Dict, Any, Optional, Callable
 from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional
 
 import httpx
 
-from app.core.logger import logger
 from app.core.embedding_model_registry import (
-    get_embedding_registry,
     EmbeddingModelSpec,
+    get_embedding_registry,
 )
-
+from app.core.logger import logger
 
 # =============================================================================
 # DATA CLASSES

@@ -22,19 +22,19 @@ Query Flow:
 5. Return: Clean JSON output
 """
 
-from typing import Annotated, Optional, List
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel, Field
 import uuid
+from typing import Annotated, List, Optional
 
-from app.core.postgres import get_db
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.v1.auth import get_current_user
-from app.models.schemas import UserResponse
-from app.services.multi_model_semantic_service import get_multi_model_semantic_service
-from app.services.multi_model_embedding_service import get_multi_model_embedding_service
 from app.core.embedding_model_registry import get_embedding_registry
-
+from app.core.postgres import get_db
+from app.models.schemas import UserResponse
+from app.services.multi_model_embedding_service import get_multi_model_embedding_service
+from app.services.multi_model_semantic_service import get_multi_model_semantic_service
 
 router = APIRouter(prefix="/query", tags=["multi-model-query"])
 
@@ -51,6 +51,7 @@ class SemanticQueryRequest(BaseModel):
     template_id: Optional[str] = Field(None, description="Optional template UUID filter")
     intent: Optional[str] = Field(None, description="Optional detected intent")
     include_alternatives: bool = Field(default=False, description="Include alternative APIs")
+    include_slot_extraction: bool = Field(default=True, description="Whether to extract values from query")
 
 
 class FinalOutput(BaseModel):
@@ -87,6 +88,9 @@ class SemanticQueryResponse(BaseModel):
     
     # Metadata
     metadata: Optional[dict] = None
+    
+    # Slot Extraction Result
+    extracted_request_body: Optional[dict] = None
     
     # Legacy fields
     api_name: Optional[str] = None
@@ -141,7 +145,8 @@ async def semantic_search(
         dataset_id=dataset_id,
         template_id=template_id,
         user_query_intent=request.intent,
-        include_alternatives=request.include_alternatives
+        include_alternatives=request.include_alternatives,
+        include_slot_extraction=request.include_slot_extraction
     )
     
     return result

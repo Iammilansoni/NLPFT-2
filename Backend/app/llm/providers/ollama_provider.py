@@ -15,24 +15,23 @@ Features:
 """
 
 import time
-from typing import Optional, List, Dict, Any, Callable
+from typing import Any, Callable, Dict, List, Optional
 
 import httpx
 
 from app.core.logger import logger
 from app.llm.providers.base import (
     BaseLLMProvider,
-    ProviderType,
+    ConnectionTestResult,
+    InvalidRequestError,
     LLMConfig,
     LLMResponse,
-    ProviderModel,
-    ConnectionTestResult,
-    ProviderError,
-    TransientError,
     ModelNotFoundError,
-    InvalidRequestError,
+    ProviderError,
+    ProviderModel,
+    ProviderType,
+    TransientError,
 )
-
 
 # =============================================================================
 # OLLAMA PROVIDER

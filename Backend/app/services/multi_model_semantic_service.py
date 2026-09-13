@@ -40,23 +40,32 @@ This means re-ranking works correctly regardless of which model
 was used for embedding, as long as the search was done correctly.
 """
 
-import uuid
 import time
-from typing import Dict, List, Any, Optional, Tuple
+import uuid
 from collections import defaultdict
 from statistics import mean
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-import numpy as np
+from typing import Any, Dict, List, Optional, Tuple
 
-from app.core.logger import logger
+import numpy as np
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.embedding_model_registry import get_embedding_registry
-from app.models.database_models import Template, Dataset
-from app.services.user_embedding_settings_service import get_user_embedding_settings_service
+from app.core.logger import logger
+from app.core.runtime import get_embedder
+from app.core.tenancy import tenant_session
+from app.models.database_models import Dataset, Template
+from app.models.schemas.embedding_schemas import ErrorCode
+from app.nlp.cross_encoder_reranker import (
+    STAGE1_TOP_K,
+    STAGE2_TOP_K,
+    get_reranker,
+)
 from app.services.multi_model_redis_service import get_multi_model_redis_service
 from app.services.ollama_embedding_service import get_ollama_service
+from app.services.pgvector_store import get_pgvector_store
 from app.services.slot_extraction_service import get_slot_extraction_service
-from app.models.schemas.embedding_schemas import ErrorCode
+from app.services.user_embedding_settings_service import get_user_embedding_settings_service
 
 
 class MultiModelSemanticRetrievalService:
@@ -83,6 +92,13 @@ class MultiModelSemanticRetrievalService:
         self.redis_service = get_multi_model_redis_service()
         self.ollama_service = get_ollama_service()
         self.slot_extractor = get_slot_extraction_service()
+        # Stage 1 recall (pgvector) and its embedder. Process-wide singletons,
+        # same lifetime as everything else grabbed here.
+        self.embedder = get_embedder()
+        self.pgvector_store = get_pgvector_store()
+        # Stage 2 cross-encoder. Process-wide singleton; the ONNX model is loaded
+        # once, lazily, and every inference is offloaded off the event loop.
+        self.reranker = get_reranker()
 
     # =========================================================================
     # MAIN RETRIEVAL PIPELINE
@@ -93,7 +109,7 @@ class MultiModelSemanticRetrievalService:
         db: AsyncSession,
         user_id: uuid.UUID,
         user_query: str,
-        top_k: int = 10,
+        top_k: int = STAGE1_TOP_K,
         dataset_id: Optional[uuid.UUID] = None,
         template_id: Optional[uuid.UUID] = None,
         user_query_intent: Optional[str] = None,
@@ -137,19 +153,32 @@ class MultiModelSemanticRetrievalService:
         )
         
         # =====================================================================
-        # STEP 1: Get user's active embedding model from Settings
+        # STEP 1-4: Stage 1 recall via pgvector
         # =====================================================================
-        model_id, dimension, model_spec = await self.settings_service.get_active_embedding_model_async(
-            db, user_id
-        )
-        
-        logger.info(f"Step 1: Active model from Settings: {model_id} (dim={dimension})")
-        
+        # This used to resolve a per-user model from Settings and search a
+        # model-specific Redis index (see git history). That path was never
+        # actually reachable from real data: templates/vectors written by
+        # seed_demo.py and the "generate dataset" flow land in Postgres's
+        # `vector_rows` (pgvector_store.py), and Redis's model-specific
+        # indices were never populated by anything, so every query here
+        # returned NO_RESULTS regardless of what had been seeded. pgvector is
+        # also what alembic/versions/20260823_pgvector_and_rls.py actually
+        # built RLS + the HNSW indexes for.
+        #
+        # pgvector has one global embedder per runtime (EXECUTION_MODE), not
+        # a per-user Settings-selectable model the way the Redis path did, so
+        # there is no per-user model to resolve here — every row was written
+        # with get_embedder()'s (model, dimension), and the query is embedded
+        # the same way.
+        embedder = self.embedder
+        effective_model = embedder.model_id
+        dimension = embedder.dimension
+
+        logger.info(f"Step 1: Runtime embedder: {effective_model} (dim={dimension})")
+
         # =====================================================================
         # STEP 2: Check compatibility with dataset (if specified)
         # =====================================================================
-        effective_model = model_id
-        
         if not skip_compatibility_check and (dataset_id or template_id):
             # Get dataset to check embedded model
             if dataset_id:
@@ -170,61 +199,54 @@ class MultiModelSemanticRetrievalService:
                 dataset = result.scalar_one_or_none()
             else:
                 dataset = None
-            
+
             if dataset and dataset.embedding_model:
-                if dataset.embedding_model != model_id:
+                if dataset.embedding_model != effective_model:
                     # MISMATCH DETECTED - FAIL
                     logger.warning(
-                        f"Step 2: Model mismatch! Settings={model_id}, "
+                        f"Step 2: Model mismatch! Runtime={effective_model}, "
                         f"Dataset={dataset.embedding_model}"
                     )
-                    
+
                     return {
                         "success": False,
                         "error": ErrorCode.MODEL_MISMATCH,
                         "message": (
-                            f"Model mismatch: Your Settings use '{model_id}', "
-                            f"but dataset was embedded with '{dataset.embedding_model}'."
+                            f"Model mismatch: this deployment embeds with "
+                            f"'{effective_model}', but the dataset was embedded "
+                            f"with '{dataset.embedding_model}'."
                         ),
-                        "settings_model": model_id,
+                        "settings_model": effective_model,
                         "dataset_model": dataset.embedding_model,
                         "dataset_id": str(dataset.dataset_id),
                         "options": [
                             {
-                                "action": "switch_settings",
-                                "label": f"Use {dataset.embedding_model}",
-                                "description": "Update Settings to match dataset"
-                            },
-                            {
                                 "action": "reembed",
-                                "label": f"Re-embed with {model_id}",
-                                "description": "Re-embed dataset with current model"
+                                "label": f"Re-embed with {effective_model}",
+                                "description": "Re-embed dataset with the current runtime model"
                             }
                         ]
                     }
-                
+
                 logger.info("Step 2: Model compatibility verified")
-        
+
         # =====================================================================
-        # STEP 3: Generate query embedding using correct model
+        # STEP 3: Generate query embedding using the runtime embedder
         # =====================================================================
         logger.info(f"Step 3: Generating query embedding with {effective_model}")
-        
+
         try:
-            query_embedding = await self.ollama_service.generate_embedding(
-                model_name=effective_model,
-                text=user_query
-            )
-            
+            query_embedding = await embedder.embed_one(user_query)
+
             if not query_embedding:
                 return {
                     "success": False,
                     "error": "EMBEDDING_FAILED",
                     "message": "Failed to generate query embedding"
                 }
-            
+
             query_vector = np.array(query_embedding, dtype=np.float32)
-            
+
             # Verify dimension
             if query_vector.shape[0] != dimension:
                 logger.error(
@@ -236,7 +258,7 @@ class MultiModelSemanticRetrievalService:
                     "error": "DIMENSION_MISMATCH",
                     "message": "Query embedding dimension mismatch"
                 }
-                
+
         except Exception as e:
             logger.error(f"Embedding generation failed: {e}")
             return {
@@ -244,32 +266,36 @@ class MultiModelSemanticRetrievalService:
                 "error": "EMBEDDING_FAILED",
                 "message": str(e)
             }
-        
+
         logger.info(f"Step 3: Query embedded (dim={query_vector.shape[0]})")
-        
+
         # =====================================================================
-        # STEP 4: Search model-specific Redis index
+        # STEP 4: Search pgvector (Stage 1 recall)
         # =====================================================================
-        logger.info(
-            f"Step 4: Searching Redis index '{model_spec.redis_index_name}'"
-        )
-        
-        search_results = self.redis_service.search_similar_vectors(
-            model_id=effective_model,
-            user_id=user_id,
-            query_vector=query_vector,
-            top_k=top_k,
-            dataset_id=dataset_id,
-            template_id=template_id
-        )
-        
+        logger.info(f"Step 4: Searching pgvector (model={effective_model}, dim={dimension})")
+
+        # tenant_session binds app.tenant_id (RLS) and tunes hnsw.iterative_scan
+        # on this transaction — pgvector_store's own contract requires it; a
+        # bare session both skips that tuning and, per RLS, sees no rows.
+        async with tenant_session(user_id) as tdb:
+            vector_result = await self.pgvector_store.search(
+                tdb,
+                query_vector,
+                embedding_model=effective_model,
+                dimension=dimension,
+                top_k=top_k,
+                dataset_id=dataset_id,
+                template_id=template_id,
+            )
+        search_results = vector_result.rows
+
         # Format Stage 1 results
         stage1_results = [
             {
                 "query": r.get("query", ""),
                 "similarity_score": round(r.get("similarity", 0.0), 4),
                 "t_id": r.get("template_id", r.get("t_id", "")),
-                "row_id": r.get("row_id", 0)
+                "row_id": r.get("row_uid", 0)
             }
             for r in search_results
         ]
@@ -287,59 +313,62 @@ class MultiModelSemanticRetrievalService:
         logger.info(f"Step 4: Retrieved {len(search_results)} candidates")
         
         # =====================================================================
-        # STEP 5: Group by t_id (template ID)
+        # STEP 5 + 6: Stage 2 — CROSS-ENCODER RERANKING
         # =====================================================================
-        logger.info("Step 5: Grouping by template ID")
-        
-        grouped = self._group_by_template(search_results)
-        
-        if not grouped:
-            return {
-                "success": False,
-                "error": "NO_VALID_TEMPLATES",
-                "message": "No valid template references found",
-                "stage1_vector_search": stage1_results
-            }
-        
-        logger.info(f"Step 5: Grouped into {len(grouped)} template candidates")
-        
-        # =====================================================================
-        # STEP 6: Re-rank candidates (MODEL-AGNOSTIC)
-        # =====================================================================
-        # Auto-detect intent if not provided to maximize intent alignment bonus
-        effective_intent = user_query_intent or self._auto_detect_intent(user_query)
-        logger.info(f"Step 6: Re-ranking candidates (intent={effective_intent})")
-        
-        best_t_id, ranking_metadata, all_scored = self._rerank_by_template(
-            grouped_results=grouped,
-            user_query_intent=effective_intent
+        # v1 grouped rows by t_id and then scored each group with
+        #     0.7*avg_similarity + 0.15*avg_confidence + 0.15*intent_alignment
+        # where avg_similarity WAS the Stage 1 cosine score. That could only
+        # re-sort Stage 1's own ordering; it could never recover a template that
+        # bi-encoder recall ranked poorly.
+        #
+        # v2 cross-encodes (user_query, utterance) for all `top_k` retrieved rows
+        # with ms-marco-MiniLM-L-12-v2, then max-pools rows up to templates.
+        # See app/nlp/cross_encoder_reranker.py for the full rationale.
+        logger.info(
+            f"Step 5+6: Cross-encoder reranking {len(search_results)} rows "
+            f"-> top {STAGE2_TOP_K} templates"
         )
-        
-        # Format Stage 2 results
-        stage2_results = [
-            {
-                "t_id": t.get("t_id", ""),
-                "avg_similarity": round(t.get("avg_similarity", 0.0), 4),
-                "avg_confidence_score": round(t.get("avg_confidence", 0.7), 4),
-                "final_score": round(t.get("final_score", 0.0), 4),
-                "rank": t.get("rank", 0),
-                "match_count": t.get("match_count", 0)
-            }
-            for t in all_scored
-        ]
-        
-        if not best_t_id:
+
+        rerank_outcome = await self.reranker.run(
+            query=user_query,
+            stage1_rows=search_results,
+            top_k=STAGE2_TOP_K,
+        )
+
+        if rerank_outcome.degraded:
+            logger.warning(
+                f"Step 5+6: DEGRADED — {rerank_outcome.degraded_reason}. "
+                f"Serving vector-order results."
+            )
+
+        stage2_results = [t.to_dict() for t in rerank_outcome.templates]
+
+        best = rerank_outcome.best
+        if best is None:
             return {
                 "success": False,
                 "error": "RERANKING_FAILED",
-                "message": "Re-ranking failed to select a candidate",
+                "message": "Re-ranking produced no candidate",
                 "stage1_vector_search": stage1_results,
-                "stage2_reranking": stage2_results
+                "stage2_reranking": stage2_results,
+                "degraded": rerank_outcome.degraded,
+                "degraded_reason": rerank_outcome.degraded_reason,
             }
-        
+
+        best_t_id = best.t_id
+        ranking_metadata = {
+            "final_score": best.ce_score,
+            "vector_score": best.vector_score,
+            "match_count": best.match_count,
+            "reranker_model": rerank_outcome.model,
+            "rows_scored": rerank_outcome.rows_scored,
+            "rerank_latency_ms": rerank_outcome.latency_ms,
+        }
+
         logger.info(
-            f"Step 6: Best t_id={best_t_id[:8]}... "
-            f"(score={ranking_metadata['final_score']:.4f})"
+            f"Step 5+6: Best t_id={best_t_id[:8]}... "
+            f"(ce_score={best.ce_score:.4f}, vector={best.vector_score:.4f}, "
+            f"{rerank_outcome.latency_ms:.1f}ms)"
         )
         
         # =====================================================================
@@ -438,33 +467,37 @@ class MultiModelSemanticRetrievalService:
             "confidence": round(ranking_metadata["final_score"], 4),
             "extracted_request_body": extracted_request_body,
             
+            # Degraded-mode signalling: when the cross-encoder is unavailable the
+            # pipeline still answers, but the caller is told the routing came from
+            # vector order alone rather than silently served worse results.
+            "degraded": rerank_outcome.degraded,
+            "degraded_reason": rerank_outcome.degraded_reason,
+
             # Metadata
             "metadata": {
                 "query": user_query,
                 "embedding_model": effective_model,
-                "top_k": top_k,
+                "stage1_top_k": top_k,
+                "stage2_top_k": STAGE2_TOP_K,
                 "total_candidates": len(search_results),
                 "processing_time_ms": processing_time_ms,
                 "t_id": best_t_id,
                 "match_count": ranking_metadata["match_count"],
-                "avg_similarity": round(ranking_metadata["avg_similarity"], 4),
-                "avg_confidence": round(ranking_metadata["avg_confidence"], 4),
-                "intent_alignment": round(ranking_metadata.get("intent_alignment", 0.5), 4),
-                "dominant_intent": ranking_metadata.get("dominant_intent", "unknown"),
+                "ce_score": round(ranking_metadata["final_score"], 4),
+                "vector_score": round(ranking_metadata["vector_score"], 4),
+                "reranker_model": ranking_metadata["reranker_model"],
+                "rows_cross_encoded": ranking_metadata["rows_scored"],
+                "rerank_latency_ms": ranking_metadata["rerank_latency_ms"],
                 "domain_tags": template.get("domain_tags", [])
             }
         }
-        
-        # Include alternatives if requested
-        if include_alternatives and len(grouped) > 1:
-            alternatives = await self._get_alternatives(
-                db=db,
-                user_id=user_id,
-                grouped=grouped,
-                best_t_id=best_t_id,
-                max_alternatives=3
-            )
-            response["alternatives"] = alternatives
+
+        # Include alternatives if requested — taken straight from the reranked
+        # Stage 2 ordering rather than re-deriving a separate grouping.
+        if include_alternatives and len(rerank_outcome.templates) > 1:
+            response["alternatives"] = [
+                t.to_dict() for t in rerank_outcome.templates[1:4]
+            ]
         
         logger.info(
             f"[Semantic Search] Complete: '{template['api_name']}' "

@@ -9,6 +9,7 @@ Resets them to 'pending' so they can be re-triggered by the user.
 
 import logging
 from datetime import datetime, timezone
+
 from sqlalchemy import select, update
 
 logger = logging.getLogger("nlpforge")

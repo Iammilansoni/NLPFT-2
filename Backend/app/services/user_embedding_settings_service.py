@@ -18,19 +18,17 @@ the Settings page is the SINGLE SOURCE OF TRUTH for all embedding operations.
 - All components query this service before embedding/searching
 """
 
-import uuid
 import asyncio
-from typing import Optional, Tuple, Dict, Any, Set
+import uuid
 from datetime import datetime, timezone
+from typing import Any, Dict, Optional, Set, Tuple
+
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
-from sqlalchemy import select
 
+from app.core.embedding_model_registry import EmbeddingModelSpec, get_embedding_registry
 from app.core.logger import logger
-from app.core.embedding_model_registry import (
-    get_embedding_registry,
-    EmbeddingModelSpec
-)
 from app.models.database_models import UserSettings
 
 # Module-level tracking for in-flight model pulls to prevent duplicates
@@ -254,6 +252,7 @@ class UserEmbeddingSettingsService:
         """
         try:
             import asyncio
+
             from app.services.embedding_model_service import get_embedding_model_service
             
             service = get_embedding_model_service()
