@@ -40,7 +40,6 @@ This means re-ranking works correctly regardless of which model
 was used for embedding, as long as the search was done correctly.
 """
 
-import asyncio
 import time
 import uuid
 from collections import defaultdict
@@ -53,6 +52,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.embedding_model_registry import get_embedding_registry
 from app.core.logger import logger
+from app.core.runtime import get_embedder
+from app.core.tenancy import tenant_session
 from app.models.database_models import Dataset, Template
 from app.models.schemas.embedding_schemas import ErrorCode
 from app.nlp.cross_encoder_reranker import (
@@ -62,6 +63,7 @@ from app.nlp.cross_encoder_reranker import (
 )
 from app.services.multi_model_redis_service import get_multi_model_redis_service
 from app.services.ollama_embedding_service import get_ollama_service
+from app.services.pgvector_store import get_pgvector_store
 from app.services.slot_extraction_service import get_slot_extraction_service
 from app.services.user_embedding_settings_service import get_user_embedding_settings_service
 
@@ -147,19 +149,32 @@ class MultiModelSemanticRetrievalService:
         )
         
         # =====================================================================
-        # STEP 1: Get user's active embedding model from Settings
+        # STEP 1-4: Stage 1 recall via pgvector
         # =====================================================================
-        model_id, dimension, model_spec = await self.settings_service.get_active_embedding_model_async(
-            db, user_id
-        )
-        
-        logger.info(f"Step 1: Active model from Settings: {model_id} (dim={dimension})")
-        
+        # This used to resolve a per-user model from Settings and search a
+        # model-specific Redis index (see git history). That path was never
+        # actually reachable from real data: templates/vectors written by
+        # seed_demo.py and the "generate dataset" flow land in Postgres's
+        # `vector_rows` (pgvector_store.py), and Redis's model-specific
+        # indices were never populated by anything, so every query here
+        # returned NO_RESULTS regardless of what had been seeded. pgvector is
+        # also what alembic/versions/20260823_pgvector_and_rls.py actually
+        # built RLS + the HNSW indexes for.
+        #
+        # pgvector has one global embedder per runtime (EXECUTION_MODE), not
+        # a per-user Settings-selectable model the way the Redis path did, so
+        # there is no per-user model to resolve here — every row was written
+        # with get_embedder()'s (model, dimension), and the query is embedded
+        # the same way.
+        embedder = get_embedder()
+        effective_model = embedder.model_id
+        dimension = embedder.dimension
+
+        logger.info(f"Step 1: Runtime embedder: {effective_model} (dim={dimension})")
+
         # =====================================================================
         # STEP 2: Check compatibility with dataset (if specified)
         # =====================================================================
-        effective_model = model_id
-        
         if not skip_compatibility_check and (dataset_id or template_id):
             # Get dataset to check embedded model
             if dataset_id:
@@ -180,61 +195,54 @@ class MultiModelSemanticRetrievalService:
                 dataset = result.scalar_one_or_none()
             else:
                 dataset = None
-            
+
             if dataset and dataset.embedding_model:
-                if dataset.embedding_model != model_id:
+                if dataset.embedding_model != effective_model:
                     # MISMATCH DETECTED - FAIL
                     logger.warning(
-                        f"Step 2: Model mismatch! Settings={model_id}, "
+                        f"Step 2: Model mismatch! Runtime={effective_model}, "
                         f"Dataset={dataset.embedding_model}"
                     )
-                    
+
                     return {
                         "success": False,
                         "error": ErrorCode.MODEL_MISMATCH,
                         "message": (
-                            f"Model mismatch: Your Settings use '{model_id}', "
-                            f"but dataset was embedded with '{dataset.embedding_model}'."
+                            f"Model mismatch: this deployment embeds with "
+                            f"'{effective_model}', but the dataset was embedded "
+                            f"with '{dataset.embedding_model}'."
                         ),
-                        "settings_model": model_id,
+                        "settings_model": effective_model,
                         "dataset_model": dataset.embedding_model,
                         "dataset_id": str(dataset.dataset_id),
                         "options": [
                             {
-                                "action": "switch_settings",
-                                "label": f"Use {dataset.embedding_model}",
-                                "description": "Update Settings to match dataset"
-                            },
-                            {
                                 "action": "reembed",
-                                "label": f"Re-embed with {model_id}",
-                                "description": "Re-embed dataset with current model"
+                                "label": f"Re-embed with {effective_model}",
+                                "description": "Re-embed dataset with the current runtime model"
                             }
                         ]
                     }
-                
+
                 logger.info("Step 2: Model compatibility verified")
-        
+
         # =====================================================================
-        # STEP 3: Generate query embedding using correct model
+        # STEP 3: Generate query embedding using the runtime embedder
         # =====================================================================
         logger.info(f"Step 3: Generating query embedding with {effective_model}")
-        
+
         try:
-            query_embedding = await self.ollama_service.generate_embedding(
-                model_name=effective_model,
-                text=user_query
-            )
-            
+            query_embedding = await embedder.embed_one(user_query)
+
             if not query_embedding:
                 return {
                     "success": False,
                     "error": "EMBEDDING_FAILED",
                     "message": "Failed to generate query embedding"
                 }
-            
+
             query_vector = np.array(query_embedding, dtype=np.float32)
-            
+
             # Verify dimension
             if query_vector.shape[0] != dimension:
                 logger.error(
@@ -246,7 +254,7 @@ class MultiModelSemanticRetrievalService:
                     "error": "DIMENSION_MISMATCH",
                     "message": "Query embedding dimension mismatch"
                 }
-                
+
         except Exception as e:
             logger.error(f"Embedding generation failed: {e}")
             return {
@@ -254,39 +262,36 @@ class MultiModelSemanticRetrievalService:
                 "error": "EMBEDDING_FAILED",
                 "message": str(e)
             }
-        
+
         logger.info(f"Step 3: Query embedded (dim={query_vector.shape[0]})")
-        
+
         # =====================================================================
-        # STEP 4: Search model-specific Redis index
+        # STEP 4: Search pgvector (Stage 1 recall)
         # =====================================================================
-        logger.info(
-            f"Step 4: Searching Redis index '{model_spec.redis_index_name}'"
-        )
-        
-        # GAP 3 FIX: `search_similar_vectors` is a synchronous method using the
-        # blocking `redis` client (multi_model_redis_service.py:32). Calling it
-        # directly from this async path stalled the event loop for the full
-        # duration of every KNN search, serialising all concurrent requests.
-        # Offloading to the default thread pool keeps the loop free to serve
-        # other requests while RediSearch works.
-        search_results = await asyncio.to_thread(
-            self.redis_service.search_similar_vectors,
-            model_id=effective_model,
-            user_id=user_id,
-            query_vector=query_vector,
-            top_k=top_k,
-            dataset_id=dataset_id,
-            template_id=template_id,
-        )
-        
+        logger.info(f"Step 4: Searching pgvector (model={effective_model}, dim={dimension})")
+
+        # tenant_session binds app.tenant_id (RLS) and tunes hnsw.iterative_scan
+        # on this transaction — pgvector_store's own contract requires it; a
+        # bare session both skips that tuning and, per RLS, sees no rows.
+        async with tenant_session(user_id) as tdb:
+            vector_result = await get_pgvector_store().search(
+                tdb,
+                query_vector,
+                embedding_model=effective_model,
+                dimension=dimension,
+                top_k=top_k,
+                dataset_id=dataset_id,
+                template_id=template_id,
+            )
+        search_results = vector_result.rows
+
         # Format Stage 1 results
         stage1_results = [
             {
                 "query": r.get("query", ""),
                 "similarity_score": round(r.get("similarity", 0.0), 4),
                 "t_id": r.get("template_id", r.get("t_id", "")),
-                "row_id": r.get("row_id", 0)
+                "row_id": r.get("row_uid", 0)
             }
             for r in search_results
         ]
