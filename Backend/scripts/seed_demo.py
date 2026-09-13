@@ -58,7 +58,7 @@ from app.services.pgvector_store import get_pgvector_store  # noqa: E402
 
 # Fixed UUID so the sandbox tenant is stable across redeploys and can be
 # referenced from the frontend's "try the demo" button.
-DEMO_USER_ID = uuid.UUID("00000000-0000-4000-8000-000000000d3m")
+DEMO_USER_ID = uuid.UUID("00000000-0000-4000-8000-000000000d30")
 DEMO_EMAIL = os.getenv("SEED_DEMO_EMAIL", "demo@nlpforge.dev")
 DEMO_PASSWORD = os.getenv("SEED_DEMO_PASSWORD", "DemoForge!2026")
 
@@ -89,24 +89,33 @@ async def ensure_demo_user() -> None:
     app.tenant_id, but the user row itself must exist before any tenant context
     can reference it.
     """
-    from app.core.security import get_password_hash
+    # NOT app.core.security.get_password_hash: the actual login endpoints
+    # (AuthService.verify_password) use a SHA-256-prehash + bcrypt scheme to
+    # dodge bcrypt's 72-byte limit, incompatible with core.security's plain
+    # bcrypt hash. Hashing with the wrong one silently locks the demo user
+    # out with "Incorrect password".
+    from app.services.auth_service import AuthService
 
     async with AsyncSessionLocal() as db:
         async with db.begin():
             await db.execute(
                 text(
                     """
-                    INSERT INTO users (u_id, email, password_hash, username,
-                                       is_verified, created_at)
-                    VALUES (CAST(:uid AS uuid), :email, :pw, :username, true, now())
+                    INSERT INTO users (u_id, email, password, user_name,
+                                       is_active, is_expert, is_admin,
+                                       email_verified, created_at)
+                    VALUES (CAST(:uid AS uuid), :email, :pw, :username,
+                            1, 0, 0, 1, now())
                     ON CONFLICT (u_id) DO UPDATE
-                        SET email = EXCLUDED.email, is_verified = true
+                        SET email = EXCLUDED.email,
+                            password = EXCLUDED.password,
+                            email_verified = 1
                     """
                 ),
                 {
                     "uid": str(DEMO_USER_ID),
                     "email": DEMO_EMAIL,
-                    "pw": get_password_hash(DEMO_PASSWORD),
+                    "pw": AuthService.hash_password(DEMO_PASSWORD),
                     "username": "demo",
                 },
             )

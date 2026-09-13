@@ -58,7 +58,13 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
-# Run DB init, seed admin user, then start the application
-# init_db_direct.py creates all tables from SQLAlchemy models (idempotent - safe to run every time)
+# Run DB init, apply the migrations create_all() can't cover, seed admin, then
+# start the application.
+# init_db_direct.py creates every ORM-mapped table (idempotent - safe to run every time)
+# run_migrations.py applies what only exists as an Alembic migration -- currently
+#   vector_rows + RLS (see alembic/versions/20260823_pgvector_and_rls.py) --
+#   which create_all() cannot create because it has no ORM model (idempotent:
+#   stamps the create_all()-covered baseline once, then `upgrade head` is a
+#   no-op on every later boot)
 # seed_admin.py creates a default admin user if the users table is empty (idempotent)
-CMD python init_db_direct.py && python seed_admin.py && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WEB_CONCURRENCY:-1}
+CMD python init_db_direct.py && python scripts/run_migrations.py && python seed_admin.py && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WEB_CONCURRENCY:-1}

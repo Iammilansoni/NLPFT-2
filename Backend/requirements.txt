@@ -23,6 +23,12 @@ celery[redis]==5.3.6   # Distributed task queue (broker + result backend via Red
 # Authentication and Security
 python-jose[cryptography]==3.3.0  # JWT tokens
 passlib[bcrypt]==1.7.4  # Password hashing
+# passlib 1.7.4 (2020) probes bcrypt.__about__.__version__ to detect the
+# backend version; bcrypt>=4.1 removed that attribute, so the probe throws
+# and passlib falls back into a broken config that rejects any password
+# ("password cannot be longer than 72 bytes") in short-lived processes
+# (e.g. scripts/seed_demo.py). Pin below that break.
+bcrypt==4.0.1
 python-multipart==0.0.6  # Form uploads
 
 # NLP and ML dependencies (Ollama + Gemini)

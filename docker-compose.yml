@@ -26,6 +26,12 @@ services:
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # Runs once, only on a brand-new data directory (Postgres's own
+      # docker-entrypoint-initdb.d convention). Creates the `nlpforge_admin`
+      # role the pgvector/RLS migration grants a bypass policy to -- nothing
+      # else in this stack ever creates it, so the migration fails with
+      # "role nlpforge_admin does not exist" without this.
+      - ./Backend/db-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nlpforge} -d ${POSTGRES_DB:-nlpforge}"]
       interval: 10s
@@ -107,6 +113,11 @@ services:
     volumes:
       - backend_storage:/app/storage
       - backend_datasets:/app/datasets
+      # scripts/seed_demo.py imports evals/api_surface.py from REPO_ROOT/evals
+      # (one level above the /app build context) — the backend image's build
+      # context is ./Backend, so evals/ is never COPYed in and has to be
+      # bind-mounted instead.
+      - ./evals:/evals:ro
     depends_on:
       postgres:
         condition: service_healthy
