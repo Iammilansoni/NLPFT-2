@@ -5,11 +5,12 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, Loader2, Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
+import { DEMO_MODE, DEMO_CREDENTIALS } from '@/lib/constants';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -32,13 +33,12 @@ export default function LoginPage() {
     if (error) setError('');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const performLogin = async (credentials: { email: string; password: string; rememberMe: boolean }) => {
     setError('');
     setIsLoading(true);
 
     try {
-      const response = await login(formData);
+      const response = await login(credentials);
 
       // Check for redirect URL in query params
       const searchParams = new URLSearchParams(window.location.search);
@@ -60,6 +60,28 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await performLogin(formData);
+  };
+
+  const handleDemoLogin = async () => {
+    setFormData((prev) => ({ ...prev, email: DEMO_CREDENTIALS.email, password: DEMO_CREDENTIALS.password }));
+    await performLogin({ email: DEMO_CREDENTIALS.email, password: DEMO_CREDENTIALS.password, rememberMe: false });
+  };
+
+  // Arriving from the demo banner's "Try it with the demo login" link
+  // (/auth/login?demo=1) pre-fills the fields but still requires a click —
+  // avoids a surprise auto-login for anyone who lands here via that link
+  // without meaning to.
+  useEffect(() => {
+    if (!DEMO_MODE) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('demo') === '1') {
+      setFormData((prev) => ({ ...prev, email: DEMO_CREDENTIALS.email, password: DEMO_CREDENTIALS.password }));
+    }
+  }, []);
 
   return (
     <div className="w-full">
@@ -88,6 +110,19 @@ export default function LoginPage() {
           <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
           <p className="text-sm text-destructive">{error}</p>
         </div>
+      )}
+
+      {/* Demo Login — recruiter shortcut, only rendered on demo deployments */}
+      {DEMO_MODE && (
+        <button
+          type="button"
+          onClick={handleDemoLogin}
+          disabled={isLoading}
+          className="mb-6 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-6 py-3 font-semibold text-primary transition-all duration-200 hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
+          Try the live demo — no signup needed
+        </button>
       )}
 
       {/* Login Form */}

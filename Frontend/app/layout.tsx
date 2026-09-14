@@ -3,6 +3,7 @@ import { Inter, Manrope, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Providers } from "./providers";
+import DemoBanner from "@/components/DemoBanner";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -51,6 +52,7 @@ export default function RootLayout({
         </a>
         <ThemeProvider>
           <Providers>
+            <DemoBanner />
             {children}
           </Providers>
         </ThemeProvider>
