@@ -39,6 +39,18 @@ export const SEARCH_LIMITS = {
   DEFAULT_TOP_K: 5,
 } as const;
 
+// Recruiter-facing public demo. Off by default (unset or anything other than
+// "true" disables it) — only flip this on for a deployment seeded via
+// Backend/scripts/seed_demo.py. Credentials default to that script's own
+// defaults (DEMO_EMAIL / DEMO_PASSWORD) so this only needs overriding if the
+// deployment seeded with SEED_DEMO_EMAIL / SEED_DEMO_PASSWORD set.
+export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+
+export const DEMO_CREDENTIALS = {
+  email: process.env.NEXT_PUBLIC_DEMO_EMAIL || 'demo@nlpforge.dev',
+  password: process.env.NEXT_PUBLIC_DEMO_PASSWORD || 'DemoForge!2026',
+} as const;
+
 export const DEBOUNCE_DELAYS = {
   SEARCH: 300,
   INPUT: 500,
