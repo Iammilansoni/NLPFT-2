@@ -1,36 +1,49 @@
 # =============================================================================
-# NLPForge-Tester - Production Docker Compose (Host Ollama)
+# NLPForge — local stack (EXECUTION_MODE=local, fully offline after first boot)
 # =============================================================================
-# Ollama runs on HOST (http://localhost:11434)
-# Docker stack connects via host.docker.internal (Linux-safe)
+#   cp .env.example .env        # set POSTGRES_PASSWORD, REDIS_PASSWORD, SECRET_KEY
+#   docker compose up -d        # first boot pulls ~2.3 GB of Ollama models
+#   open http://localhost:3000  # "Try the demo" logs into the seeded tenant
+#
+# Configuration comes from ONE file, the repo-root .env (Backend/.env is also
+# read if present, for backwards compatibility). Hostnames of the services inside
+# this network are set here, not in .env, so the same .env works unchanged.
 # =============================================================================
 
+x-backend-env: &backend-env
+  # In-network addresses. These override anything in .env on purpose.
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-nlpforge}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-nlpforge}
+  SYNC_DATABASE_URL: postgresql://${POSTGRES_USER:-nlpforge}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nlpforge}
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+  REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+  CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
+  CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/2
+  OLLAMA_HOST: http://ollama:11434
+  OLLAMA_BASE_URL: http://ollama:11434
+  EXECUTION_MODE: local
+  EXTRACTION_MODEL: ${EXTRACTION_MODEL:-llama3.2:3b}
+  ENVIRONMENT: ${ENVIRONMENT:-production}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
 services:
-  # ---------------------------------------------------------------------------
-  # PostgreSQL Database
-  # ---------------------------------------------------------------------------
   postgres:
-    # pgvector/pgvector ships the `vector` extension the Phase 3 migration
-    # needs. Plain postgres:15-alpine cannot CREATE EXTENSION vector.
+    # pgvector/pgvector ships the `vector` extension the retrieval tables need.
     image: pgvector/pgvector:pg16
-    container_name: nlpforge-postgres
-    hostname: postgres
-    env_file:
-      - ./Backend/.env
-    ports:
-      - "127.0.0.1:5433:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-nlpforge}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:-nlpforge}
       PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT_HOST:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      # Runs once, only on a brand-new data directory (Postgres's own
-      # docker-entrypoint-initdb.d convention). Creates the `nlpforge_admin`
-      # role the pgvector/RLS migration grants a bypass policy to -- nothing
-      # else in this stack ever creates it, so the migration fails with
-      # "role nlpforge_admin does not exist" without this.
+      # Runs once on a new data directory: creates the nlpforge_admin role the
+      # RLS migration grants its maintenance policy to.
       - ./Backend/db-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nlpforge} -d ${POSTGRES_DB:-nlpforge}"]
@@ -39,27 +52,17 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
-    networks:
-      - nlpforge-network
 
-  # ---------------------------------------------------------------------------
-  # Redis Stack (Vector DB + RedisInsight)
-  # ---------------------------------------------------------------------------
   redis:
-    image: redis/redis-stack:latest
-    container_name: nlpforge-redis
-    hostname: redis
-    env_file:
-      - ./Backend/.env
-    ports:
-      - "127.0.0.1:6379:6379"
+    # redis-stack (not plain redis): existing volumes may hold RediSearch data
+    # from v1's Redis vector index, which plain redis cannot load.
+    image: redis/redis-stack-server:latest
     environment:
       REDIS_ARGS: >-
-        --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
-        --appendonly yes
-        --appendfsync everysec
-        --maxmemory 1gb
-        --maxmemory-policy allkeys-lru
+        --requirepass ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+        --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "127.0.0.1:${REDIS_PORT_HOST:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -68,202 +71,128 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-    networks:
-      - nlpforge-network
 
-  # ---------------------------------------------------------------------------
-  # Backend (FastAPI)
-  # ---------------------------------------------------------------------------
-  backend:
-    build:
-      context: ./Backend
-      dockerfile: Dockerfile
-    image: nlpforge-backend:latest
-    container_name: nlpforge-backend
-    env_file:
-      - ./Backend/.env
-    ports:
-      - "8000:8000"
-    environment:
-      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/0
-      REDIS_HOST: redis
-      OLLAMA_BASE_URL: http://ollama:11434
-      OLLAMA_HOST: http://ollama:11434
-      # Local mode: Ollama supplies embeddings + generation, nothing leaves the host.
-      EXECUTION_MODE: ${EXECUTION_MODE:-local}
-      VECTOR_BACKEND: ${VECTOR_BACKEND:-pgvector}
-      SEED_DEMO: ${SEED_DEMO:-false}
-      ENVIRONMENT: ${ENVIRONMENT:-production}
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://10.0.0.1:3000,http://10.0.0.1:8000}
-      # Celery broker + backend (DB1 = broker, DB2 = results)
-      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/1
-      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/2
-      # Unlocked — in-memory task state removed, Celery result backend is shared
-      WEB_CONCURRENCY: 4
-      # Seed admin user (created only when users table is empty).
-      # SEED_ADMIN_PASSWORD is deliberately NOT given a fallback here: a
-      # hardcoded default in this file would apply unconditionally on every
-      # deployment built from this compose file, which defeats seed_admin.py's
-      # own guard (it refuses to seed a default password outside
-      # EXECUTION_MODE=local specifically to avoid a public default admin
-      # credential). Set it in Backend/.env to seed a chosen admin password;
-      # leave it unset in local mode to get seed_admin.py's own throwaway
-      # local-only default.
-      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@nlpforge.dev}
-      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
-      SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-admin}
-
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-    volumes:
-      - backend_storage:/app/storage
-      - backend_datasets:/app/datasets
-      # scripts/seed_demo.py imports evals/api_surface.py from REPO_ROOT/evals
-      # (one level above the /app build context) — the backend image's build
-      # context is ./Backend, so evals/ is never COPYed in and has to be
-      # bind-mounted instead.
-      - ./evals:/evals:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    restart: unless-stopped
-    networks:
-      - nlpforge-network
-
-  # ---------------------------------------------------------------------------
-  # Frontend (Next.js) - Hardened with Security Controls
-  # ---------------------------------------------------------------------------
-  frontend:
-    build:
-      context: ./Frontend
-      dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: ""
-        # next.config.js's rewrites() (the API proxy) is evaluated once at
-        # `next build` time and baked into .next/routes-manifest.json -- it
-        # is NOT re-read from the runtime environment. BACKEND_INTERNAL_URL
-        # was previously only ever set in this file's `environment:` block
-        # below (runtime), so the rewrite was permanently empty in every
-        # image built from this Dockerfile regardless of that value.
-        BACKEND_INTERNAL_URL: http://backend:8000
-        # Public Google OAuth client ID for the "Sign In With Google" button.
-        # Baked in at build time like every other NEXT_PUBLIC_* var. Leave
-        # unset to keep the button rendered as disabled ("not configured").
-        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-    image: nlpforge-frontend:latest
-    container_name: nlpforge-frontend
-    
-    ports:
-      - "3000:3000"
-    environment:
-      # Leave empty to enable dynamic host detection (localhost vs 10.0.0.1)
-      NEXT_PUBLIC_API_URL: ""
-      BACKEND_INTERNAL_URL: http://backend:8000
-      # Do not expose an absolute API URL to the client; keep API_URL empty for builds
-      API_URL: ""
-      NODE_ENV: production
-      NPM_CONFIG_IGNORE_SCRIPTS: "true"
-    depends_on:
-      backend:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - nlpforge-network
-
-  # ---------------------------------------------------------------------------
-  # Ollama (Local Embeddings Server)
-  # Note: Replace `ollama/ollama:latest` with the correct Ollama image if needed.
-  # If you prefer to run Ollama on the host, omit this service and keep OLLAMA_HOST pointing
-  # to the host (e.g. http://host.docker.internal:11434).
-  # ---------------------------------------------------------------------------
   ollama:
-    # Local mode only. `--profile cloud` omits this service entirely, which is
-    # the whole point of the cloud runtime: no 4-8GB model server.
-    profiles: ["", "local"]
     image: ollama/ollama:latest
-    container_name: nlpforge-ollama
-    restart: unless-stopped
+    environment:
+      # Keep models resident: reloading a 3B model on CPU costs tens of seconds.
+      OLLAMA_KEEP_ALIVE: "24h"
     expose:
       - "11434"
     volumes:
       - ollama_models:/root/.ollama
     healthcheck:
       test: ["CMD", "ollama", "list"]
-      interval: 30s
+      interval: 15s
       timeout: 10s
-      retries: 5
-    networks:
-      - nlpforge-network
+      retries: 10
+    restart: unless-stopped
 
-  # ---------------------------------------------------------------------------
-  # Celery Worker — dataset generation & embedding tasks
-  # Shares the same image as the backend. Runs a sync worker process (no uvicorn).
-  # Scales independently: docker compose up --scale celery-worker=3
-  # ---------------------------------------------------------------------------
-  celery-worker:
+  # One-shot: make sure the embedding and extraction models exist before the
+  # API starts. A no-op (seconds) once they are in the ollama_models volume.
+  ollama-pull:
+    image: ollama/ollama:latest
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - ollama pull nomic-embed-text && ollama pull ${EXTRACTION_MODEL:-llama3.2:3b}
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
     build:
       context: ./Backend
       dockerfile: Dockerfile
-    image: nlpforge-backend:latest          # Reuses backend image — no extra build
-    container_name: nlpforge-celery-worker
-    # Override the CMD from Dockerfile: run Celery instead of uvicorn
-    command: >
-      celery -A app.worker.celery_app:celery_app worker
-      --loglevel=info
-      --concurrency=2
-      --queues=nlpforge
-      --hostname=worker@%h
+    image: nlpforge-backend:latest
     env_file:
-      - ./Backend/.env
+      - path: ./.env
+        required: false
+      - path: ./Backend/.env
+        required: false
     environment:
-      REDIS_HOST: redis
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
-      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/1
-      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/2
-      # Sync DB URL for psycopg2 — workers run outside the async event loop
-      SYNC_DATABASE_URL: postgresql://${POSTGRES_USER:-nlpforge}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-nlpforge}
-      OLLAMA_HOST: http://ollama:11434
-      EXECUTION_MODE: ${EXECUTION_MODE:-local}
-      VECTOR_BACKEND: ${VECTOR_BACKEND:-pgvector}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      <<: *backend-env
+      # Seed the demo tenant (20 API templates, embedded) on every boot.
+      # Idempotent: refreshes the demo vectors, never touches other tenants.
+      SEED_DEMO: ${SEED_DEMO:-true}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+      # Admin account created only when the users table is empty. Unset means
+      # a localhost-only default (see Backend/seed_admin.py).
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@nlpforge.dev}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
     volumes:
-      - backend_storage:/app/storage
-      - backend_datasets:/app/datasets    # Shared volume — worker writes CSV, backend serves it
+      - backend_datasets:/app/datasets
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-      ollama:
+      ollama-pull:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  celery-worker:
+    image: nlpforge-backend:latest
+    command: >
+      celery -A app.worker.celery_app:celery_app worker
+      --loglevel=info --concurrency=2 --queues=nlpforge --hostname=worker@%h
+    env_file:
+      - path: ./.env
+        required: false
+      - path: ./Backend/.env
+        required: false
+    environment:
+      <<: *backend-env
+    volumes:
+      - backend_datasets:/app/datasets  # worker writes generated CSVs, API serves them
+    depends_on:
+      backend:
+        condition: service_healthy
+    # The image's HEALTHCHECK probes the API port, which a worker never opens.
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.worker.celery_app:celery_app inspect ping --timeout 10 >/dev/null"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+      args:
+        # Empty => the browser calls same-origin /api/*, which Next.js proxies to
+        # BACKEND_INTERNAL_URL (baked into the build by next.config.js rewrites).
+        NEXT_PUBLIC_API_URL: ""
+        BACKEND_INTERNAL_URL: http://backend:8000
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+        # Shows the demo banner and the one-click "Try the demo" login.
+        NEXT_PUBLIC_DEMO_MODE: ${DEMO_MODE:-true}
+    image: nlpforge-frontend:latest
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+    depends_on:
+      backend:
         condition: service_healthy
     restart: unless-stopped
-    networks:
-      - nlpforge-network
 
-# =============================================================================
-# Volumes
-# =============================================================================
 volumes:
   postgres_data:
   redis_data:
-  backend_storage:
   backend_datasets:
-  ollama_models:  # Persists Ollama models so they don't need to be re-pulled
-
-# =============================================================================
-# Network
-# =============================================================================
-networks:
-  nlpforge-network:
-    driver: bridge
+  ollama_models:

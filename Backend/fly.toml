@@ -1,6 +1,6 @@
 #  NLPForge — Fly.io deployment (cloud mode)
 #
-#  Deploy:
+#  Deploy (run from Backend/, so the build context matches Dockerfile.cloud):
 #     fly launch --no-deploy --copy-config     # first time only, claims an app name
 #     fly secrets set ...                      # see DEPLOYMENT.md
 #     fly deploy
@@ -14,10 +14,12 @@ app = "nlpforge"
 primary_region = "iad"          # change to your nearest region
 
 [build]
-  dockerfile = "Backend/Dockerfile.cloud"
+  dockerfile = "Dockerfile.cloud"
 
 [env]
   EXECUTION_MODE = "cloud"
+  # production: Secure cookies, no /auth/dev/* helpers, no debug detail in errors.
+  ENVIRONMENT = "production"
   VECTOR_BACKEND = "pgvector"
   # Measured -0.083 Hit@1 against bge-small; see evals/README.md finding 2.
   RERANKER_ENABLED = "false"
@@ -45,7 +47,7 @@ primary_region = "iad"          # change to your nearest region
   [[http_service.checks]]
     interval = "30s"
     timeout = "5s"
-    grace_period = "40s"        # covers alembic upgrade + model warm on boot
+    grace_period = "60s"        # covers migrations + model warm-up on boot
     method = "GET"
     path = "/api/v1/health"
 

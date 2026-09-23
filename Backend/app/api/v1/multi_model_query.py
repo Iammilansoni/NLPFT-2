@@ -1,38 +1,25 @@
 # Backend\app\api\v1\multi_model_query.py
 
 """
-Multi-Model Query API - Semantic Search with Model Governance
+Query API - natural language -> API template + extracted request body.
 
-Purpose:
-This API provides the main query endpoint for semantic search with
-strict model governance. It enforces Settings as the source of truth
-and prevents cross-model searches.
-
-NON-NEGOTIABLE RULES:
-1. Always use model from Settings
-2. Check compatibility before search
-3. Return clear errors on mismatch
-4. Never silently fall back
-
-Query Flow:
-1. Pre-flight: Check model compatibility
-2. Search: Use Settings model
-3. Rerank: Model-agnostic scoring
-4. Resolve: Fetch from PostgreSQL
-5. Return: Clean JSON output
+POST /api/v1/query/semantic-search is the product's main endpoint. See
+app/services/multi_model_semantic_service.py for the three-stage pipeline.
 """
 
 import uuid
 from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth import get_current_user
 from app.core.embedding_model_registry import get_embedding_registry
 from app.core.postgres import get_db
+from app.core.rate_limit import limiter
 from app.models.schemas import UserResponse
+from app.nlp.cross_encoder_reranker import STAGE1_TOP_K
 from app.services.multi_model_embedding_service import get_multi_model_embedding_service
 from app.services.multi_model_semantic_service import get_multi_model_semantic_service
 
@@ -46,23 +33,54 @@ router = APIRouter(prefix="/query", tags=["multi-model-query"])
 class SemanticQueryRequest(BaseModel):
     """Semantic query request"""
     query: str = Field(..., min_length=1, max_length=1000, description="Natural language query")
-    top_k: int = Field(default=10, ge=1, le=100, description="Number of results")
+    top_k: int = Field(
+        default=STAGE1_TOP_K, ge=1, le=100,
+        description="Stage 1 recall depth (utterance rows). Default is the benchmarked k.",
+    )
     dataset_id: Optional[str] = Field(None, description="Optional dataset UUID filter")
     template_id: Optional[str] = Field(None, description="Optional template UUID filter")
-    intent: Optional[str] = Field(None, description="Optional detected intent")
+    intent: Optional[str] = Field(
+        None, description="Accepted for backward compatibility; routing does not use it"
+    )
     include_alternatives: bool = Field(default=False, description="Include alternative APIs")
     include_slot_extraction: bool = Field(default=True, description="Whether to extract values from query")
 
 
 class FinalOutput(BaseModel):
-    """Final API output (clean JSON)"""
+    """The resolved API call."""
     t_id: str
     api_name: str
     endpoint: str
     method: str
     confidence_score: float
+    base_url: Optional[str] = None
+    extracted_base_url: Optional[str] = None
+    effective_base_url: Optional[str] = None
+    url_source: Optional[str] = None
     request_schema: Optional[dict] = None
     response_schema: Optional[dict] = None
+    extracted_request_body: Optional[dict] = None
+
+
+class ExtractionInfo(BaseModel):
+    """Stage 3 outcome. `ok=False` with `degraded=False` means validation failed."""
+    ok: bool
+    values: dict = {}
+    missing_required: List[str] = []
+    degraded: bool = False
+    reason: Optional[str] = None
+    attempts: int = 0
+    latency_ms: float = 0.0
+    model: Optional[str] = None
+
+
+class RankingInfo(BaseModel):
+    """Stage 2 outcome."""
+    strategy: str
+    degraded: bool = False
+    degraded_reason: Optional[str] = None
+    reranker_model: Optional[str] = None
+    rows_cross_encoded: int = 0
 
 
 class StageResult(BaseModel):
@@ -89,13 +107,20 @@ class SemanticQueryResponse(BaseModel):
     # Metadata
     metadata: Optional[dict] = None
     
-    # Slot Extraction Result
+    # Stage 3
     extracted_request_body: Optional[dict] = None
-    
-    # Legacy fields
+    extraction: Optional[ExtractionInfo] = None
+
+    # Stage 2 + overall health of this answer
+    ranking: Optional[RankingInfo] = None
+    degraded: bool = False
+    alternatives: Optional[List[dict]] = None
+
+    # Flat fields kept for existing clients
     api_name: Optional[str] = None
     endpoint: Optional[str] = None
     method: Optional[str] = None
+    base_url: Optional[str] = None
     confidence: Optional[float] = None
 
 
@@ -112,8 +137,10 @@ class ReembedRequest(BaseModel):
 # =============================================================================
 
 @router.post("/semantic-search", response_model=SemanticQueryResponse)
+@limiter.limit("60/minute")
 async def semantic_search(
-    request: SemanticQueryRequest,
+    request: Request,
+    body: SemanticQueryRequest,
     current_user: Annotated[UserResponse, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db)
 ):
@@ -134,19 +161,18 @@ async def semantic_search(
     service = get_multi_model_semantic_service()
     
     # Parse optional UUIDs
-    dataset_id = uuid.UUID(request.dataset_id) if request.dataset_id else None
-    template_id = uuid.UUID(request.template_id) if request.template_id else None
-    
+    dataset_id = uuid.UUID(body.dataset_id) if body.dataset_id else None
+    template_id = uuid.UUID(body.template_id) if body.template_id else None
+
     result = await service.semantic_search(
         db=db,
         user_id=current_user.u_id,
-        user_query=request.query,
-        top_k=request.top_k,
+        user_query=body.query,
+        top_k=body.top_k,
         dataset_id=dataset_id,
         template_id=template_id,
-        user_query_intent=request.intent,
-        include_alternatives=request.include_alternatives,
-        include_slot_extraction=request.include_slot_extraction
+        include_alternatives=body.include_alternatives,
+        include_slot_extraction=body.include_slot_extraction,
     )
     
     return result
@@ -260,19 +286,18 @@ async def list_embedding_models(
 async def query_service_health(
     current_user: Annotated[UserResponse, Depends(get_current_user)]
 ):
-    """
-    Check query service health.
-    
-    Returns:
-        Health status of all components
-    """
-    from app.services.multi_model_redis_service import get_multi_model_redis_service
-    
-    redis_service = get_multi_model_redis_service()
-    redis_health = redis_service.health_check()
-    
+    """Routing readiness for the caller: embedder reachable + indexed vectors."""
+    from app.core.runtime import get_embedder
+    from app.core.tenancy import tenant_session
+    from app.services.pgvector_store import get_pgvector_store
+
+    embedder = get_embedder()
+    embedder_ok = await embedder.health()
+    async with tenant_session(current_user.u_id) as tdb:
+        stats = await get_pgvector_store().stats(tdb)
     return {
-        "status": redis_health.get("status", "unknown"),
-        "redis": redis_health.get("redis", "unknown"),
-        "indexes": redis_health.get("indexes", {})
+        "status": "ok" if embedder_ok and stats["total_rows"] else "not_ready",
+        "embedder": {"model": embedder.model_id, "dimension": embedder.dimension,
+                     "reachable": embedder_ok},
+        "vectors": stats,
     }

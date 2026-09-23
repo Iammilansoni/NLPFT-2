@@ -39,6 +39,17 @@ pytestmark = [
 DIM = 384
 
 
+async def _role_bypasses_rls() -> bool:
+    """Superusers and BYPASSRLS roles skip every policy, even FORCEd ones."""
+    async with AsyncSessionLocal() as session:
+        row = (
+            await session.execute(
+                text("SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = current_user")
+            )
+        ).first()
+    return bool(row and row[0])
+
+
 def _vec(seed: float) -> list[float]:
     return [seed] * DIM
 
@@ -99,7 +110,12 @@ async def test_session_without_tenant_sees_nothing():
     """
     Policies use current_setting('app.tenant_id', TRUE) so an unbound session
     yields NULL and matches no rows. Fail closed, never open.
+
+    This is a property of the DATABASE policy, so it only holds for a role RLS
+    applies to. Run the suite as a non-superuser to exercise it (CI does).
     """
+    if await _role_bypasses_rls():
+        pytest.skip("connected role is superuser/BYPASSRLS: PostgreSQL skips RLS for it")
     async with AsyncSessionLocal() as session:
         async with session.begin():
             assert await current_tenant(session) is None

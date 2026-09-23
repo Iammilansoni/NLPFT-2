@@ -8,7 +8,7 @@ create_all() (run on every boot by init_db_direct.py) only creates
 missing tables -- it does not alter columns on tables that already
 exist, so an existing deployment needs this migration to actually pick
 up the new column and the relaxed NOT NULL constraint. A fresh database
-gets both from the ORM model directly.
+gets both from the ORM model directly, so every step below is conditional.
 
 Revision ID: 20260913_google_oauth
 Revises: 20260823_pgvector_rls
@@ -30,9 +30,16 @@ def upgrade() -> None:
         # schema, which already matches the ORM model -- nothing to migrate.
         return
 
-    op.add_column("users", sa.Column("google_id", sa.Text(), nullable=True))
-    op.create_unique_constraint("uq_users_google_id", "users", ["google_id"])
-    op.create_index("ix_users_google_id", "users", ["google_id"])
+    # Idempotent. On a FRESH database the container's boot runs create_all()
+    # before migrations, and the ORM model already declares google_id -- the
+    # column, its unique constraint and index exist before this runs. Adding
+    # them unconditionally raised DuplicateColumnError and crash-looped every
+    # fresh install. Only an EXISTING pre-OAuth database needs these changes.
+    columns = {c["name"] for c in sa.inspect(bind).get_columns("users")}
+    if "google_id" not in columns:
+        op.add_column("users", sa.Column("google_id", sa.Text(), nullable=True))
+        op.create_unique_constraint("uq_users_google_id", "users", ["google_id"])
+        op.create_index("ix_users_google_id", "users", ["google_id"])
     op.alter_column("users", "password", existing_type=sa.Text(), nullable=True)
 
 

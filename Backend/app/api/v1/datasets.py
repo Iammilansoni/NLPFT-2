@@ -11,6 +11,7 @@ KEY DESIGN: ONE EMBEDDING MODEL PER DATASET
 """
 
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -55,7 +56,6 @@ from app.models.schemas.embedding_schemas import (
     SearchDatasetRequest,
 )
 from app.nlp.dataset_generator import get_enterprise_dataset_generator
-from app.nlp.dataset_ingestor import ingest_csv_to_redis
 from app.services.audit_service import get_audit_service
 from app.services.dataset_task_manager import get_task_manager
 from app.services.multi_model_embedding_service import get_multi_model_embedding_service
@@ -257,62 +257,33 @@ async def store_csv_to_postgresql(
 
 # ============= BACKGROUND TASKS =============
 
-def process_upload_task(task_id: str, file_path: str, user_id: str = None, template_id: str = None, clear_existing: bool = False):
-    """Background task to process uploaded CSV with auto-embedding"""
+async def embed_uploaded_dataset(task_id: str, user_id: UUID, dataset_id: UUID) -> None:
+    """Background: embed a freshly uploaded dataset into pgvector for routing."""
+    from app.core.postgres import AsyncSessionLocal
+    from app.services.multi_model_embedding_service import get_multi_model_embedding_service
+
     task_manager = get_task_manager()
-    try:
-        task_manager.update_task(task_id, status="running", message="Processing CSV file...")
-        result = ingest_csv_to_redis(file_path, clear_existing=clear_existing)
-        
-        if result["success"]:
-            task_manager.update_task(
-                task_id,
-                status="completed",
-                message=f"Successfully ingested {result['count']} entries",
-                completed_at=datetime.now(timezone.utc).isoformat(),
-                statistics={
-                    "total_apis": len(result.get("intents", [])),
-                    "total_nl_variations": result["count"],
-                    "new_embeddings": result.get("new_embeddings", result["count"]),
-                    "skipped_duplicates": result.get("skipped_duplicates", 0)
-                },
-                files={"csv": file_path}
-            )
-            
-            # =====================================================================
-            # AUTO-EMBED CSV DATASET (Using sync function - no Celery needed)
-            # =====================================================================
-            if user_id and result["count"] > 0:
-                # Auto-embed on upload is not wired up: this code path has no
-                # dataset_id to embed against, so the upload is marked skipped
-                # and the caller embeds explicitly via POST /db/{id}/embed.
-                #
-                # What stood here was a `run_embed()` coroutine that was defined
-                # but never awaited, opened a session it never used, and carried
-                # three contradictory comments reasoning about how to obtain the
-                # dataset_id. It did nothing; this records the same outcome
-                # without implying otherwise.
-                task_manager.update_task(
-                    task_id,
-                    auto_embed_status="skipped",
-                    auto_embed_error="Auto-embed requires dataset_id; embed explicitly."
-                )
-        else:
-            task_manager.update_task(
-                task_id,
-                status="failed",
-                message=f"Failed to ingest: {result.get('error', 'Unknown error')}",
-                error=result.get("error", "Unknown error")
-            )
-    except Exception as e:
-        logger.error(f"Error processing upload task {task_id}: {e}", exc_info=True)
-        task_manager.update_task(task_id, status="failed", message=str(e), error=str(e))
+    task_manager.update_task(task_id, status="running", message="Embedding uploaded rows...")
+    async with AsyncSessionLocal() as db:
+        result = await get_multi_model_embedding_service().embed_dataset(
+            db=db, user_id=user_id, dataset_id=dataset_id
+        )
+    if result.get("success"):
+        task_manager.update_task(
+            task_id,
+            status="completed",
+            message=f"Embedded {result.get('embedded_count', 0)} rows",
+            completed_at=datetime.now(timezone.utc).isoformat(),
+            statistics={
+                "embedded": result.get("embedded_count", 0),
+                "unroutable": result.get("unroutable_rows", 0),
+            },
+        )
+    else:
+        task_manager.update_task(
+            task_id, status="failed", message=result.get("message", "Embedding failed")
+        )
 
-
-# Note: Legacy process_generation_task removed - use template-based generation
-
-
-# ============= DATASET GENERATION & UPLOAD =============
 
 @router.post("/upload")
 async def upload_dataset(
@@ -342,8 +313,11 @@ async def upload_dataset(
     # Associate task with current user
     task_id = task_manager.create_task(user_id=current_user.u_id)
     
-    # Save file to disk
-    save_path = os.path.join(DATASETS_DIR, file.filename)
+    # Save file to disk under a server-chosen name. The client's filename is
+    # untrusted: joined as-is, "../../x.csv" would write outside DATASETS_DIR.
+    original_name = os.path.basename(file.filename.replace("\\", "/")) or "upload.csv"
+    safe_stem = re.sub(r"[^A-Za-z0-9._-]", "_", original_name)[:80]
+    save_path = os.path.join(DATASETS_DIR, f"upload_{uuid.uuid4().hex[:12]}_{safe_stem}")
     with open(save_path, "wb") as f:
         f.write(content)
     
@@ -367,7 +341,7 @@ async def upload_dataset(
             user_id=current_user.u_id,
             template_id=t_id,
             db=db,
-            dataset_name=file.filename
+            dataset_name=original_name
         )
         
         logger.info(f"CSV stored in PostgreSQL: {file.filename} (dataset_id={dataset.dataset_id})")
@@ -375,28 +349,19 @@ async def upload_dataset(
         raise
     except Exception as e:
         logger.error(f"Failed to store CSV in PostgreSQL: {e}", exc_info=True)
-        # Continue with Redis ingestion even if PostgreSQL fails
-        dataset = None
-    
-    # ========== BACKGROUND: INGEST TO REDIS + EMBED ==========
-    # Pass user_id and dataset_id for auto-embedding (ensures multi-tenant isolation)
+        raise HTTPException(status_code=400, detail=f"Could not read CSV: {e}")
+
     background_tasks.add_task(
-        process_upload_task, 
-        task_id, 
-        save_path, 
-        user_id=str(current_user.u_id),
-        template_id=str(t_id) if t_id else None,
-        clear_existing=False
+        embed_uploaded_dataset, task_id, current_user.u_id, dataset.dataset_id
     )
-    
-    logger.info(f"CSV upload started: {file.filename} for user {current_user.u_id}")
-    
+    logger.info(f"CSV upload stored: {original_name} for user {current_user.u_id}")
+
     return {
         "task_id": task_id,
-        "dataset_id": str(dataset.dataset_id) if dataset else None,
-        "message": "File uploaded and stored in PostgreSQL. Embedding started in background.",
-        "file": save_path,
-        "total_rows": dataset.total_rows if dataset else None
+        "dataset_id": str(dataset.dataset_id),
+        "message": "File stored. Embedding for routing started in the background.",
+        "file": os.path.basename(save_path),
+        "total_rows": dataset.total_rows,
     }
 
 
@@ -834,6 +799,7 @@ async def get_task_status(
             "progress": 100,
             "message": result.get("message", f"Generated {result.get('total_generated', '?')} test cases."),
             "current_step": "complete",
+            "dataset_id": result.get("dataset_id"),
             "result": result,
         }
 
@@ -1162,10 +1128,10 @@ async def delete_dataset_from_db(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Delete a dataset, all its rows from PostgreSQL, AND its Redis vectors.
+    Delete a dataset, all its rows from PostgreSQL, AND its routing vectors.
     
     Cleanup order:
-    1. Clean up Redis vectors (before DB delete, so we still have metadata)
+    1. Delete its vectors from pgvector (vector_rows)
     2. Delete dataset from PostgreSQL (cascade deletes csv_rows)
     
     WARNING: This permanently deletes all associated CSV rows and embeddings.
@@ -1183,56 +1149,20 @@ async def delete_dataset_from_db(
         if not dataset:
             raise HTTPException(status_code=404, detail="Dataset not found")
         
-        # 1. Clean up Redis vectors BEFORE deleting from DB
-        vectors_deleted = 0
-        try:
-            from app.core.embedding_model_registry import get_embedding_registry
-            from app.services.multi_model_redis_service import get_multi_model_redis_service
-            
-            redis_service = get_multi_model_redis_service()
-            registry = get_embedding_registry()
-            
-            parsed_dataset_id = UUID(dataset_id)
-            
-            if dataset.embedding_model:
-                # Try the known model first
-                try:
-                    vectors_deleted = redis_service.delete_dataset_vectors(
-                        model_id=dataset.embedding_model,
-                        user_id=current_user.u_id,
-                        dataset_id=parsed_dataset_id
-                    )
-                except ValueError:
-                    # Model not in registry — fall back to direct key scan
-                    logger.warning(
-                        f"Model '{dataset.embedding_model}' not in registry, "
-                        f"scanning all namespaces for orphan vectors"
-                    )
-            
-            if vectors_deleted == 0:
-                # Fallback: scan ALL registered models for this dataset's vectors
-                for model_id in registry.list_model_ids():
-                    try:
-                        deleted = redis_service.delete_dataset_vectors(
-                            model_id=model_id,
-                            user_id=current_user.u_id,
-                            dataset_id=parsed_dataset_id
-                        )
-                        vectors_deleted += deleted
-                    except Exception:
-                        continue
-            
-            if vectors_deleted > 0:
-                logger.info(
-                    f"Cleaned up {vectors_deleted} Redis vectors for dataset "
-                    f"{dataset_id[:8]} during deletion"
-                )
-        except Exception as redis_err:
-            # Log but don't fail the deletion — Redis cleanup is best-effort
-            logger.warning(
-                f"Could not clean Redis vectors for dataset {dataset_id[:8]}: {redis_err}"
+        # 1. Remove the dataset's routing vectors. vector_rows.dataset_id carries
+        #    no FK, so without this the deleted dataset would keep answering queries.
+        from app.core.tenancy import tenant_session
+        from app.services.pgvector_store import get_pgvector_store
+
+        async with tenant_session(current_user.u_id) as tdb:
+            vectors_deleted = await get_pgvector_store().delete_by_dataset(
+                tdb, UUID(dataset_id)
             )
-        
+        if vectors_deleted:
+            logger.info(
+                f"Removed {vectors_deleted} vectors for dataset {dataset_id[:8]} during deletion"
+            )
+
         # 2. Delete dataset from PostgreSQL (cascade will delete csv_rows)
         total_rows = dataset.total_rows
         await db.delete(dataset)
@@ -1312,7 +1242,7 @@ async def rename_dataset(
 
 
 @router.post("/db/{dataset_id}/embed")
-async def embed_dataset_to_redis(
+async def embed_dataset_endpoint(
     dataset_id: str,
     force_reembed: bool = Query(False, description="Force re-embed even if already embedded"),
     db: AsyncSession = Depends(get_db),
@@ -1360,8 +1290,9 @@ async def embed_dataset_to_redis(
             "embedding_status": result.get("status", "completed"),
             "model": result.get("model_id"),
             "dimension": result.get("dimension"),
-            "redis_index": result.get("redis_index"),
+            "vector_store": result.get("vector_store", "pgvector"),
             "total_rows": result.get("total_rows"),
+            "unroutable_rows": result.get("unroutable_rows", 0),
             "embedded_count": result.get("embedded_count"),
             "failed_count": result.get("failed_count"),
             "message": f"Embedded {result.get('embedded_count', 0)} rows successfully"

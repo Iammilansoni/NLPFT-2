@@ -21,8 +21,7 @@ Secondary wins: one less service to run and pay for, vectors transactionally
 consistent with the templates they reference (no more orphaned index entries),
 and joins against relational data without a round trip.
 
-The Redis path is retained behind VECTOR_BACKEND=redis so the two can be
-benchmarked on the same eval harness rather than argued about.
+v1's Redis vectors can be copied here with scripts/backfill_redis_to_pgvector.py.
 
 INTERACTION WITH RLS -- THE IMPORTANT PART
 ------------------------------------------
@@ -33,12 +32,11 @@ ZERO surviving rows -- silently, with no error.
 Every query here therefore runs on a session prepared by `app.core.tenancy`,
 which sets `hnsw.iterative_scan = relaxed_order` on the same transaction. Callers
 MUST use `tenant_session()` or the `get_tenant_db` dependency; a bare session
-will both bypass tuning and (correctly) see no rows at all.
+binds no tenant, so every query here (correctly) matches no rows.
 """
 
 from __future__ import annotations
 
-import os
 import time
 import uuid
 from dataclasses import dataclass
@@ -49,8 +47,6 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logger import logger
-
-VECTOR_BACKEND = os.getenv("VECTOR_BACKEND", "pgvector").lower()
 
 
 def to_pgvector(vec: Sequence[float]) -> str:
@@ -183,9 +179,9 @@ class PgVectorStore:
           * The `dimension = :dim` predicate is not merely a filter -- it is what
             makes the partial HNSW index for that dimension eligible. Drop it and
             the planner falls back to a sequential scan.
-          * No `u_id` predicate appears anywhere. RLS supplies it. If this query
-            returns another tenant's row, RLS is misconfigured -- which is
-            exactly the failure `verify_rls_enforced()` checks for at startup.
+          * Tenant scoping comes from the transaction's bound tenant (set by
+            `tenant_session()`), applied here explicitly AND by RLS when the
+            connecting role does not bypass it -- two independent layers.
         """
         arr = np.asarray(query_vector, dtype=np.float32).ravel()
         if arr.shape[0] != dimension:
@@ -193,7 +189,16 @@ class PgVectorStore:
                 f"query vector dimension {arr.shape[0]} != expected {dimension}"
             )
 
-        filters = ["dimension = :dim", "embedding_model = :model"]
+        # The tenant predicate is explicit, not left to RLS alone: RLS is skipped
+        # entirely for superuser / BYPASSRLS roles (the default docker-compose
+        # role is one), and a retrieval path that leaks across tenants under a
+        # common deployment is not isolated. `current_setting(..., true)` yields
+        # NULL when no tenant is bound, which matches nothing -- fail closed.
+        filters = [
+            "u_id = current_setting('app.tenant_id', true)::uuid",
+            "dimension = :dim",
+            "embedding_model = :model",
+        ]
         params: Dict[str, Any] = {
             "dim": dimension,
             "model": embedding_model,
@@ -267,14 +272,20 @@ class PgVectorStore:
 
     async def delete_by_dataset(self, db: AsyncSession, dataset_id: uuid.UUID) -> int:
         res = await db.execute(
-            text(f"DELETE FROM {self.TABLE} WHERE dataset_id = CAST(:d AS uuid)"),
+            text(
+                f"DELETE FROM {self.TABLE} WHERE dataset_id = CAST(:d AS uuid) "
+                f"AND u_id = current_setting('app.tenant_id', true)::uuid"
+            ),
             {"d": str(dataset_id)},
         )
         return int(res.rowcount or 0)
 
     async def delete_by_template(self, db: AsyncSession, template_id: uuid.UUID) -> int:
         res = await db.execute(
-            text(f"DELETE FROM {self.TABLE} WHERE t_id = CAST(:t AS uuid)"),
+            text(
+                f"DELETE FROM {self.TABLE} WHERE t_id = CAST(:t AS uuid) "
+                f"AND u_id = current_setting('app.tenant_id', true)::uuid"
+            ),
             {"t": str(template_id)},
         )
         return int(res.rowcount or 0)
@@ -286,6 +297,7 @@ class PgVectorStore:
                 f"""
                 SELECT embedding_model, dimension, COUNT(*) AS n
                 FROM {self.TABLE}
+                WHERE u_id = current_setting('app.tenant_id', true)::uuid
                 GROUP BY embedding_model, dimension
                 ORDER BY n DESC
                 """

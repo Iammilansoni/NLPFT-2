@@ -138,21 +138,19 @@ async def test_onnx_embedder_offloads_to_thread():
 
 def test_seed_demo_and_benchmark_share_one_catalogue():
     """
-    The demo tenant is seeded from evals/api_surface.py on purpose: the numbers
-    in the README must be reproducible against what a reviewer clicks. Two
-    fixtures would drift.
+    The demo tenant and the routing benchmark read ONE catalogue on purpose: the
+    numbers in the README must be reproducible against what a reviewer clicks.
+    Two fixtures would drift.
     """
-    import sys
     from pathlib import Path
 
-    evals_dir = Path(__file__).resolve().parents[3] / "evals"
-    sys.path.insert(0, str(evals_dir))
-    from api_surface import API_TEMPLATES  # type: ignore[import-not-found]
+    from app.demo_catalogue import API_TEMPLATES
 
-    seed_src = (
-        Path(__file__).resolve().parents[2] / "scripts" / "seed_demo.py"
-    ).read_text(encoding="utf-8")
+    root = Path(__file__).resolve().parents[3]
+    seed_src = (root / "Backend" / "scripts" / "seed_demo.py").read_text(encoding="utf-8")
+    evals_src = (root / "evals" / "api_surface.py").read_text(encoding="utf-8")
 
-    assert "from api_surface import API_TEMPLATES" in seed_src
+    assert "from app.demo_catalogue import API_TEMPLATES" in seed_src
+    assert "from app.demo_catalogue import" in evals_src
     assert len(API_TEMPLATES) == 20
     assert all(t.get("utterances") for t in API_TEMPLATES)

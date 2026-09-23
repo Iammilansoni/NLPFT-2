@@ -56,7 +56,7 @@ from app.core.circuit_breaker import CircuitOpenError, get_breaker
 from app.core.logger import logger
 
 OLLAMA_URL = os.getenv("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
-EXTRACTION_MODEL = os.getenv("EXTRACTION_MODEL", "llama3.2")
+EXTRACTION_MODEL = os.getenv("EXTRACTION_MODEL", "llama3.2:3b")
 EXTRACTION_TIMEOUT = float(os.getenv("EXTRACTION_TIMEOUT", "45"))
 
 
@@ -80,11 +80,14 @@ class ExtractionResult:
     attempts: int = 0
     latency_ms: float = 0.0
     model: str = EXTRACTION_MODEL
+    # Required fields the request never mentioned. Reported, never invented.
+    missing_required: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "ok": self.ok,
             "values": self.values,
+            "missing_required": self.missing_required,
             "degraded": self.degraded,
             "reason": self.reason,
             "attempts": self.attempts,
@@ -188,6 +191,28 @@ class StructuredExtractionService:
             )
         return self._client
 
+    async def warm(self) -> bool:
+        """
+        Load the model into Ollama's memory ahead of the first request.
+
+        On CPU, loading a 3B model takes tens of seconds; paying that inside a
+        user's first request would exceed EXTRACTION_TIMEOUT and report a
+        spurious llm_unreachable. An empty prompt loads without generating.
+        """
+        try:
+            client = await self.client()
+            response = await client.post(
+                f"{OLLAMA_URL}/api/generate",
+                json={"model": self.model, "prompt": "", "keep_alive": "24h"},
+                timeout=httpx.Timeout(300.0, connect=5.0),
+            )
+            ok = response.status_code == 200
+            logger.info(f"Extraction model {self.model} warm: {ok}")
+            return ok
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Extraction model warm-up failed: {exc}")
+            return False
+
     async def aclose(self) -> None:
         if self._client and not self._client.is_closed:
             await self._client.aclose()
@@ -278,7 +303,10 @@ class StructuredExtractionService:
             return ExtractionResult(ok=True, values={}, reason="no schema on template")
 
         Validator = build_validator(request_schema)
+        known_keys = set((request_schema.get("properties") or {}).keys())
+        required = list(request_schema.get("required") or [])
         repair_error: Optional[str] = None
+        last_parsed: Dict[str, Any] = {}
         attempts = 0
 
         for attempt in range(max_repair_attempts + 1):
@@ -336,6 +364,7 @@ class StructuredExtractionService:
 
             # Drop nulls so absent fields do not masquerade as explicit nulls.
             parsed = {k: v for k, v in parsed.items() if v is not None}
+            last_parsed = {k: v for k, v in parsed.items() if k in known_keys}
 
             try:
                 validated = Validator(**parsed)
@@ -360,9 +389,15 @@ class StructuredExtractionService:
                 model=self.model,
             )
 
+        # Validation never passed. Most often the request simply did not mention a
+        # required field ("log me in as dana@shop.io" has no password). Return what
+        # WAS extracted plus exactly which required fields are absent, rather than
+        # discarding correct values or inventing the missing ones.
         return ExtractionResult(
             ok=False,
             degraded=False,
+            values=last_parsed,
+            missing_required=[k for k in required if k not in last_parsed],
             reason=f"validation_failed after {attempts} attempts: {repair_error}",
             attempts=attempts,
             latency_ms=(time.perf_counter() - t0) * 1000,

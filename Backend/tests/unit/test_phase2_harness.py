@@ -409,3 +409,18 @@ def test_dedup_disabled_passes_everything_through():
     rows = [{"template_id": "T1", "scenario_type": "valid", "query": "x"}] * 3
     embs = [_vec(1.0, 0.0)] * 3
     assert len(d.filter_batch(rows, embs)) == 3
+
+
+@pytest.mark.asyncio
+async def test_missing_required_field_keeps_extracted_values():
+    """
+    "log me in as a@b.com" has no password. Validation must fail rather than
+    invent one -- but the email that WAS extracted is returned, and the missing
+    field is named, instead of discarding correct work.
+    """
+    only_email = json.dumps({"email": "a@b.com"})
+    svc = _svc_with_responses([only_email, only_email])
+    res = await svc.extract("log me in as a@b.com", SCHEMA)
+    assert res.ok is False and res.degraded is False
+    assert res.values == {"email": "a@b.com"}
+    assert res.missing_required == ["password"]

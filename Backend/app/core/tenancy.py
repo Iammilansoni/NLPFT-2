@@ -243,3 +243,43 @@ def get_tenant_db(current_user_dep: Any):
                 yield session
 
     return _dependency
+
+
+async def rls_status(table: str = "vector_rows") -> dict:
+    """
+    Will PostgreSQL actually enforce RLS for the role this app connects as?
+
+    RLS must be ENABLED and FORCED on the table, AND the connecting role must be
+    neither a superuser nor BYPASSRLS -- both of those skip every policy
+    regardless of FORCE. The official postgres image makes POSTGRES_USER a
+    superuser, so a default docker-compose stack reports `enforced=False` here.
+    The retrieval path stays tenant-safe either way (PgVectorStore filters on the
+    bound tenant explicitly); this reports whether the database is a second,
+    independent layer.
+    """
+    async with AsyncSessionLocal() as session:
+        role = (
+            await session.execute(
+                text(
+                    "SELECT current_user, rolsuper, rolbypassrls "
+                    "FROM pg_roles WHERE rolname = current_user"
+                )
+            )
+        ).first()
+        forced = await verify_rls_enforced(session, table)
+
+    name, is_super, bypass = (role[0], bool(role[1]), bool(role[2])) if role else ("?", False, False)
+    enforced = forced and not is_super and not bypass
+    if enforced:
+        detail = f"RLS enforced for role '{name}' on {table}"
+    elif is_super or bypass:
+        detail = (
+            f"role '{name}' is {'a superuser' if is_super else 'BYPASSRLS'}: "
+            f"PostgreSQL RLS policies are bypassed. Tenant isolation relies on the "
+            f"application's explicit tenant predicates. Connect as a non-superuser "
+            f"role (see docs/ARCHITECTURE.md) to enforce RLS in the database too."
+        )
+    else:
+        detail = f"RLS is not enabled+forced on {table}"
+    return {"role": name, "superuser": is_super, "bypassrls": bypass,
+            "forced": forced, "enforced": enforced, "detail": detail}

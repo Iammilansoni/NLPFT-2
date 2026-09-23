@@ -30,7 +30,7 @@ class Settings:
     host = "127.0.0.1"
     port = 8000
     workers = 1
-    debug = os.getenv("DEBUG", "true").lower() == "true"
+    debug = os.getenv("DEBUG", "false").lower() == "true"
     log_level = os.getenv("LOG_LEVEL", "info")
     environment = os.getenv("ENVIRONMENT", "development")
     
@@ -115,31 +115,20 @@ if not settings.database_url and settings.postgres_host:
 # =============================================================================
 # SMTP VALIDATION - REQUIRED for email functionality (skip in testing)
 # =============================================================================
-_testing = os.getenv("TESTING", "").lower() in ("1", "true", "yes")
-if not settings.smtp_user or not settings.smtp_password:
-    if settings.environment in ("development", "testing") or _testing:
-        import warnings
-        warnings.warn(
-            "\n" + "="*80 + "\n"
-            "⚠️  WARNING: SMTP_USER / SMTP_PASSWORD not set.\n"
-            "   Email features (registration, password reset) will NOT work.\n"
-            "   Add SMTP_USER and SMTP_PASSWORD to Backend/.env\n"
-            + "="*80,
-            UserWarning,
-            stacklevel=2,
-        )
-        settings.smtp_user = settings.smtp_user or "noreply@localhost"
-        settings.smtp_password = settings.smtp_password or "placeholder"
-    else:
-        raise ValueError(
-            "❌ CRITICAL: SMTP configuration is required.\n"
-            "Email functionality (registration, password reset) requires:\n"
-            "  SMTP_USER=your_email@gmail.com\n"
-            "  SMTP_PASSWORD=your_app_password\n\n"
-            "For Gmail, create an App Password at:\n"
-            "  Google Account → Security → 2-Step Verification → App Passwords\n\n"
-            "Add these to Backend/.env"
-        )
+# Email is optional: without SMTP credentials the app runs, and registration /
+# password-reset e-mails are logged as undeliverable instead of sent. Refusing to
+# boot over a missing mail server blocked every local and demo deployment.
+EMAIL_ENABLED = bool(settings.smtp_user and settings.smtp_password)
+if not EMAIL_ENABLED:
+    import warnings
+    warnings.warn(
+        "SMTP_USER / SMTP_PASSWORD not set: e-mail delivery (verification codes, "
+        "password reset) is disabled. Set both in .env to enable it.",
+        UserWarning,
+        stacklevel=2,
+    )
+    settings.smtp_user = settings.smtp_user or "noreply@localhost"
+    settings.smtp_password = settings.smtp_password or ""
 
 # Ensure datasets directory exists
 DATASETS_DIR = settings.datasets_path
@@ -152,11 +141,10 @@ REDIS_HOST = os.getenv("REDIS_HOST", "")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "")
 
-# Validate Redis in non-development
-if not REDIS_HOST and settings.environment != "development":
-    raise ValueError("❌ CRITICAL: REDIS_HOST must be set in environment variables.")
-elif not REDIS_HOST:
-    REDIS_HOST = "localhost"  # Development fallback only
+# Redis backs rate limiting, the JWT denylist, Celery and the circuit breaker.
+# Each degrades explicitly without it, so it is not a boot requirement.
+if not REDIS_HOST:
+    REDIS_HOST = "localhost"
 
 # =============================================================================
 # OLLAMA CONFIGURATION - All values from environment
@@ -164,11 +152,12 @@ elif not REDIS_HOST:
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "")
 MODEL_NAME = os.getenv("OLLAMA_EMBEDDING_MODEL", os.getenv("MODEL_NAME", ""))
 
-# Validate Ollama in non-development
-if not OLLAMA_HOST and settings.environment != "development":
-    raise ValueError("❌ CRITICAL: OLLAMA_HOST must be set in environment variables.")
+# Ollama is only a dependency in local mode; cloud mode embeds in-process.
+_execution_mode = os.getenv("EXECUTION_MODE", "local").lower()
+if not OLLAMA_HOST and settings.environment != "development" and _execution_mode == "local":
+    raise ValueError("❌ CRITICAL: OLLAMA_HOST must be set when EXECUTION_MODE=local.")
 elif not OLLAMA_HOST:
-    OLLAMA_HOST = "http://localhost:11434"  # Development fallback only
+    OLLAMA_HOST = "http://localhost:11434"
 
 if not MODEL_NAME:
     MODEL_NAME = "nomic-embed-text"  # Safe default for embedding model

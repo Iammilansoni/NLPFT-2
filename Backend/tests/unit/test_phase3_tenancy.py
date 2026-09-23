@@ -156,13 +156,17 @@ def test_to_pgvector_flattens_and_handles_numpy():
 # ===========================================================================
 
 @pytest.mark.asyncio
-async def test_search_sql_contains_no_tenant_filter():
+async def test_search_sql_scopes_to_the_bound_tenant():
     """
-    LANDMINE 3: adding a defensive `u_id = ...` here would mask a broken RLS
-    configuration — the app would look correct while workers and scripts that
-    bypass the router leaked data.
+    The tenant predicate is explicit, and it reads the TRANSACTION's bound
+    tenant (set by tenant_session), never a caller-supplied id.
 
-    Isolation is RLS's job. Its absence in this SQL is intentional.
+    RLS alone was not enough: superuser and BYPASSRLS roles skip every policy,
+    and the default docker-compose role is a superuser, so the RLS-only query
+    returned other tenants' vectors there (reproduced by the integration suite).
+    A bound-GUC predicate keeps the same "no tenant bound -> no rows" contract
+    under any role; startup separately reports whether RLS is enforced too, so a
+    misconfigured database is surfaced rather than masked.
     """
     session = _RecordingSession(rows=[])
     store = PgVectorStore()
@@ -175,9 +179,10 @@ async def test_search_sql_contains_no_tenant_filter():
         top_k=25,
     )
 
-    sql = session.sql
-    assert "u_id" not in sql, "tenant filtering must come from RLS, not the query"
-    assert "current_setting" not in sql, "reads must not hand-roll the tenant either"
+    sql = " ".join(session.sql.split())
+    assert "u_id = current_setting('app.tenant_id', true)::uuid" in sql
+    # Fail closed: missing_ok=true yields NULL when unbound, matching nothing.
+    assert ":u_id" not in sql and ":user_id" not in sql, "tenant must not be a caller param"
 
 
 @pytest.mark.asyncio

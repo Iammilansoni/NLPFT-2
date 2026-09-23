@@ -215,7 +215,10 @@ def runtime_info() -> Dict[str, Any]:
         "execution_mode": EXECUTION_MODE,
         "embedder": {"model": emb.model_id, "dimension": emb.dimension},
         "generation": "ollama" if EXECUTION_MODE == "local" else "hosted-api",
-        "vector_backend": os.getenv("VECTOR_BACKEND", "pgvector"),
+        "extraction_model": os.getenv("EXTRACTION_MODEL", "llama3.2:3b"),
+        "reranker_enabled": os.getenv("RERANKER_ENABLED", "false").lower() in ("1", "true", "yes"),
+        "stage1_top_k": int(os.getenv("STAGE1_TOP_K", "25")),
+        "vector_backend": "pgvector",
         # Vectors are only comparable within one (model, dimension) pair.
         "reembed_required_on_mode_switch": True,
     }

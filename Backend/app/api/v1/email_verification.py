@@ -12,22 +12,26 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logger import logger
 from app.core.postgres import get_db
+from app.core.rate_limit import limiter
 from app.models.database_models import User
 from app.models.email_verification_models import EmailVerification
 from app.services.email_service import EmailService, get_email_service
 
 router = APIRouter(prefix="/auth", tags=["email-verification"])
-limiter = Limiter(key_func=get_remote_address)
 
 # Dev-only endpoints are hidden from the OpenAPI schema in production
-_DEV_MODE = os.getenv("ENVIRONMENT", "development").lower() != "production"
+# Dev helpers that reveal / bypass OTPs. Explicit opt-in, and never in
+# production: "not production" alone exposed them on any deployment that simply
+# forgot to set ENVIRONMENT.
+_DEV_MODE = (
+    os.getenv("ENABLE_DEV_ENDPOINTS", "false").lower() == "true"
+    and os.getenv("ENVIRONMENT", "development").lower() != "production"
+)
 
 
 # --- Schemas ---
@@ -403,7 +407,7 @@ async def dev_get_otp(
     Blocked in production. Use this when SMTP is not reachable during local dev.
     """
     import os
-    if os.getenv("ENVIRONMENT", "development").lower() == "production":
+    if not _DEV_MODE:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This endpoint is only available in development mode."
@@ -452,7 +456,7 @@ async def dev_verify_direct(
     Blocked in production. Use this to unblock login when SMTP is unavailable.
     """
     import os
-    if os.getenv("ENVIRONMENT", "development").lower() == "production":
+    if not _DEV_MODE:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This endpoint is only available in development mode."

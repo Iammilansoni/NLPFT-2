@@ -70,6 +70,30 @@ def upgrade() -> None:
     # -- extension ---------------------------------------------------------
     op.execute("CREATE EXTENSION IF NOT EXISTS vector")
 
+    # -- maintenance role --------------------------------------------------
+    # The admin_full_access policies below are granted TO nlpforge_admin.
+    # docker-compose creates it in Backend/db-init; managed Postgres (Neon etc.)
+    # has no init hook, so create it here when the migrating role may. Without
+    # CREATEROLE the policy is skipped rather than failing the migration.
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'nlpforge_admin') THEN
+                CREATE ROLE nlpforge_admin;
+            END IF;
+        EXCEPTION WHEN insufficient_privilege THEN
+            RAISE NOTICE 'cannot create role nlpforge_admin; admin policy skipped';
+        END
+        $$;
+        """
+    )
+    has_admin_role = bool(
+        bind.execute(
+            sa.text("SELECT 1 FROM pg_roles WHERE rolname = 'nlpforge_admin'")
+        ).scalar()
+    )
+
     # -- vector_rows -------------------------------------------------------
     op.create_table(
         "vector_rows",
@@ -153,13 +177,14 @@ def upgrade() -> None:
         # Maintenance escape hatch: migrations, backups and the seed script run
         # as a role holding BYPASSRLS or `nlpforge_admin`, not as the app role.
         op.execute(f"DROP POLICY IF EXISTS admin_full_access ON {table}")
-        op.execute(
-            f"""
-            CREATE POLICY admin_full_access ON {table}
-                TO nlpforge_admin
-                USING (true) WITH CHECK (true)
-            """
-        )
+        if has_admin_role:
+            op.execute(
+                f"""
+                CREATE POLICY admin_full_access ON {table}
+                    TO nlpforge_admin
+                    USING (true) WITH CHECK (true)
+                """
+            )
 
 
 def downgrade() -> None:

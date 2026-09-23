@@ -17,14 +17,13 @@ from typing import List, Optional
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth import get_current_user
 from app.core.logger import logger
 from app.core.postgres import get_db
+from app.core.rate_limit import limiter
 from app.models.database_models import ExpectedResponse, Metadata, Parameter, Template, User
 from app.models.schemas.template_schemas import EnterpriseTemplateCreate as TemplateCreate
 from app.models.schemas.template_schemas import EnterpriseTemplateResponse as TemplateResponse
@@ -45,7 +44,6 @@ from app.models.schemas.template_schemas import (
 from app.services.audit_service import get_audit_service
 
 # Initialize rate limiter for template operations
-limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/templates", tags=["Template Builder"])
 
@@ -106,7 +104,8 @@ async def create_template(
             description=template_data.description,
             base_url=template_data.base_url,
             method=template_data.method.value,
-            Field=template_data.endpoint,
+            endpoint=template_data.endpoint,
+            Field=template_data.endpoint,  # legacy column, kept in sync
             json_schema=template_data.json_schema,
             response_schema=template_data.response_schema,
             sample_requests=template_data.sample_requests,  # Already List[Dict]
@@ -169,7 +168,7 @@ async def create_template(
             description=new_template.description,
             base_url=new_template.base_url,
             method=new_template.method,
-            endpoint=new_template.Field,
+            endpoint=new_template.endpoint or new_template.Field,
             json_schema=new_template.json_schema,
             response_schema=new_template.response_schema,
             sample_requests=new_template.sample_requests,
@@ -367,6 +366,7 @@ async def update_draft_template(
             template.method = template_data.method.value
         if template_data.endpoint is not None:
             template.endpoint = template_data.endpoint
+            template.Field = template_data.endpoint  # legacy column, kept in sync
         if template_data.json_schema is not None:
             template.json_schema = template_data.json_schema
         if template_data.response_schema is not None:
@@ -533,7 +533,7 @@ async def list_templates(
                 description=template.description,
                 base_url=template.base_url,
                 method=template.method,
-                endpoint=template.Field,
+                endpoint=template.endpoint or template.Field,
                 json_schema=template.json_schema,
                 response_schema=template.response_schema,
                 sample_requests=template.sample_requests or [],
@@ -681,7 +681,7 @@ async def get_template(
             description=template.description,
             base_url=template.base_url,
             method=template.method,
-            endpoint=template.Field,
+            endpoint=template.endpoint or template.Field,
             json_schema=template.json_schema,
             response_schema=template.response_schema,
             sample_requests=template.sample_requests or [],
@@ -770,6 +770,7 @@ async def update_template(
             template.method = template_data.method.value
         if template_data.endpoint:
             template.endpoint = template_data.endpoint
+            template.Field = template_data.endpoint  # legacy column, kept in sync
         if template_data.json_schema:
             template.json_schema = template_data.json_schema
         if template_data.response_schema is not None:

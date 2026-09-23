@@ -1,70 +1,53 @@
-# Multi-stage build for NLPForge Backend API
-FROM python:3.11-slim AS base
+# NLPForge backend — LOCAL mode image (embeddings + extraction via Ollama).
+# Also used by the Celery worker service. Cloud mode: see Dockerfile.cloud.
+FROM python:3.11-slim
 
-# Set working directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    gcc \
-    g++ \
-    libpq-dev \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl gcc g++ libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set pip configuration for better reliability
 ENV PIP_DEFAULT_TIMEOUT=300 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    # Only used if RERANKER_ENABLED=true; must be writable by appuser.
+    RERANKER_CACHE_DIR=/app/.cache/flashrank
 
-# Copy requirements and install Python dependencies
-COPY requirements.txt ./requirements.txt
-
-# Create non-root user for security
 RUN useradd -m -u 1000 appuser
 
-# Install requirements (no PyTorch needed - using Ollama HTTP API)
-RUN pip install --no-cache-dir --default-timeout=300 -r requirements.txt
+COPY requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Create necessary directories and set permissions
-RUN mkdir -p /app/storage /app/datasets /app/storage/faiss_index /app/storage/flashrank_cache && \
-    chown -R appuser:appuser /app
-
-# Switch to appuser
+RUN mkdir -p /app/datasets /app/.cache && chown -R appuser:appuser /app
 USER appuser
 
-# Copy application code
 COPY --chown=appuser:appuser app/ ./app/
-
-# Copy database migration files
 COPY --chown=appuser:appuser alembic.ini ./
 COPY --chown=appuser:appuser alembic/ ./alembic/
-
-# Operational scripts. seed_demo.py is the documented one-click demo path
-# (`docker compose exec backend python scripts/seed_demo.py`), so it has to be
-# present in the local image too — Dockerfile.cloud already copies this.
+COPY --chown=appuser:appuser config/ ./config/
 COPY --chown=appuser:appuser scripts/ ./scripts/
-
-# Copy additional files
+# Boot scripts: init_db_direct.py, seed_admin.py
 COPY --chown=appuser:appuser *.py ./
-COPY --chown=appuser:appuser *.json ./ 
 
-# Expose port
 EXPOSE 8000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
-# Run DB init, apply the migrations create_all() can't cover, seed admin, then
-# start the application.
-# init_db_direct.py creates every ORM-mapped table (idempotent - safe to run every time)
-# run_migrations.py applies what only exists as an Alembic migration -- currently
-#   vector_rows + RLS (see alembic/versions/20260823_pgvector_and_rls.py) --
-#   which create_all() cannot create because it has no ORM model (idempotent:
-#   stamps the create_all()-covered baseline once, then `upgrade head` is a
-#   no-op on every later boot)
-# seed_admin.py creates a default admin user if the users table is empty (idempotent)
-CMD python init_db_direct.py && python scripts/run_migrations.py && python seed_admin.py && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WEB_CONCURRENCY:-1}
+# Boot sequence -- every step is idempotent, so this runs on every start:
+#   init_db_direct.py    create_all() for every ORM-mapped table
+#   run_migrations.py    stamp the create_all() baseline once, then
+#                        `alembic upgrade head` for what exists only as a
+#                        migration (vector_rows, HNSW indexes, RLS policies)
+#   seed_admin.py        admin account, only when the users table is empty
+#   seed_demo.py         demo tenant (20 templates, embedded) when SEED_DEMO=true;
+#                        a seed failure is logged and does not stop the API
+# The demo seed needs evals/api_surface.py, which docker-compose bind-mounts.
+CMD python init_db_direct.py \
+ && python scripts/run_migrations.py \
+ && python seed_admin.py \
+ && { [ "$SEED_DEMO" != "true" ] || python scripts/seed_demo.py || echo "demo seed failed; starting API anyway"; } \
+ && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WEB_CONCURRENCY:-1}

@@ -1,190 +1,43 @@
 # =============================================================================
-# NLPForge-Tester - Development Docker Compose
+# NLPForge — infrastructure only, for running backend/frontend on the host
 # =============================================================================
-# Infrastructure services in Docker
-# Frontend & Backend run locally for hot reload
-# 
-# Cross-platform compatible: Windows, Linux, macOS
+#   docker compose -f docker-compose.dev.yml up -d
+#   cp Backend/.env.example Backend/.env
+#   cd Backend  && python init_db_direct.py && python scripts/run_migrations.py \
+#               && python scripts/seed_demo.py && uvicorn app.main:app --reload
+#   cd Frontend && npm install && npm run dev
 #
-# Usage:
-#   Start:    docker-compose -f docker-compose.dev.yml up -d
-#   Stop:     docker-compose -f docker-compose.dev.yml down
-#   Logs:     docker-compose -f docker-compose.dev.yml logs -f
-#   Reset:    docker-compose -f docker-compose.dev.yml down -v
-#
-# Then run locally:
-#   Backend:  cd Backend && python -m uvicorn app.main:app --reload --port 8000
-#   Frontend: cd Frontend && npm run dev
-#
-# Access Points:
-#   - Backend API:    http://localhost:8000 (run locally)
-#   - Frontend:       http://localhost:3000 (run locally)
-#   - RedisInsight:   http://localhost:8001
-#   - Redis Commander: http://localhost:8081
-#   - pgAdmin:        http://localhost:5050
-#   - Ollama:         http://localhost:11434 (run locally: ollama serve)
-#
+# Ollama runs on the host (https://ollama.com):  ollama pull nomic-embed-text
+#                                               ollama pull llama3.2:3b
 # =============================================================================
 
 services:
-  # ---------------------------------------------------------------------------
-  # PostgreSQL Database
-  # ---------------------------------------------------------------------------
   postgres:
-    image: postgres:15-alpine
-    container_name: nlpforge-dev-postgres
-    hostname: postgres
-    env_file:
-      - ./Backend/.env
-    ports:
-      - "127.0.0.1:5432:5432"
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-nlpforge}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nlpforge_secure_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nlpforge_dev}
       POSTGRES_DB: ${POSTGRES_DB:-nlpforge}
-      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "127.0.0.1:5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - dev_postgres_data:/var/lib/postgresql/data
+      - ./Backend/db-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nlpforge} -d ${POSTGRES_DB:-nlpforge}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nlpforge}"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
-    restart: unless-stopped
-    networks:
-      - nlpforge-network
 
-  # ---------------------------------------------------------------------------
-  # Redis Stack - Vector DB with RediSearch
-  # ---------------------------------------------------------------------------
   redis:
-    image: redis/redis-stack:latest
-    container_name: nlpforge-dev-redis
-    hostname: redis
-    env_file:
-      - ./Backend/.env
-    ports:
-      - "127.0.0.1:6379:6379"   # Redis port
-      - "127.0.0.1:8001:8001"   # RedisInsight UI (localhost only)
+    image: redis/redis-stack-server:latest
     environment:
-      REDIS_ARGS: >-
-        --requirepass ${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024}
-        --appendonly yes
-        --appendfsync everysec
-        --maxmemory 512mb
-        --maxmemory-policy allkeys-lru
+      REDIS_ARGS: --requirepass ${REDIS_PASSWORD:-nlpforge_dev}
+    ports:
+      - "127.0.0.1:6379:6379"
     volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024}", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    restart: unless-stopped
-    networks:
-      - nlpforge-network
+      - dev_redis_data:/data
 
-  # ---------------------------------------------------------------------------
-  # Redis Commander - Web UI for Redis
-  # ---------------------------------------------------------------------------
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    container_name: nlpforge-dev-redis-commander
-    hostname: redis-commander
-    env_file:
-      - ./Backend/.env
-    ports:
-      - "127.0.0.1:8081:8081"
-    environment:
-      REDIS_HOSTS: local:redis:6379:0:${REDIS_PASSWORD:-nlpforge_redis_secure_password_2024}
-      HTTP_USER: ${REDIS_COMMANDER_USER:-admin}
-      HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD:-admin123}
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - nlpforge-network
-
-  # ---------------------------------------------------------------------------
-  # pgAdmin - PostgreSQL Web UI
-  # ---------------------------------------------------------------------------
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: nlpforge-dev-pgadmin
-    hostname: pgadmin
-    env_file:
-      - ./Backend/.env
-    ports:
-      - "127.0.0.1:5050:80"
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
-      PGADMIN_CONFIG_SERVER_MODE: "False"
-      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - nlpforge-network
-
-  # ---------------------------------------------------------------------------
-  # Ollama - Local LLM & Embedding Server
-  # ---------------------------------------------------------------------------
-  # NOTE: Ollama is commented out - run locally instead for faster model loading
-  # To run Ollama locally: ollama serve
-  # Then pull models: ollama pull nomic-embed-text && ollama pull llama3.2
-  # ---------------------------------------------------------------------------
-  # ollama:
-  #   image: ollama/ollama:latest
-  #   container_name: nlpforge-dev-ollama
-  #   hostname: ollama
-  #   ports:
-  #     - "11434:11434"
-  #   volumes:
-  #     - ollama_data:/root/.ollama
-  #   environment:
-  #     OLLAMA_HOST: 0.0.0.0
-  #     OLLAMA_ORIGINS: "*"
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 5
-  #     start_period: 60s
-  #   restart: unless-stopped
-  #   networks:
-  #     - nlpforge-network
-
-
-# =============================================================================
-# Volumes
-# =============================================================================
-# IMPORTANT: Using same volume names as docker-compose.yml to share data
-# This ensures your account, templates, and datasets persist across dev/prod modes
 volumes:
-  postgres_data:
-    driver: local
-    name: nlpforge-postgres-data
-  redis_data:
-    driver: local
-    name: nlpforge-redis-data
-  pgadmin_data:
-    driver: local
-    name: nlpforge-pgadmin-data
-  ollama_data:
-    driver: local
-    name: nlpforge-ollama-data
-
-# =============================================================================
-# Networks
-# =============================================================================
-networks:
-  nlpforge-network:
-    driver: bridge
-    name: nlpforge-dev-network
+  dev_postgres_data:
+  dev_redis_data:
