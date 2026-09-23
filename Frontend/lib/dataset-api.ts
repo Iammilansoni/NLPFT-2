@@ -150,12 +150,13 @@ export class DatasetApiClient {
     const response = await this.client.post<GenerateDatasetResponse>(
       '/api/v1/datasets/generate',
       {
-        user_id: data.user_id,
+        // Field names the backend accepts (api/v1/datasets.py DatasetGenerateRequest).
+        // The LLM is the user's default provider (Settings -> LLM Providers).
         template_id: data.template_id,
-        rows: data.rows || 500,
-        llm_model: data.llm_model || 'gpt-4',
-        custom_prompt: data.custom_prompt,
-        temperature: data.temperature || 0.7,
+        num_examples: Math.max(10, data.rows || 100),
+        user_prompt:
+          data.custom_prompt?.trim() ||
+          'Realistic, varied requests a user would type to call this API, including casual and formal phrasing.',
       }
     );
     return response.data;

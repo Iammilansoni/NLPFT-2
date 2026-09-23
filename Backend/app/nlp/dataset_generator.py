@@ -285,48 +285,60 @@ You understand. Await user prompt.
             edge_count = 3
             extreme_count = 2
 
-        # Extract parameter info for dynamic examples
-        num_concepts = 3 # valid, edge, error
-        per_concept_variants = min(15, max(1, math.floor(num_examples / num_concepts)))
-        phrasing_instruction = f"Provide {per_concept_variants} different phrasings" if num_examples < 50 else "aim for diverse phrasings; for larger datasets target 10–15 per concept."
-        
         params = template_data.get("parameters", []) if template_data else []
         p_names = [p.get("name") for p in params if p.get("name")]
         
         # Fallback for empty parameters
         p_names_clean = p_names[:2] if p_names else ["data", "parameter"]
         p1 = p_names_clean[0]
-        p2 = p_names_clean[1] if len(p_names_clean) > 1 else "config"
         
-        api_name = template_data.get("name", "API") if template_data else "API"
 
+        # Style examples come from THIS template's own samples. A fixed example
+        # from another API gets copied by small models into the wrong dataset,
+        # e.g. order-status questions labelled as Cancel_Order.
+        own_queries = [
+            s.get("query") for s in (template_data or {}).get("sample_requests", []) or []
+            if isinstance(s, dict) and s.get("query")
+        ][:3]
+        style = (
+            "Examples of the style wanted, for this API: " + "; ".join(f'"{q}"' for q in own_queries) + "."
+            if own_queries
+            else 'Examples of the style wanted (for an unrelated weather API): "will it rain in Leeds tomorrow?", '
+                 '"weather for Paris this weekend please".'
+        )
+        purpose = ((template_data or {}).get("description") or "").strip().split(". ")[0]
+
+        extra = (
+            f"\nAdditional instructions from the user: {user_prompt.strip()}\n"
+            if user_prompt and user_prompt.strip()
+            else ""
+        )
+        focus = f"\nFocus areas: {', '.join(focus_areas)}\n" if focus_areas else ""
+
+        # These utterances become the retrieval index the router matches real
+        # user requests against, so they must read like real user requests.
+        # The previous prompt asked for phrasings such as "Submit request to
+        # perform {api_name} on {param}"; small models copied that verbatim,
+        # producing API-jargon utterances no user would ever type.
         user_prompt_text = f"""Generate exactly {num_examples} test cases for the API above. Output ONLY a JSON array.
 
-Requirements:
-- {valid_count} valid test cases with realistic data
-- {edge_count} edge cases (boundary values, empty strings, long text)
-- {extreme_count} error cases (missing required fields, wrong types)
+Mix: {valid_count} valid requests, {edge_count} edge cases (boundary or unusual values), {extreme_count} error cases (a required value missing or clearly invalid).
 
-Each test case needs: query, api, endpoint, method, request, expected_response, scenario_type, test_category, notes
+The "query" field is what a real end user would type or say to get this done. Rules for "query":
+- Plain, natural language in the user's own words, as if talking to an assistant or support agent.
+- Do NOT mention the API name, the endpoint path, HTTP methods, JSON, or parameter names like {p1}.
+- Use concrete, realistic values (names, e-mails, ids, amounts, dates) where the request needs them.
+- Vary the style: short commands, polite requests, questions, casual phrasing, a few typos (about 10%).
+- Every query must be different; never reuse a sentence pattern with only a value changed.
+- Every query must ask for exactly what THIS API does ({purpose}). Never write a request that
+  belongs to a different action, even a related one (e.g. checking status is not cancelling).
 
-CRITICAL FOR HIGH CONFIDENCE SCORES (80%+):
-1. **Use domain-specific technical terminology** from the schema
-2. **Include multiple parameter mentions** in each query (e.g., "perform action on {p1} and {p2}")
-3. **{phrasing_instruction}**:
-   - Formal: "Submit a POST request to {api_name} for {p1} processing..."
-   - Technical shorthand: "{api_name} {p1} spec-compliant execution"
-   - Natural question: "How do I perform {api_name} on the given {p1}?"
-   - With parameters: "{p1}=value {p2}=default"
-4. **Add typo variants (10% of total)** with slightly lower expected quality
-5. **Include action verbs**: calculate, generate, process, execute, apply, transform, compute
+{style}
+Bad queries (never write like this): "Submit request to perform the API on {p1}", "Process {p1} using the API specification".
 
-Generate varied natural language queries:
-- "Submit request to perform {api_name} on {p1} with specific configuration"
-- "Generate {api_name} analysis {p1} technical parameters"
-- "How do I transform raw input into valid {p1} using {api_name}?"
-- "Process {p1} using {api_name} specification"
-- Include some with typos like "crete requ est witout fiel ds"
-
+Each test case needs: query, api, endpoint, method, request, expected_response, scenario_type (valid | edge_case | error_case), test_category, notes.
+The "request" object must contain the values stated in the query, using the schema's field names.
+{extra}{focus}
 Output format: [{{"query":"...", "api":"...", ...}}, ...]
 Return ONLY the JSON array, nothing else."""
         
@@ -810,6 +822,27 @@ Return ONLY the JSON array, nothing else."""
             self.provider = "gemini"
             self.model_name = _gemini_model
             return await self._call_gemini_api(system_prompt, user_prompt, num_examples)
+
+        # Local mode with nothing configured: use the Ollama model the stack
+        # already runs for extraction, so generation works with zero API keys.
+        if os.getenv("EXECUTION_MODE", "local").lower() == "local":
+            from app.llm.provider_factory import LLMProviderFactory
+            from app.llm.providers.base import LLMConfig
+
+            model = os.getenv("EXTRACTION_MODEL", "llama3.2:3b")
+            local = LLMProviderFactory.create(
+                "ollama", model, base_url=os.getenv("OLLAMA_HOST", "http://localhost:11434"), timeout=600.0
+            )
+            self.provider, self.model_name = "ollama", model
+            logger.info(f"No LLM provider configured; using local Ollama model {model}")
+            try:
+                response = await local.generate(
+                    prompt=user_prompt, system_prompt=system_prompt, config=LLMConfig(max_tokens=4096)
+                )
+                return response.content
+            finally:
+                if hasattr(local, "close"):
+                    await local.close()
         
         raise ValueError(
             "No LLM provider available. "

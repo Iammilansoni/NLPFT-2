@@ -20,7 +20,7 @@ in-memory index, so it runs in CI on every push.
 
 | File | Purpose |
 |---|---|
-| `api_surface.py` | 20 API templates + 100 indexed utterances, grouped into confusion clusters |
+| `api_surface.py` | re-exports the 20-template catalogue (100 indexed utterances, grouped into confusion clusters) from `Backend/app/demo_catalogue.py`, which also seeds the demo tenant |
 | `benchmark_queries.py` | 180 held-out labeled queries across 4 difficulty tiers |
 | `run_eval.py` | Index, three ranking strategies, metrics, reporting |
 

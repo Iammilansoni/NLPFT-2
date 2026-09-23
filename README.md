@@ -2,338 +2,232 @@
 
 # NLPForge
 
-### Semantic API Router & Structured Extraction Harness
+**Turn a sentence into a validated API call.**
 
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.123+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=nextdotjs&logoColor=white)](https://nextjs.org)
-[![pgvector](https://img.shields.io/badge/pgvector-HNSW-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://github.com/pgvector/pgvector)
-[![CI](https://img.shields.io/github/actions/workflow/status/Iammilansoni/NLPFT-2/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Iammilansoni/NLPFT-2/actions)
-[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+A semantic API router: vector retrieval picks the right endpoint from your API catalogue, and a
+schema-constrained LLM extracts a request body that validates against that endpoint's JSON Schema.
+Routing accuracy is measured on a held-out benchmark in CI.
 
-**Routes natural language to the right API endpoint, then extracts a
-schema-valid request body — deterministically, and with the accuracy measured.**
+[Architecture](docs/ARCHITECTURE.md) · [Run it locally](#getting-started) · [Benchmark](#measured-results) · [Deployment](DEPLOYMENT.md)
+
+![NLPForge demo: a request is routed to Refund_Order and its body extracted; a request missing a password is reported, not invented](docs/demo.gif)
+
+FastAPI · PostgreSQL + pgvector · Ollama (nomic-embed-text, llama3.2) · Pydantic · Celery + Redis · Next.js 16
 
 </div>
 
 ---
 
-## What this is
+## What is this?
 
-NLPForge is the **deterministic routing layer that sits beneath an LLM agent**,
-not the agent itself.
+LLM agents are unreliable at choosing which API to call, because routing is usually left to a
+prompt. NLPForge treats routing as a **retrieval problem that can be measured**. You describe
+your APIs once as templates. For each request, it returns the one endpoint to call plus a
+request body that passes the endpoint's schema. When a value is missing, it says which one,
+instead of inventing it.
 
-Give it a sentence. It picks the correct API template out of a catalogue, fills
-in the request body against that template's JSON Schema, and hands back
-structured, executable output:
-
-```
-  "authenticate with email dana@shop.io and password Passw0rd"
-                            │
-     Stage 1  RECALL     ───┤  bi-encoder → pgvector HNSW, k=25
-     Stage 2  RANKING    ───┤  max-pool rows → top template
-     Stage 3  EXTRACTION ───┤  schema-constrained decode → Pydantic validate
-                            ▼
-  {
-    "api_name": "User_Login",
-    "endpoint": "/auth/login",
-    "method": "POST",
-    "confidence_score": 0.9137,
-    "extracted_request_body": {
-      "email": "dana@shop.io",
-      "password": "Passw0rd"
-    },
-    "degraded": false
-  }
+```text
+"Refund 25 dollars on order 8820 because it arrived broken"
+        │
+        ▼
+POST /orders/{order_id}/refund
+{ "order_id": "8820", "amount": 25.0 }        extraction.ok = true · degraded = false
 ```
 
-**What it is not.** There is no planning loop, no multi-step tool execution, no
-conversation. It resolves one utterance to one endpoint. That constraint is the
-point: agents are unreliable at tool selection precisely because routing is
-usually left to a prompt. This makes routing a measurable retrieval problem
-instead.
+It is deliberately **not an agent**. There is no planning loop and no multi-step execution:
+one request resolves to one endpoint.
 
----
+## Key features
 
-## Routing benchmark
+- **Semantic routing:** pgvector HNSW search over example utterances, max-pooled per template.
+- **Structured extraction:** JSON-Schema-constrained decoding, Pydantic validation, one repair
+  retry, and missing required fields reported explicitly.
+- **Honest failure signalling:** every response carries per-stage outcomes and `degraded`, so
+  "the request had no values" is distinguishable from "the LLM was unreachable".
+- **Template catalogue:** documented APIs with a draft → review → approved workflow. Approval
+  requires complete documentation, samples and schemas.
+- **Dataset pipeline:** an LLM generates example utterances per template on Celery (your
+  configured provider, Gemini, or the local Ollama model), or you upload a CSV. Both are
+  embedded into pgvector and become routable.
+- **Multi-tenant:** a tenant predicate on every vector query plus PostgreSQL row-level security,
+  cookie-based JWT auth with refresh-token rotation, and a Redis-backed rate limiter.
+- **Two runtimes:** fully offline on Ollama, or cloud mode with in-process ONNX embeddings.
 
-Accuracy is measured, not asserted. `evals/` holds **180 held-out queries** over
-**20 API templates** in four difficulty tiers. It needs no PostgreSQL, Redis or
-Ollama, so it runs in CI on every push and gates merges.
+## How it works
 
-```bash
-python evals/run_eval.py --embedder onnx          # the numbers below
-python evals/run_eval.py                          # tfidf smoke mode, no downloads
-```
-
-`embedder bge-small-en-v1.5` · `STAGE1_TOP_K=25` · dense recall@25 **1.000**
-
-| Strategy | Hit@1 | Hit@3 | MRR@5 | Ships? |
-|---|---|---|---|---|
-| **`stage1_only`** — dense vector only | **0.822** | **0.983** | **0.896** | ✅ **default** |
-| `hybrid_rrf` — dense + BM25 fused | 0.806 | 0.956 | 0.880 | available |
-| `v2_cross_encoder` — + cross-encoder | 0.739 | 0.944 | 0.836 | off by default |
-| `bm25_only` — lexical only | 0.600 | 0.861 | 0.727 | — |
-| `v1_heuristic` — what v1 shipped | 0.589 | 0.850 | 0.712 | removed |
-
-**Hit@1 by difficulty tier**
-
-| Strategy | direct | paraphrase | colloquial | hard_negative |
-|---|---|---|---|---|
-| `stage1_only` | 0.950 | **0.900** | 0.800 | 0.600 |
-| `hybrid_rrf` | **1.000** | 0.717 | **0.900** | **0.650** |
-| `v2_cross_encoder` | 0.975 | 0.683 | 0.800 | 0.525 |
-
-Accuracy is deterministic and reproduces exactly. Latency: dense retrieval is
-sub-millisecond; the cross-encoder adds 120–265ms p50 on CPU.
-
-### What the benchmark found
-
-**v1's reranker was actively harmful.** It scored **0.589 against a 0.822
-baseline** — 23 points *worse* than doing nothing. It computed
-`0.7·avg_similarity + 0.15·avg_confidence + 0.15·intent_alignment`, where
-`avg_similarity` was Stage 1's own cosine score. It could only re-sort Stage 1's
-ordering, and the `intent_alignment` term (keyword substring matching, where
-`"please"` implied `action`) injected noise uncorrelated with relevance.
-
-**The cross-encoder was also a regression — and finding that required fixing the
-benchmark first.** Measured against a char-trigram TF-IDF baseline it looked like
-a clear +0.111 Hit@1 win, and it shipped on that basis. Re-measured against the
-actual production embedder it is **−0.083** (0.822 → 0.739), losing at every
-retrieval depth:
-
-| `STAGE1_TOP_K` | dense only | + cross-encoder |
+| Stage | What happens | Implementation |
 |---|---|---|
-| 5 | 0.822 | 0.756 |
-| 10 | 0.822 | 0.750 |
-| 25 | 0.822 | 0.739 |
+| **1 · Recall** | Embed the request and retrieve the top-25 most similar utterances for the caller's tenant | `nomic-embed-text` → pgvector HNSW (cosine) |
+| **2 · Rank** | Max-pool utterance scores per template; the best template is the route | `app/nlp/cross_encoder_reranker.py` (cross-encoder available, off by default) |
+| **3 · Extract** | Fill the request body under the template's JSON Schema, validate, repair once | Ollama `llama3.2:3b` + Pydantic, behind a Redis circuit breaker |
 
-Not a tuning problem. `ms-marco-MiniLM` is trained on web-search queries against
-prose passages; this corpus is short imperative commands matched against short
-utterances, which is off-distribution for it. `bge-small` is trained for exactly
-that shape and wins outright. **The earlier gain was an artefact of a weak
-baseline** — TF-IDF left room to recover; a good embedder leaves none.
-
-`RERANKER_ENABLED` therefore defaults to `false`. The code, the benchmark arm and
-the measurement all remain, so the decision is re-checkable against any new
-embedder rather than inherited on faith.
-
-**Hybrid retrieval wins the hardest tier but not overall.** BM25 fused by
-Reciprocal Rank Fusion takes hard negatives from 0.600 → **0.650** and direct
-queries to a perfect 1.000, at sub-millisecond cost — but costs 0.822 → 0.806
-overall, because it dilutes the paraphrase tier where dense retrieval is strongest
-(0.900 → 0.717). On n=180 that overall delta is within noise. Shipped as
-available, not as default, on the principle that an unproven gain does not become
-a default.
-
-**Every routing error is a precision failure.** Dense recall@25 is **1.000** —
-the correct template is always retrieved. No amount of recall tuning can help;
-all remaining headroom is in ranking.
-
-Full methodology, tier definitions and caveats: **[`evals/README.md`](evals/README.md)**
-
----
-
-## Architecture
-
-```
-                    ┌─────────────────────────────────────────┐
-  NL query ─────────▶ Stage 0 · semantic cache (Redis)        │──hit──▶ response
-                    └────────────────┬────────────────────────┘
-                                     │ miss
-                    ┌────────────────▼────────────────────────┐
-                    │ Stage 1 · RECALL          k=25          │
-                    │ embedder → pgvector HNSW                │
-                    │ RLS + hnsw.iterative_scan               │
-                    └────────────────┬────────────────────────┘
-                    ┌────────────────▼────────────────────────┐
-                    │ Stage 2 · RANKING                       │
-                    │ max-pool utterance rows → template      │
-                    │                                         │
-                    │ optional, OFF by default, measured:     │
-                    │   · BM25 + RRF fusion   (hybrid)        │
-                    │   · FlashRank cross-encoder  (−0.083)   │
-                    └────────────────┬────────────────────────┘
-                    ┌────────────────▼────────────────────────┐
-                    │ Stage 3 · EXTRACTION                    │
-                    │ schema-constrained decode               │
-                    │ → Pydantic validate → repair retry      │
-                    │ Redis-backed circuit breaker            │
-                    └─────────────────────────────────────────┘
+```text
+Next.js ──/api/*──► FastAPI ──► Stage 1 embed ─► pgvector (RLS + tenant filter)
+                                 Stage 2 rank
+                                 Stage 3 extract ─► Ollama ─► Pydantic ─► response
+                    Celery ◄── dataset generation / embedding      Redis: queue · rate limits · JWT deny-list
 ```
 
-### Design decisions worth explaining
+Full request flow, data model, tenancy design and failure behaviour are in
+**[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
-**Aggregate rows→template by MAX, not mean.** A template with one perfect match
-among ten mediocre ones is a better route than one with eleven lukewarm matches.
-Mean-pooling (v1's behaviour) ranks it lower. This turned out to be a larger
-accuracy lever than the cross-encoder — which was negative.
+## Measured results
 
-**Optional ranking stages stay in the tree, switched off.** The cross-encoder and
-the BM25/RRF hybrid are both fully implemented, both wired into the benchmark as
-comparison arms, and both default to off because measurement said so. Deleting
-them would discard the ability to re-check that decision when the embedder
-changes; enabling them by default would repeat the mistake of shipping an
-unmeasured assumption. `RERANKER_ENABLED=true` and `VECTOR_BACKEND` make either
-one a config change, not a code change.
+The benchmark has 180 held-out queries against 20 API templates, in four difficulty tiers.
+Sibling endpoints such as password-reset-request, reset-confirm and change-password are
+deliberately included as hard negatives. None of the queries appear in the indexed utterances.
 
-**Tenant isolation is enforced by PostgreSQL, not by application code.** v1 relied
-on 32+ hand-written `u_id ==` filters across the routers; one omission is a
-cross-tenant leak. v2 uses Row-Level Security with a tenant-scoped session.
+| Strategy | Hit@1 | Hit@3 | Notes |
+|---|---|---|---|
+| **Dense retrieval + max-pool (shipped)** | **0.822** | 0.983 | `bge-small`, exact search; `python evals/run_eval.py --embedder onnx` (CI gate ≥ 0.78) |
+| Same, through the live API (local mode) | 0.800 | 0.967 | `nomic-embed-text` via pgvector, full HTTP path |
+| Dense + BM25 hybrid (RRF) | 0.806 | 0.956 | wins hard negatives (0.650), loses paraphrases |
+| Dense + ms-marco cross-encoder | 0.739 | 0.944 | off-distribution for short commands, so disabled |
+| v1 weighted heuristic | 0.589 | 0.850 | what the first version shipped |
 
-Two non-obvious things that make RLS work, both handled in `app/core/tenancy.py`:
+The correct template is always in the top 25 (Recall@25 = 1.000), so all remaining error comes
+from ranking. Routing takes about 100 ms p50 through the API without extraction. Extraction adds
+about 1–5 s on CPU. Methodology and caveats are in **[evals/README.md](evals/README.md)**.
 
-- **`SET LOCAL`, never `SET`.** The session pool reuses connections. A plain `SET`
-  persists the tenant GUC past the request, and the next request — for a
-  *different* tenant — inherits it. That turns the security feature into the
-  leak. `SET LOCAL` is transaction-scoped, so it requires an explicit
-  transaction.
-- **`hnsw.iterative_scan`.** An HNSW scan returns `ef_search` candidates and RLS
-  filters them *afterwards*. A tenant owning 2% of rows can get **zero** results
-  from a top-50 scan — no error, just silent recall collapse. Iterative scan
-  keeps pulling until it has enough post-filter rows.
+## Tech stack
 
-**Circuit breaker state lives in Redis.** The API and N Celery workers are separate
-processes. An in-process breaker would let the API trip correctly while workers
-keep hammering the same dead dependency. Breaker state is a property of the
-dependency, not of the observer.
+| Layer | Technologies |
+|---|---|
+| Frontend | Next.js 16 (App Router), React 18, TypeScript, Tailwind CSS (token-based design system), TanStack Query |
+| Backend | FastAPI (async), SQLAlchemy 2, Pydantic v2, Alembic, Celery |
+| AI / ML | Ollama (`nomic-embed-text`, `llama3.2:3b`), fastembed ONNX (`bge-small-en-v1.5`), FlashRank |
+| Data | PostgreSQL 16 + pgvector (HNSW, row-level security), Redis |
+| Infrastructure | Docker Compose, GitHub Actions (lint, tests, Postgres integration, benchmark gate, frontend build) |
 
-**Failure is reported, never swallowed.** v1 returned `{}` when extraction failed
-*and* when a query genuinely had no slots — byte-identical. Every response now
-carries `degraded` and `degraded_reason`.
+## Project structure
 
----
+```text
+Backend/
+  app/
+    api/v1/            REST endpoints (query, templates, datasets, auth, settings)
+    services/          routing pipeline, pgvector store, extraction, embedding
+    nlp/               ranking, URL detection, BM25/RRF (benchmark arm)
+    core/              config, tenancy (RLS), runtime (embedder), rate limiting
+    demo_catalogue*.py the 20-template catalogue shared by the demo seed and the benchmark
+  alembic/             migrations (pgvector, HNSW, RLS)
+  scripts/             demo seed, migrations runner, Redis→pgvector backfill
+  tests/               unit + Postgres integration tests
+Frontend/              Next.js app (landing, dashboard, templates, datasets, settings)
+evals/                 routing benchmark (180 held-out queries)
+docs/                  architecture, demo GIF, screenshots
+scripts/smoke_test.py  end-to-end check of a running stack
+```
 
-## Stack
+## Getting started
 
-| Layer | Choice | Why |
-|---|---|---|
-| API | FastAPI (async) | — |
-| Vectors | **PostgreSQL + pgvector HNSW** | RLS cannot span a Redis boundary; one storage engine, one tenancy model |
-| Reranker | FlashRank `ms-marco-MiniLM-L-12-v2` (~34MB ONNX) | Measured best accuracy/latency point |
-| Embeddings | `bge-small-en-v1.5` ONNX (cloud) / Ollama (local) | Selected by `EXECUTION_MODE` |
-| Extraction LLM | Ollama (local) / Gemini Flash, Groq (cloud) | — |
-| Redis | cache, rate limiting, JWT denylist, breaker state | *Not* vectors |
-| Queue | Celery | Dataset generation |
-| Frontend | Next.js 16 | — |
+### Prerequisites
 
-Redis HNSW from v1 is retained behind `VECTOR_BACKEND=redis` as a benchmark arm,
-so the pgvector migration stays measurable rather than assumed.
+- Docker with Compose **v2.24+**
+- About 6 GB of free RAM for the local LLM
 
----
-
-## Quick start
-
-### Local — zero API keys, fully offline
+### Run locally
 
 ```bash
 git clone https://github.com/Iammilansoni/NLPFT-2.git
 cd NLPFT-2
-cp Backend/.env.example .env      # POSTGRES_PASSWORD and SECRET_KEY are required
-docker compose up -d
-docker compose exec backend python scripts/seed_demo.py
+cp .env.example .env        # set POSTGRES_PASSWORD, REDIS_PASSWORD and SECRET_KEY
+docker compose up -d --build
 ```
 
-`seed_demo.py` creates a sandbox tenant with the 20 benchmark templates already
-embedded, so the pipeline is queryable immediately. Open http://localhost:3000
-and sign in with the credentials the seed script prints.
+The first boot downloads about 2.3 GB of Ollama models. When `docker compose ps` shows the
+backend as **healthy**, open **http://localhost:3000** and choose **Try the live demo**. The demo
+tenant is seeded automatically with 20 complete, approved API templates.
 
-### Cloud — serverless MVP
-
-No Ollama container: embeddings run in-process via ONNX, inference uses a hosted
-API. Fits Neon + Fly.io + Vercel free tiers.
+Check the stack end to end:
 
 ```bash
-EXECUTION_MODE=cloud
+pip install httpx && python scripts/smoke_test.py
 ```
 
-Full walkthrough and cost breakdown: **[`DEPLOYMENT.md`](DEPLOYMENT.md)**
+### Environment variables
 
----
+| Variable | Required | Purpose |
+|---|---|---|
+| `POSTGRES_PASSWORD`, `REDIS_PASSWORD` | yes | service credentials |
+| `SECRET_KEY` | yes | JWT signing key (≥ 32 characters) |
+| `SECRET_KEY_ENCRYPTION` | recommended | Fernet key for stored LLM-provider API keys |
+| `GEMINI_API_KEY` | optional | LLM dataset generation with a hosted model |
+| `SMTP_*` | optional | verification and password-reset e-mails |
+| `GOOGLE_CLIENT_ID` | optional | Google sign-in |
+
+Every other setting has a working default; see [`.env.example`](.env.example). For running the
+services without Docker, see [`docker-compose.dev.yml`](docker-compose.dev.yml) and
+[`Backend/.env.example`](Backend/.env.example).
+
+### Deployment
+
+`Backend/Dockerfile.cloud` and `Backend/fly.toml` describe a Fly.io + Neon deployment with
+in-process ONNX embeddings. That path is provided but has not been exercised end to end; see
+[DEPLOYMENT.md](DEPLOYMENT.md).
+
+## Usage
+
+1. **Dashboard:** type a request such as *"change my password from oldpass1 to NewPass#9"*. You
+   get the endpoint, the extracted body and the outcome of each stage.
+2. **Templates:** add your own API with its method, endpoint, JSON Schema and samples, then
+   submit it for review.
+3. **Datasets:** generate example utterances for an approved template, or upload a CSV with a
+   `query` column. Embedding makes them routable. Generation uses the provider set in
+   **Settings → LLM Providers**; without one it falls back to `GEMINI_API_KEY`, then to the
+   local Ollama model.
+4. **API:** `POST /api/v1/query/semantic-search` with `{"query": "..."}`. OpenAPI docs are at
+   http://localhost:8000/docs.
+
+## Engineering decisions
+
+- **Max-pool over mean.** A template with one exact utterance match should beat one with many
+  lukewarm matches. v1's mean-based heuristic scored 23 points lower than plain dense retrieval.
+- **The reranker ships off, and stays in the tree.** The cross-encoder lowered Hit@1 at every
+  recall depth on this data. It remains a benchmark arm, so the decision can be re-checked when
+  the embedder changes.
+- **Constrained decoding plus validation.** The decoder cannot emit invalid JSON. Pydantic
+  enforces types and required fields, and one repair retry feeds the error back. Blank or
+  placeholder values count as missing, so the model cannot pad a required field.
+- **Tenancy in two layers.** Superuser database roles bypass RLS, so every vector query also
+  filters on the transaction-bound tenant. The health endpoint reports whether RLS is actually
+  enforced for the connected role.
+- **Transaction-scoped tenant binding.** `set_config(..., is_local => true)` instead of `SET`, so a
+  pooled connection can never carry one tenant's identity into another request.
 
 ## Testing
 
-```bash
-cd Backend
-pytest                                     # 115 tests
-python ../evals/run_eval.py                # routing benchmark
-python scripts/backfill_redis_to_pgvector.py --dry-run
-```
-
-CI runs lint, the unit suite, the frontend build, and the routing benchmark as a
-merge gate.
-
----
-
-## Version history
-
-| Tag / branch | What it is | Authorship |
+| Suite | Scope | Runs in CI |
 |---|---|---|
-| **`v1.0-internship`** | Internship delivery, Sep 2025 – Feb 2026. Two-stage retrieval prototype: FastAPI + Redis HNSW + Celery + Ollama, 8 LLM providers, Docker Compose. | Team: Milan Soni, Avadhi Singhal, Abhilash Joshi |
-| **`v2-ai-harness`** (now `main`) | Current. Real cross-encoder, measured routing, pgvector + RLS, dual runtime, structured extraction — every fix and finding documented in this README. | Individual: Milan Soni |
+| `Backend/tests/unit` (152 tests) | routing orchestration, extraction and repair, circuit breaker, tenancy SQL, auth, demo catalogue completeness | yes |
+| `Backend/tests/integration/test_rls_isolation.py` | migrations on an empty Postgres + cross-tenant isolation as a non-superuser role | yes |
+| `evals/run_eval.py` | routing accuracy; merge gate at Hit@1 ≥ 0.78 | yes |
+| `scripts/smoke_test.py` | full user loop against a running stack (login → route → create template → upload → embed → route → delete) | manual |
+| Frontend | `tsc --noEmit`, ESLint, production build | yes |
 
-`v1.0-internship` is preserved deliberately. The measured regression it exhibits
-(`v1_heuristic` at 0.444 vs a 0.617 baseline) is reproducible from that tag, and
-the delta is the point of the rewrite.
+## Limitations and next steps
 
-Every commit from `v1.0-internship` onward — the entire v2 rewrite described in
-this README — is individual work by Milan Soni. Reproducible directly from the
-repository, no need to take this on faith:
+- **Catalogue size.** 20 templates is small, and Hit@1 will fall as the catalogue grows. The
+  dominant errors are sibling endpoints that differ by authentication state (hard-negative Hit@1
+  is 0.625 live).
+- **Reranking.** A cross-encoder fine-tuned on generated utterances is the obvious next
+  experiment, and the harness is ready to measure it.
+- **Cloud extraction.** Cloud mode has no hosted LLM wired into Stage 3 yet, so extraction
+  reports `degraded` there.
+- **Local generation is slow.** Dataset generation with the local 3B model on CPU takes minutes
+  per batch, and its utterances are less varied than a hosted model's. Configure a hosted
+  provider for real datasets.
+- **RLS for CRUD.** The CRUD routers rely on explicit tenant filters. Running the API as a
+  non-superuser role would enforce RLS for them too.
 
-```bash
-git log v1.0-internship..main --format='%an' | sort -u
-#   Milan Soni
-```
+## Project history
 
----
+| Version | What it is | Authorship |
+|---|---|---|
+| `v1.0-internship` | Internship prototype: FastAPI, Redis vectors, Celery, eight LLM providers | Team: Milan Soni, Avadhi Singhal, Abhilash Joshi |
+| `v2` (this branch) | pgvector + RLS, measured routing, structured extraction, dual runtime, redesigned UI | Milan Soni |
 
-## Known limitations
+## Author
 
-Stated plainly, because the previous README's central claim did not survive
-contact with its own code.
+**Milan Soni**, [github.com/Iammilansoni](https://github.com/Iammilansoni)
 
-- **Benchmark conclusions are embedder-specific.** The cross-encoder result
-  reversed sign between two embedders. Any claim here holds for
-  `bge-small-en-v1.5` and must be re-measured for another. `--embedder tfidf`
-  remains as a zero-dependency smoke mode; its *absolute* numbers are not
-  production figures.
-- **20 templates is a small catalogue**, and n=180 makes deltas under ~0.03
-  indistinguishable from noise — which is why the hybrid arm is not shipped as
-  default. Hit@1 will fall as the catalogue grows. Re-run before quoting numbers
-  at a different scale.
-- **Hit@1 on hard negatives is 0.600** (0.650 with hybrid). Sibling endpoints
-  that differ by *authentication state* rather than vocabulary — reset-request vs
-  reset-confirm vs change-password — remain the dominant error class, and no
-  ranking strategy tested here solves them.
-- **A reranker trained on this distribution has not been tried.** The failure of
-  `ms-marco` is a domain-mismatch result, not evidence that reranking cannot
-  help. Fine-tuning a cross-encoder on the generated dataset is the obvious next
-  experiment, and the harness will measure it.
-- **The frontend is functional, not polished.** Effort went to the retrieval
-  pipeline and the data layer.
-
----
-
-## Project layout
-
-```
-Backend/
-  app/
-    nlp/cross_encoder_reranker.py     Stage 2 reranking
-    nlp/semantic_dedup.py             generation-time dedup
-    core/tenancy.py                   RLS session + HNSW scan tuning
-    core/circuit_breaker.py           Redis-backed breaker
-    core/runtime.py                   EXECUTION_MODE adapter
-    services/pgvector_store.py        Stage 1 recall
-    services/structured_extraction_service.py   Stage 3
-    repositories/                     SQL out of the routers
-  scripts/seed_demo.py                one-click sandbox tenant
-evals/                                180-query routing benchmark
-DEPLOYMENT.md                         local + cloud deployment
-```
-
----
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+MIT licensed. See [LICENSE](LICENSE).
