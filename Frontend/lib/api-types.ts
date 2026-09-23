@@ -393,15 +393,21 @@ export interface SemanticRetrieveStage1Result {
   query: string;
   similarity_score: number;
   t_id: string;
+  api_name?: string;
+  row_id?: string;
 }
 
+/** Stage 2: one template candidate after max-pooling its utterance rows. */
 export interface SemanticRetrieveStage2Result {
   t_id: string;
-  avg_similarity: number;
-  avg_confidence_score: number;
-  final_score: number;
   rank: number;
+  ce_score: number;
+  vector_score: number;
   match_count: number;
+  api_name: string;
+  endpoint: string;
+  method: string;
+  best_utterance: string;
 }
 
 export interface SemanticRetrieveFinalOutput {
@@ -410,46 +416,65 @@ export interface SemanticRetrieveFinalOutput {
   endpoint: string;
   method: string;
   confidence_score: number;
-  request_schema: Record<string, unknown>;
-  response_schema: Record<string, unknown>;
-  extracted_request_body?: Record<string, unknown>;
+  base_url?: string;
+  extracted_base_url?: string | null;
+  effective_base_url?: string;
+  url_source?: 'query' | 'template';
+  request_schema?: Record<string, unknown> | null;
+  response_schema?: Record<string, unknown> | null;
+  extracted_request_body?: Record<string, unknown> | null;
+}
+
+/** Stage 3 outcome. ok=false + degraded=false means validation failed. */
+export interface SemanticRetrieveExtraction {
+  ok: boolean;
+  values: Record<string, unknown>;
+  missing_required: string[];
+  degraded: boolean;
+  reason?: string | null;
+  attempts: number;
+  latency_ms: number;
+  model?: string;
+}
+
+export interface SemanticRetrieveRanking {
+  strategy: 'vector_maxpool' | 'cross_encoder' | 'vector_maxpool_fallback' | string;
+  degraded: boolean;
+  degraded_reason?: string | null;
+  reranker_model?: string;
+  rows_cross_encoded: number;
 }
 
 export interface SemanticRetrieveMetadata {
   query: string;
-  top_k: number;
-  total_candidates: number;
-  processing_time_ms: number;
-  t_id?: string;
-  match_count?: number;
-  avg_similarity?: number;
-  avg_confidence?: number;
-  intent_alignment?: number;
-  dominant_intent?: string;
-  domain_tags?: string[];
-  matched_queries?: string[];
+  embedding_model?: string;
+  embedding_dimension?: number;
+  stage1_top_k?: number;
+  stage2_top_k?: number;
+  total_candidates?: number;
+  processing_time_ms?: number;
+  best_utterance?: string;
+  vector_score?: number;
+  reranker_enabled?: boolean;
+  timings_ms?: { embed: number; vector_search: number; ranking: number; extraction: number };
 }
 
 export interface SemanticRetrieveResponse {
   success: boolean;
+  error?: string;
+  message?: string;
   stage1_vector_search: SemanticRetrieveStage1Result[];
   stage2_reranking: SemanticRetrieveStage2Result[];
   final_output: SemanticRetrieveFinalOutput | null;
   metadata: SemanticRetrieveMetadata;
-  extracted_request_body?: Record<string, unknown>;
-  // Legacy fields
+  extracted_request_body?: Record<string, unknown> | null;
+  extraction?: SemanticRetrieveExtraction | null;
+  ranking?: SemanticRetrieveRanking | null;
+  degraded?: boolean;
   api_name?: string;
   endpoint?: string;
   method?: string;
   base_url?: string;
   confidence?: number;
-  alternatives?: Array<{
-    t_id: string;
-    api_name: string;
-    endpoint: string;
-    method: string;
-    avg_similarity: number;
-    match_count: number;
-  }>;
-  error?: string;
+  alternatives?: SemanticRetrieveStage2Result[];
 }

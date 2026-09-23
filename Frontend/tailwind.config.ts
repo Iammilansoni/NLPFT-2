@@ -1,5 +1,8 @@
 import type { Config } from "tailwindcss";
 
+/** A token-backed colour that supports Tailwind opacity modifiers (bg-primary/10). */
+const token = (name: string) => `hsl(var(--${name}) / <alpha-value>)`;
+
 const config: Config = {
   darkMode: ["class"],
   content: [
@@ -11,68 +14,54 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["var(--font-manrope)", "sans-serif"],
-        mono: ["var(--font-jetbrains-mono)", "monospace"],
+        sans: ["var(--font-inter)", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["var(--font-manrope)", "var(--font-inter)", "ui-sans-serif", "sans-serif"],
+        mono: ["var(--font-jetbrains-mono)", "ui-monospace", "monospace"],
       },
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
-        },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
-        },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
-        },
-        popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
-        },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-        },
-        // Command Center semantic colors
-        success: {
-          DEFAULT: "#10B981",
-          foreground: "#ffffff",
-        },
-        error: {
-          DEFAULT: "#EF4444",
-          foreground: "#ffffff",
-        },
-        warning: {
-          DEFAULT: "hsl(var(--warning))",
-          foreground: "hsl(var(--warning-foreground))",
-        },
-        info: {
-          DEFAULT: "hsl(var(--info))",
-          foreground: "hsl(var(--info-foreground))",
-        },
+        border: token("border"),
+        input: token("input"),
+        ring: token("ring"),
+        background: token("background"),
+        foreground: token("foreground"),
+        primary: { DEFAULT: token("primary"), foreground: token("primary-foreground") },
+        brand: { 2: token("brand-2") },
+        secondary: { DEFAULT: token("secondary"), foreground: token("secondary-foreground") },
+        destructive: { DEFAULT: token("destructive"), foreground: token("destructive-foreground") },
+        muted: { DEFAULT: token("muted"), foreground: token("muted-foreground") },
+        accent: { DEFAULT: token("accent"), foreground: token("accent-foreground") },
+        popover: { DEFAULT: token("popover"), foreground: token("popover-foreground") },
+        card: { DEFAULT: token("card"), foreground: token("card-foreground") },
+        surface: { 1: token("surface-1"), 2: token("surface-2"), 3: token("surface-3") },
+        success: { DEFAULT: token("success"), foreground: token("success-foreground") },
+        warning: { DEFAULT: token("warning"), foreground: token("warning-foreground") },
+        info: { DEFAULT: token("info"), foreground: token("info-foreground") },
+        // Legacy alias: `error` === destructive.
+        error: { DEFAULT: token("destructive"), foreground: token("destructive-foreground") },
       },
-      // Command Center: Crisp 4-6px border radii
+      // One radius scale for components AND page containers.
       borderRadius: {
-        lg: "0.375rem",   // 6px
-        md: "0.375rem",   // 6px
-        sm: "0.25rem",    // 4px
-        xs: "0.25rem",    // 4px
-        DEFAULT: "0.375rem",
+        xs: "0.25rem",   // 4px  – inline chips, code
+        sm: "0.375rem",  // 6px  – small controls
+        DEFAULT: "0.5rem",
+        md: "0.5rem",    // 8px  – buttons, inputs
+        lg: "0.75rem",   // 12px – cards, menus
+        xl: "1rem",      // 16px – panels
+        "2xl": "1.25rem",// 20px – feature panels
+        "3xl": "1.75rem",// 28px – hero surfaces
+      },
+      boxShadow: {
+        xs: "var(--shadow-xs)",
+        sm: "var(--shadow-sm)",
+        DEFAULT: "var(--shadow-sm)",
+        md: "var(--shadow-md)",
+        lg: "var(--shadow-lg)",
+        xl: "var(--shadow-xl)",
+        "2xl": "var(--shadow-xl)",
+        glow: "0 0 0 1px hsl(var(--primary) / 0.25), 0 8px 30px -8px hsl(var(--primary) / 0.45)",
+      },
+      backgroundImage: {
+        "brand-gradient": "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--brand-2)) 100%)",
       },
       keyframes: {
         "accordion-down": {
@@ -87,7 +76,7 @@ const config: Config = {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.6" },
         },
-        "shimmer": {
+        shimmer: {
           "100%": { transform: "translateX(100%)" },
         },
       },
@@ -95,7 +84,7 @@ const config: Config = {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "cc-pulse": "cc-pulse 2s ease-in-out infinite",
-        "shimmer": "shimmer 1.5s infinite",
+        shimmer: "shimmer 1.5s infinite",
       },
     },
   },

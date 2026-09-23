@@ -92,7 +92,7 @@ export function Navigation() {
               </div>
               <div className="hidden sm:flex flex-col">
                 <span className="font-semibold text-base leading-tight tracking-tight">NLPForge</span>
-                <span className="text-[10px] text-muted-foreground font-medium tracking-wide">API Testing</span>
+                <span className="text-[10px] text-muted-foreground font-medium tracking-wide">API Router</span>
               </div>
             </Link>
           </div>

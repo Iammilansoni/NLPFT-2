@@ -3,6 +3,7 @@
  * Central configuration for all API requests
  */
 import { getApiBase } from '../runtime-config';
+import { redirectToLogin } from '@/lib/auth-redirect';
 
 // Helper to get API base dynamically (not at module load time)
 function getApiBaseUrl(): string {
@@ -68,9 +69,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
     // Any 401 means the session is invalid or expired; redirect on status alone
     if (response.status === 401) {
       // Redirect to login — cookies will be cleared server-side on /logout
-      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth')) {
-        window.location.href = '/auth/login';
-      }
+      redirectToLogin();
     }
 
     throw new ApiError(

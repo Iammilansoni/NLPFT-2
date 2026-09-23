@@ -41,10 +41,10 @@ const phases: Phase[] = [
     title: 'Authentication',
     subtitle: 'Secure Access',
     icon: Lock,
-    color: 'text-emerald-600 dark:text-emerald-400',
-    bgColor: 'bg-emerald-50 dark:bg-emerald-950/30',
-    borderColor: 'border-emerald-200 dark:border-emerald-800',
-    ringColor: 'ring-emerald-400/50',
+    color: 'text-success dark:text-success',
+    bgColor: 'bg-success/10 dark:bg-success/30',
+    borderColor: 'border-success/25 dark:border-success',
+    ringColor: 'ring-success/50',
     steps: [
       { title: 'Sign Up', desc: 'Create account with email & password' },
       { title: 'Verify Email', desc: 'Enter OTP sent to your email' },
@@ -57,10 +57,10 @@ const phases: Phase[] = [
     title: 'Template',
     subtitle: 'Define Structure',
     icon: LayoutTemplate,
-    color: 'text-blue-600 dark:text-blue-400',
-    bgColor: 'bg-blue-50 dark:bg-blue-950/30',
-    borderColor: 'border-blue-200 dark:border-blue-800',
-    ringColor: 'ring-blue-400/50',
+    color: 'text-info dark:text-info',
+    bgColor: 'bg-info/10 dark:bg-info/30',
+    borderColor: 'border-info/25 dark:border-info',
+    ringColor: 'ring-info/50',
     steps: [
       { title: 'Navigate', desc: 'Go to Templates page' },
       { title: 'Create New', desc: 'Click "New Template"' },
@@ -75,10 +75,10 @@ const phases: Phase[] = [
     title: 'Model Config',
     subtitle: 'LLM Setup',
     icon: Bot,
-    color: 'text-violet-600 dark:text-violet-400',
-    bgColor: 'bg-violet-50 dark:bg-violet-950/30',
-    borderColor: 'border-violet-200 dark:border-violet-800',
-    ringColor: 'ring-violet-400/50',
+    color: 'text-primary dark:text-primary',
+    bgColor: 'bg-primary/10 dark:bg-primary/30',
+    borderColor: 'border-primary/25 dark:border-primary',
+    ringColor: 'ring-primary/50',
     steps: [
       { title: 'Open Settings', desc: 'Navigate to Settings page' },
       { title: 'Configure LLM', desc: 'Select provider (OpenAI, Gemini)' },
@@ -93,10 +93,10 @@ const phases: Phase[] = [
     title: 'Dataset Gen',
     subtitle: 'AI Generation',
     icon: Database,
-    color: 'text-amber-600 dark:text-amber-400',
-    bgColor: 'bg-amber-50 dark:bg-amber-950/30',
-    borderColor: 'border-amber-200 dark:border-amber-800',
-    ringColor: 'ring-amber-400/50',
+    color: 'text-warning dark:text-warning',
+    bgColor: 'bg-warning/10 dark:bg-warning/30',
+    borderColor: 'border-warning/25 dark:border-warning',
+    ringColor: 'ring-warning/50',
     steps: [
       { title: 'Navigate', desc: 'Go to Datasets page' },
       { title: 'Generate New', desc: 'Click "Generate Dataset"' },
@@ -111,14 +111,14 @@ const phases: Phase[] = [
     title: 'Embeddings',
     subtitle: 'Vectorization',
     icon: Binary,
-    color: 'text-pink-600 dark:text-pink-400',
-    bgColor: 'bg-pink-50 dark:bg-pink-950/30',
-    borderColor: 'border-pink-200 dark:border-pink-800',
-    ringColor: 'ring-pink-400/50',
+    color: 'text-brand-2 dark:text-brand-2',
+    bgColor: 'bg-brand-2/10 dark:bg-brand-2/30',
+    borderColor: 'border-brand-2/25 dark:border-brand-2',
+    ringColor: 'ring-brand-2/50',
     steps: [
       { title: 'Embed Dataset', desc: 'Click "Embed" on dataset' },
       { title: 'Processing', desc: 'Vectors being generated' },
-      { title: 'Store in Redis', desc: 'HNSW index created' },
+      { title: 'Store in pgvector', desc: 'HNSW-indexed, tenant-scoped' },
       { title: 'Complete', desc: 'Dataset ready for search' },
     ],
   },
@@ -127,10 +127,10 @@ const phases: Phase[] = [
     title: 'Search',
     subtitle: 'Semantic Query',
     icon: Search,
-    color: 'text-indigo-600 dark:text-indigo-400',
-    bgColor: 'bg-indigo-50 dark:bg-indigo-950/30',
-    borderColor: 'border-indigo-200 dark:border-indigo-800',
-    ringColor: 'ring-indigo-400/50',
+    color: 'text-primary dark:text-primary',
+    bgColor: 'bg-primary/10 dark:bg-primary/30',
+    borderColor: 'border-primary/25 dark:border-primary',
+    ringColor: 'ring-primary/50',
     steps: [
       { title: 'Navigate', desc: 'Go to Query page' },
       { title: 'Enter Query', desc: 'Type natural language question' },
@@ -144,10 +144,10 @@ const phases: Phase[] = [
     title: 'Results',
     subtitle: 'Output Ready',
     icon: Zap,
-    color: 'text-teal-600 dark:text-teal-400',
-    bgColor: 'bg-teal-50 dark:bg-teal-950/30',
-    borderColor: 'border-teal-200 dark:border-teal-800',
-    ringColor: 'ring-teal-400/50',
+    color: 'text-success dark:text-success',
+    bgColor: 'bg-success/10 dark:bg-success/30',
+    borderColor: 'border-success/25 dark:border-success',
+    ringColor: 'ring-success/50',
     steps: [
       { title: 'Dashboard', desc: 'View on main dashboard' },
       { title: 'JSON Output', desc: 'Structured API response' },
@@ -328,13 +328,13 @@ export default function UserJourneyFlow() {
       {/* Legend / Footer */}
       <div className="mt-16 pt-8 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center text-xs text-gray-400">
         <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-            <span>End-to-End Encryption</span>
+            <CheckCircle2 className="w-4 h-4 text-success" />
+            <span>Tenant-scoped at every step</span>
         </div>
         <div className="flex gap-4">
-            <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-400"></div> Auth</span>
-            <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-violet-400"></div> AI Models</span>
-            <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-teal-400"></div> API</span>
+            <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-success"></div> Auth</span>
+            <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-primary"></div> AI Models</span>
+            <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-success"></div> API</span>
         </div>
       </div>
     </div>

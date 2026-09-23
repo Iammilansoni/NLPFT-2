@@ -68,10 +68,10 @@ export function Sidebar() {
       <header className="lg:hidden fixed top-0 left-0 right-0 z-50 h-14 flex items-center justify-between px-4 bg-background/95 backdrop-blur-sm border-b border-border">
         {/* Logo */}
         <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="flex-shrink-0 h-7 w-7 rounded-sm bg-primary flex items-center justify-center">
+          <div className="flex-shrink-0 h-7 w-7 rounded-lg bg-brand-gradient shadow-glow flex items-center justify-center">
             <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
-              <path d="M12 2L21 7V17L12 22L3 17V7L12 2Z" stroke="currentColor" strokeWidth="1.5" fill="none" className="text-primary-foreground" />
-              <path d="M12 6L17 9V15L12 18L7 15V9L12 6Z" fill="currentColor" className="text-primary-foreground" />
+              <path d="M12 2L21 7V17L12 22L3 17V7L12 2Z" stroke="currentColor" strokeWidth="1.5" fill="none" className="text-white" />
+              <path d="M12 6L17 9V15L12 18L7 15V9L12 6Z" fill="currentColor" className="text-white" />
             </svg>
           </div>
           <span className="font-bold text-base text-foreground">NLPForge</span>
@@ -151,7 +151,7 @@ export function Sidebar() {
             href="/"
             className="flex items-center gap-2 overflow-hidden"
           >
-            <div className="flex-shrink-0 h-7 w-7 rounded-sm bg-primary flex items-center justify-center">
+            <div className="flex-shrink-0 h-7 w-7 rounded-lg bg-brand-gradient shadow-glow flex items-center justify-center">
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
@@ -163,12 +163,12 @@ export function Sidebar() {
                   stroke="currentColor"
                   strokeWidth="1.5"
                   fill="none"
-                  className="text-primary-foreground"
+                  className="text-white"
                 />
                 <path
                   d="M12 6L17 9V15L12 18L7 15V9L12 6Z"
                   fill="currentColor"
-                  className="text-primary-foreground"
+                  className="text-white"
                 />
               </svg>
             </div>
@@ -178,7 +178,7 @@ export function Sidebar() {
                   NLPForge
                 </span>
                 <span className="text-[10px] text-muted-foreground tracking-wide">
-                  API Testing
+                  API Router
                 </span>
               </div>
             )}
@@ -203,7 +203,7 @@ export function Sidebar() {
                     'flex items-center gap-3 rounded-lg font-medium transition-colors',
                     isExpanded ? 'px-3 py-3 md:py-2.5 text-sm' : 'px-2 py-3 md:py-2 justify-center',
                     isActive
-                      ? 'bg-primary/10 text-primary border-l-2 border-l-primary ml-0 pl-[10px]'
+                      ? 'bg-primary/10 text-primary font-medium'
                       : 'text-muted-foreground hover:text-foreground hover:bg-accent active:bg-accent/80'
                   )}
                 >

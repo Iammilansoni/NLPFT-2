@@ -36,6 +36,8 @@ import {
   Workflow,
 } from "lucide-react"
 import { apiClient } from "@/lib/api"
+import { MetricCard } from '@/components/dashboard/MetricCard'
+import { PageHeader } from '@/components/ui/page-header'
 import type { TemplateModel, TemplateFilters } from "@/lib/api-types"
 import { cn, formatDate, toTitleCase } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -77,37 +79,9 @@ interface StatCardProps {
   trend?: { value: number; label: string }
 }
 
-const StatCard = ({ title, value, subtitle, icon: Icon, gradient, trend }: StatCardProps) => (
-  <div className={cn(
-    "relative overflow-hidden rounded-2xl p-6",
-    "bg-gradient-to-br border border-white/10",
-    "shadow-lg shadow-black/5",
-    "transition-all duration-300 hover:scale-[1.02] hover:shadow-xl",
-    gradient
-  )}>
-    {/* Background Pattern */}
-    <div className="absolute inset-0 opacity-10">
-      <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/20" />
-      <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10" />
-    </div>
-    
-    <div className="relative">
-      <div className="flex items-center justify-between mb-4">
-        <div className="p-2.5 rounded-xl bg-white/20 backdrop-blur-sm">
-          <Icon className="h-5 w-5 text-white" />
-        </div>
-        {trend && (
-          <div className="flex items-center gap-1 text-xs font-medium text-white/80">
-            <TrendingUp className="h-3 w-3" />
-            {trend.value > 0 ? '+' : ''}{trend.value}% {trend.label}
-          </div>
-        )}
-      </div>
-      <div className="text-3xl font-bold text-white mb-1">{value}</div>
-      <div className="text-sm font-medium text-white/80">{title}</div>
-      {subtitle && <div className="text-xs text-white/60 mt-1">{subtitle}</div>}
-    </div>
-  </div>
+// KPI cards share the app-wide MetricCard style.
+const StatCard = ({ title, value, subtitle, icon: Icon }: StatCardProps) => (
+  <MetricCard label={title} value={value} subtitle={subtitle} icon={<Icon />} />
 )
 
 // =============================================================================
@@ -141,7 +115,7 @@ const TemplateCard = ({
       "transition-all duration-300",
       "hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1",
       isApproved 
-        ? "border-emerald-500/20 bg-gradient-to-br from-emerald-500/[0.03] to-transparent" 
+        ? "border-success/20 bg-gradient-to-br from-success/[0.03] to-transparent" 
         : "border-border/50 hover:border-border"
     )}>
       {/* Status Indicator */}
@@ -149,12 +123,12 @@ const TemplateCard = ({
         <div className={cn(
           "flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-medium",
           isApproved 
-            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" 
+            ? "bg-success/10 text-success dark:text-success" 
             : "bg-muted text-muted-foreground"
         )}>
           <span className={cn(
             "h-1.5 w-1.5 rounded-full",
-            isApproved ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground"
+            isApproved ? "bg-success animate-pulse" : "bg-muted-foreground"
           )} />
           {isApproved ? "Active" : "Draft"}
         </div>
@@ -211,7 +185,7 @@ const TemplateCard = ({
             checked={isApproved}
             onCheckedChange={onToggleStatus}
             disabled={isToggling}
-            className="scale-90 data-[state=checked]:bg-emerald-600"
+            className="scale-90 data-[state=checked]:bg-success"
           />
           <span className="text-xs text-muted-foreground">
             {template.updated_at ? formatDate(template.updated_at) : "Not updated"}
@@ -307,16 +281,9 @@ export default function TemplatesPage() {
     queryFn: () => apiClient.listTemplates(),
   })
 
-  // Hot reload mutation
+  // Refresh: re-read the list from the API.
   const reloadMutation = useMutation({
-    mutationFn: () => apiClient.reloadTemplates(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["templates"] })
-      toast({
-        title: "Templates Reloaded",
-        description: "All templates have been refreshed from disk.",
-      })
-    },
+    mutationFn: () => queryClient.refetchQueries({ queryKey: ["templates"] }),
   })
 
   // Delete mutation
@@ -439,11 +406,11 @@ export default function TemplatesPage() {
   // UI Helpers
   const getMethodBadgeVariant = (method: string) => {
     switch (method.toUpperCase()) {
-      case 'GET': return 'bg-blue-500/10 text-blue-700 dark:text-blue-400 hover:bg-blue-500/20 border-blue-200 dark:border-blue-900'
-      case 'POST': return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 border-emerald-200 dark:border-emerald-900'
-      case 'PUT': return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 border-amber-200 dark:border-amber-900'
-      case 'DELETE': return 'bg-red-500/10 text-red-700 dark:text-red-400 hover:bg-red-500/20 border-red-200 dark:border-red-900'
-      case 'PATCH': return 'bg-purple-500/10 text-purple-700 dark:text-purple-400 hover:bg-purple-500/20 border-purple-200 dark:border-purple-900'
+      case 'GET': return 'bg-info/10 text-info dark:text-info hover:bg-info/20 border-info/25 dark:border-info'
+      case 'POST': return 'bg-success/10 text-success dark:text-success hover:bg-success/20 border-success/25 dark:border-success'
+      case 'PUT': return 'bg-warning/10 text-warning dark:text-warning hover:bg-warning/20 border-warning/25 dark:border-warning'
+      case 'DELETE': return 'bg-destructive/10 text-destructive dark:text-destructive hover:bg-destructive/20 border-destructive/25 dark:border-destructive'
+      case 'PATCH': return 'bg-primary/10 text-primary dark:text-primary hover:bg-primary/20 border-primary/25 dark:border-primary'
       default: return 'bg-muted text-muted-foreground'
     }
   }
@@ -470,29 +437,18 @@ export default function TemplatesPage() {
         {/* Background Decorations */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl" />
-          <div className="absolute top-20 -left-20 w-60 h-60 bg-blue-500/5 rounded-full blur-3xl" />
+          <div className="absolute top-20 -left-20 w-60 h-60 bg-info/5 rounded-full blur-3xl" />
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-px bg-gradient-to-r from-transparent via-border to-transparent" />
         </div>
 
         <div className="relative max-w-7xl mx-auto px-6 py-12 lg:py-16">
           {/* Header */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-10">
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/10">
-                  <Layers className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <h1 className="text-3xl lg:text-4xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                    API Templates
-                  </h1>
-                  <p className="text-muted-foreground mt-1">
-                    Design, manage, and deploy your semantic API patterns
-                  </p>
-                </div>
-              </div>
-            </div>
-
+          <PageHeader
+            icon={<Layers />}
+            title="API Templates"
+            description="The catalogue requests are routed to: endpoint, method and request schema per API."
+            className="mb-8"
+            actions={
             <div className="flex items-center gap-3">
               <TooltipProvider>
                 <Tooltip>
@@ -505,10 +461,10 @@ export default function TemplatesPage() {
                       className="h-10 gap-2 rounded-xl border-dashed"
                     >
                       <RefreshCw className={cn("h-4 w-4", reloadMutation.isPending && "animate-spin")} />
-                      Sync
+                      Refresh
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Reload templates from disk</TooltipContent>
+                  <TooltipContent>Reload the template list</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
 
@@ -530,7 +486,8 @@ export default function TemplatesPage() {
                 New Template
               </Button>
             </div>
-          </div>
+            }
+          />
 
           {/* Stats Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -539,28 +496,28 @@ export default function TemplatesPage() {
               title="Total Templates"
               value={stats.total}
               subtitle="Across all categories"
-              gradient="from-violet-600 to-indigo-600"
+              gradient="from-primary to-brand-2"
             />
             <StatCard
               icon={CheckCircle}
               title="Active Templates"
               value={stats.active}
               subtitle="Ready for generation"
-              gradient="from-emerald-600 to-teal-600"
+              gradient="from-success to-success"
             />
             <StatCard
               icon={FileCode}
               title="Draft Templates"
               value={stats.draft}
               subtitle="Pending approval"
-              gradient="from-amber-600 to-orange-600"
+              gradient="from-warning to-warning"
             />
             <StatCard
               icon={Activity}
               title="HTTP Methods"
               value={Object.keys(stats.methods).length}
               subtitle={Object.keys(stats.methods).join(", ") || "None"}
-              gradient="from-pink-600 to-rose-600"
+              gradient="from-brand-2 to-destructive"
             />
           </div>
         </div>
@@ -839,7 +796,7 @@ export default function TemplatesPage() {
                         <div className="flex items-center gap-2">
                           <span className={cn(
                             "flex h-2 w-2 rounded-full",
-                            template.status === "approved" ? "bg-emerald-500" : "bg-muted-foreground"
+                            template.status === "approved" ? "bg-success" : "bg-muted-foreground"
                           )} />
                           <span className="text-sm">
                             {template.status === "approved" ? "Active" : "Draft"}
@@ -848,7 +805,7 @@ export default function TemplatesPage() {
                             checked={template.status === "approved"}
                             onCheckedChange={() => toggleVisibilityMutation.mutate(template.template_id || template.api_name)}
                             disabled={togglingTemplateId === (template.template_id || template.api_name)}
-                            className="scale-75 data-[state=checked]:bg-emerald-600"
+                            className="scale-75 data-[state=checked]:bg-success"
                           />
                         </div>
                       </td>

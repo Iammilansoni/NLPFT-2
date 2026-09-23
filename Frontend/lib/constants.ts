@@ -51,6 +51,8 @@ export const DEMO_CREDENTIALS = {
   password: process.env.NEXT_PUBLIC_DEMO_PASSWORD || 'DemoForge!2026',
 } as const;
 
+export const REPO_URL = 'https://github.com/Iammilansoni/NLPFT-2';
+
 export const DEBOUNCE_DELAYS = {
   SEARCH: 300,
   INPUT: 500,

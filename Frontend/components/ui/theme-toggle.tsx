@@ -116,8 +116,8 @@ export function ThemeToggle({ className }: { className?: string }) {
       >
         <span className="sr-only">Select theme</span>
         <span className="relative flex items-center justify-center h-5 w-5">
-          {effectiveTheme === 'light' && <Sun className="h-5 w-5 text-amber-500 transition-all" aria-hidden="true" />}
-          {effectiveTheme === 'dark' && <Moon className="h-5 w-5 text-blue-300 transition-all" aria-hidden="true" />}
+          {effectiveTheme === 'light' && <Sun className="h-5 w-5 text-warning transition-all" aria-hidden="true" />}
+          {effectiveTheme === 'dark' && <Moon className="h-5 w-5 text-info transition-all" aria-hidden="true" />}
           {effectiveTheme === 'system' && <Laptop2 className="h-5 w-5 text-slate-500 dark:text-slate-300 transition-all" aria-hidden="true" />}
         </span>
         <span
@@ -146,7 +146,7 @@ export function ThemeToggle({ className }: { className?: string }) {
               data-focus={focused || undefined}
               className={cn(
                 'flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium relative group text-left cursor-pointer select-none transition-colors',
-                active ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300 dark:bg-blue-400/10 ring-1 ring-blue-500/30' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-700/40',
+                active ? 'bg-info/15 text-info dark:text-info dark:bg-info/10 ring-1 ring-info/30' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-700/40',
                 focused && !active && 'ring-1 ring-slate-400/40 dark:ring-slate-500/40'
               )}
               onClick={() => { setTheme(opt.value); close() }}
@@ -162,8 +162,8 @@ export function ThemeToggle({ className }: { className?: string }) {
                 <span>{opt.label}</span>
                 <span className="text-[10px] font-normal opacity-70">{opt.description}</span>
               </span>
-              {active && <Check className="ml-auto h-4 w-4 text-blue-600 dark:text-blue-400" aria-hidden="true" />}
-              <span className="pointer-events-none absolute inset-0 rounded-lg ring-2 ring-blue-500/0 group-hover:ring-blue-400/30 transition" />
+              {active && <Check className="ml-auto h-4 w-4 text-info dark:text-info" aria-hidden="true" />}
+              <span className="pointer-events-none absolute inset-0 rounded-lg ring-2 ring-info/0 group-hover:ring-info/30 transition" />
             </button>
           )
         })}

@@ -11,6 +11,7 @@
 
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { getApiBase } from './runtime-config';
+import { redirectToLogin } from '@/lib/auth-redirect';
 
 export const apiClient: AxiosInstance = axios.create({
   timeout: 30000,
@@ -83,9 +84,7 @@ apiClient.interceptors.response.use(
       processQueue(refreshError);
 
       // Refresh token is expired / invalid — force logout
-      if (!window.location.pathname.startsWith('/auth')) {
-        window.location.href = '/auth/login';
-      }
+      redirectToLogin();
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;

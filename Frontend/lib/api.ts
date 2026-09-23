@@ -3,6 +3,7 @@
  * Type-safe API wrapper with error handling
  */
 
+import { redirectToLogin } from '@/lib/auth-redirect';
 import type {
   SearchRequest,
   SearchResponse,
@@ -19,6 +20,7 @@ import type {
   QueryRequest,
   QueryResponse,
   ApiErrorResponse,
+  SemanticRetrieveResponse,
 } from './api-types';
 import { getApiBase } from './runtime-config';
 
@@ -50,9 +52,7 @@ class ApiClient {
         if (response.status === 401 && typeof window !== 'undefined') {
           // The Axios api-client handles silent refresh for Axios calls.
           // For raw-fetch callers, redirect when truly unauthenticated.
-          if (!window.location.pathname.startsWith('/auth')) {
-            window.location.href = '/auth/login';
-          }
+          redirectToLogin();
         }
 
         let errorData: ApiErrorResponse;
@@ -126,168 +126,23 @@ class ApiClient {
   // ============================================================================
 
   /**
-   * Two-Stage AI Ranking Engine
-   * 
-   * Stage 1: Vector Retrieval (Top-K) from Redis Vector DB using KNN search
-   * Stage 2: FlashRank Reranking with ms-marco-MiniLM-L-12-v2 cross-encoder
-   * 
-   * @param query - Search query text
-   * @param topK - Number of candidates to retrieve (default: 5)
-   * @returns Ranked results with FlashRank scores
-   */
-  async rankQuery(query: string, topK: number = 5): Promise<{
-    query: string;
-    ranked_results: Array<{
-      rank: number;
-      score: number;
-      text: string;
-    }>;
-  }> {
-    return this.request(`/api/v1/ranking/rank?query=${encodeURIComponent(query)}&top_k=${topK}`);
-  }
-
-  /**
-   * Detailed Two-Stage AI Ranking with full metadata
-   * 
-   * Returns both Stage 1 and Stage 2 results with complete information including:
-   * - Stage 1 vector retrieval results with similarity scores
-   * - Stage 2 reranked results with full metadata (API, endpoint, request/response)
-   * 
-   * @param query - Search query text
-   * @param topK - Number of candidates to retrieve (default: 5)
-   */
-  async rankQueryDetailed(query: string, topK: number = 5): Promise<{
-    query: string;
-    stage1_results: Array<{
-      api: string;
-      query: string;
-      endpoint: string;
-      method: string;
-      request: any;
-      response: any;
-      cosine_similarity: number;
-    }>;
-    ranked_results: Array<{
-      rank: number;
-      score: number;
-      text: string;
-      api: string;
-      endpoint: string;
-      method: string;
-      request: any;
-      response: any;
-      original_similarity: number;
-      vector_score: number;
-    }>;
-  }> {
-    return this.request('/api/v1/ranking/rank/detailed', {
-      method: 'POST',
-      body: JSON.stringify({ query, top_k: topK }),
-    });
-  }
-
-  /**
-   * Get reranker model information
-   */
-  async getRerankerInfo(): Promise<{
-    model_name: string;
-    model_type: string;
-    framework: string;
-    loaded: boolean;
-  }> {
-    return this.request('/api/v1/ranking/rank/info');
-  }
-
-  /**
-   * Semantic API Retrieval Pipeline
-   * 
-   * Returns stage-by-stage results:
-   * - Stage 1: Vector Search (Redis)
-   * - Stage 2: Re-ranking (grouped by t_id)
-   * - Final Output: Best match from PostgreSQL
-   * - Slot Extraction: Extracted values from query
-   * 
-   * @param query - Natural language query
-   * @param topK - Number of candidates to retrieve (default: 10)
-   * @param intentType - Optional query intent hint
-   * @param includeAlternatives - Whether to include alternative APIs
-   * @param includeSlotExtraction - Whether to extract values from query (default: true)
+   * Route a natural-language request to an API template and extract its body.
+   * POST /api/v1/query/semantic-search -- see Backend/app/services/multi_model_semantic_service.py
    */
   async semanticRetrieve(
     query: string,
-    topK: number = 10,
-    intentType?: string,
+    topK: number = 25,
+    _intentType?: string,
     includeAlternatives: boolean = false,
     includeSlotExtraction: boolean = true
-  ): Promise<{
-    success: boolean;
-    // Stage 1: Vector Search Results
-    stage1_vector_search: Array<{
-      query: string;
-      similarity_score: number;
-      t_id: string;
-    }>;
-    // Stage 2: Re-ranking Results
-    stage2_reranking: Array<{
-      t_id: string;
-      avg_similarity: number;
-      avg_confidence_score: number;
-      final_score: number;
-      rank: number;
-      match_count: number;
-    }>;
-    // Final Output (from PostgreSQL)
-    final_output: {
-      t_id: string;
-      api_name: string;
-      endpoint: string;
-      method: string;
-      confidence_score: number;
-      request_schema: any;
-      response_schema: any;
-      extracted_request_body?: Record<string, any>;
-    } | null;
-    // Metadata
-    metadata: {
-      query: string;
-      top_k: number;
-      total_candidates: number;
-      processing_time_ms: number;
-      t_id?: string;
-      match_count?: number;
-      avg_similarity?: number;
-      avg_confidence?: number;
-      intent_alignment?: number;
-      dominant_intent?: string;
-      domain_tags?: string[];
-      matched_queries?: string[];
-    };
-    // Slot Extraction Result
-    extracted_request_body?: Record<string, any>;
-    // Legacy fields for backward compatibility
-    api_name?: string;
-    endpoint?: string;
-    method?: string;
-    base_url?: string;
-    confidence?: number;
-    alternatives?: Array<{
-      t_id: string;
-      api_name: string;
-      endpoint: string;
-      method: string;
-      avg_similarity: number;
-      match_count: number;
-    }>;
-    error?: string;
-  }> {
-    return this.request('/api/v1/query/semantic-search', {
+  ): Promise<SemanticRetrieveResponse> {
+    return this.request<SemanticRetrieveResponse>('/api/v1/query/semantic-search', {
       method: 'POST',
       body: JSON.stringify({
         query,
         top_k: topK,
-        intent: intentType,
         include_alternatives: includeAlternatives,
-        include_slot_extraction: includeSlotExtraction
+        include_slot_extraction: includeSlotExtraction,
       }),
     });
   }
@@ -423,18 +278,6 @@ class ApiClient {
     return this.request<any>(`/api/v1/templates/${templateId}/submit`, options);
   }
 
-  async syncTemplates(): Promise<TemplateSyncResponse> {
-    return this.request<TemplateSyncResponse>('/api/v1/templates/sync', {
-      method: 'POST',
-    });
-  }
-
-  async reloadTemplates(): Promise<TemplateReloadResponse> {
-    return this.request<TemplateReloadResponse>('/api/v1/templates/reload', {
-      method: 'POST',
-    });
-  }
-
   async validateTemplate(templateId: string): Promise<any> {
     return this.request<any>(`/api/v1/templates/${templateId}/validate`);
   }
@@ -496,16 +339,6 @@ class ApiClient {
 
   async getDatasetStatus(taskId: string): Promise<any> {
     return this.request<any>(`/api/v1/datasets/status/${taskId}`);
-  }
-
-  async embedDataset(filename: string, embeddingModel?: string): Promise<any> {
-    return this.request<any>('/api/v1/datasets/embed', {
-      method: 'POST',
-      body: JSON.stringify({
-        filename,
-        embedding_model: embeddingModel,
-      }),
-    });
   }
 
   /**
@@ -596,47 +429,9 @@ class ApiClient {
   // Query API
   // ============================================================================
 
-  async query(data: QueryRequest): Promise<QueryResponse> {
-    return this.request<QueryResponse>('/api/v1/query/query', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
   // ============================================================================
   // Run API (Query Execution & Results)
   // ============================================================================
-
-  async createRun(text: string, options?: any): Promise<{ run_id: string }> {
-    return this.request('/api/v1/query', {
-      method: 'POST',
-      body: JSON.stringify({ text, ...options }),
-    });
-  }
-
-  async getRunStatus(runId: string): Promise<any> {
-    return this.request(`/api/v1/run/${runId}/status`, {
-      method: 'GET',
-    });
-  }
-
-  async getRunResults(runId: string): Promise<any> {
-    return this.request(`/api/v1/run/${runId}/results`, {
-      method: 'GET',
-    });
-  }
-
-  async startSeleniumTest(runId: string): Promise<{ started: boolean }> {
-    return this.request(`/api/v1/test/run/${runId}/start`, {
-      method: 'POST',
-    });
-  }
-
-  async cancelRun(runId: string): Promise<{ cancelled: boolean }> {
-    return this.request(`/api/v1/run/${runId}/cancel`, {
-      method: 'POST',
-    });
-  }
 
   // ============================================================================
   // User Settings API
@@ -725,23 +520,6 @@ class ApiClient {
   // ============================================================================
 
   /**
-   * Check model compatibility between user settings and dataset
-   * Returns whether search can proceed without dimension mismatch
-   */
-  async checkModelCompatibility(datasetId: string): Promise<{
-    compatible: boolean;
-    user_model: string;
-    user_dimension: number;
-    dataset_model: string | null;
-    dataset_dimension: number | null;
-    can_search: boolean;
-    message: string;
-    recommendation?: string;
-  }> {
-    return this.request(`/api/v1/model-validation/check-compatibility/${datasetId}`);
-  }
-
-  /**
    * Preflight check before search - validates model alignment
    * Call this BEFORE performing any semantic search
    */
@@ -764,22 +542,6 @@ class ApiClient {
   }
 
   /**
-   * Switch to use the dataset's embedding model temporarily
-   * Updates user settings to match dataset model
-   */
-  async switchToDatasetModel(datasetId: string): Promise<{
-    success: boolean;
-    previous_model: string;
-    new_model: string;
-    new_dimension: number;
-    message: string;
-  }> {
-    return this.request(`/api/v1/model-validation/switch-to-dataset-model/${datasetId}`, {
-      method: 'POST',
-    });
-  }
-
-  /**
    * Get list of all available embedding models
    */
   async getAvailableModels(): Promise<{
@@ -792,120 +554,6 @@ class ApiClient {
     default_model: string;
   }> {
     return this.request('/api/v1/model-validation/available-models');
-  }
-
-  /**
-   * Multi-model semantic search with governance
-   * Uses model-isolated Redis indices
-   */
-  async multiModelSemanticSearch(
-    query: string,
-    options?: {
-      datasetId?: string;
-      topK?: number;
-      minSimilarity?: number;
-      useDatasetModel?: boolean;
-    }
-  ): Promise<{
-    success: boolean;
-    query: string;
-    model_used: string;
-    dimension: number;
-    stage1_vector_search: Array<{
-      query: string;
-      similarity_score: number;
-      t_id: string;
-    }>;
-    stage2_reranking: Array<{
-      t_id: string;
-      avg_similarity: number;
-      avg_confidence_score: number;
-      final_score: number;
-      rank: number;
-      match_count: number;
-    }>;
-    final_output: {
-      t_id: string;
-      api_name: string;
-      endpoint: string;
-      method: string;
-      confidence_score: number;
-      request_schema: any;
-      response_schema: any;
-    } | null;
-    metadata: {
-      query: string;
-      top_k: number;
-      total_candidates: number;
-      processing_time_ms: number;
-    };
-    error?: string;
-  }> {
-    return this.request('/api/v1/multi-model-query/semantic-search', {
-      method: 'POST',
-      body: JSON.stringify({
-        query,
-        dataset_id: options?.datasetId,
-        top_k: options?.topK ?? 10,
-        min_similarity: options?.minSimilarity ?? 0.6,
-        use_dataset_model: options?.useDatasetModel ?? false,
-      }),
-    });
-  }
-
-  /**
-   * Embed dataset with multi-model governance
-   */
-  async multiModelEmbedDataset(
-    datasetId: string,
-    options?: {
-      model?: string;
-      useSettingsModel?: boolean;
-    }
-  ): Promise<{
-    success: boolean;
-    dataset_id: string;
-    model_used: string;
-    dimension: number;
-    embedded_count: number;
-    message: string;
-  }> {
-    return this.request(`/api/v1/multi-model-query/datasets/${datasetId}/embed`, {
-      method: 'POST',
-      body: JSON.stringify({
-        model: options?.model,
-        use_settings_model: options?.useSettingsModel ?? true,
-      }),
-    });
-  }
-
-  /**
-   * Re-embed dataset with a different model
-   */
-  async multiModelReembedDataset(
-    datasetId: string,
-    targetModel: string,
-    options?: {
-      clearExisting?: boolean;
-      chunkSize?: number;
-    }
-  ): Promise<{
-    success: boolean;
-    dataset_id: string;
-    previous_model: string | null;
-    new_model: string;
-    new_dimension: number;
-    embedded_count: number;
-    message: string;
-  }> {
-    return this.request(`/api/v1/multi-model-query/datasets/${datasetId}/reembed`, {
-      method: 'POST',
-      body: JSON.stringify({
-        target_model: targetModel,
-        clear_existing: options?.clearExisting ?? true,
-        chunk_size: options?.chunkSize ?? 100,
-      }),
-    });
   }
 
   // ============================================================================
@@ -1108,7 +756,11 @@ class ApiClient {
   // ============================================================================
 
   /**
-   * List all available embedding models (Ollama + registered)
+   * The embedding model this deployment routes with.
+   *
+   * There is exactly one: it is set per deployment (EXECUTION_MODE) because every
+   * indexed vector and every query must come from the same model. Returned in the
+   * list shape older callers expect.
    */
   async listEmbeddingModels(): Promise<{
     models: Array<{
@@ -1125,55 +777,23 @@ class ApiClient {
     local_count: number;
     registered_count: number;
   }> {
-    return this.request('/api/v1/embeddings/models/available');
-  }
-
-  /**
-   * Detect embedding dimension for an Ollama model
-   */
-  async detectEmbeddingDimension(
-    modelName: string,
-    autoPull: boolean = true
-  ): Promise<{
-    model_name: string;
-    dimension: number;
-    already_registered: boolean;
-    display_name?: string;
-    redis_index?: string;
-    message?: string;
-  }> {
-    const params = new URLSearchParams({
-      model_name: modelName,
-      auto_pull: autoPull.toString(),
-    });
-    return this.request(`/api/v1/embeddings/models/detect-dimension?${params}`, {
-      method: 'POST',
-    });
-  }
-
-  /**
-   * Register a new embedding model with auto-dimension detection
-   */
-  async registerEmbeddingModel(
-    modelName: string,
-    autoPull: boolean = true
-  ): Promise<{
-    success: boolean;
-    model_id: string;
-    dimension: number;
-    display_name: string;
-    redis_index_name: string;
-    already_registered: boolean;
-    redis_index_created?: boolean;
-    redis_index_error?: string;
-  }> {
-    const params = new URLSearchParams({
-      model_name: modelName,
-      auto_pull: autoPull.toString(),
-    });
-    return this.request(`/api/v1/embeddings/models/register?${params}`, {
-      method: 'POST',
-    });
+    const health = await this.request<{ runtime?: { embedder?: { model: string; dimension: number } } }>(
+      '/api/v1/health'
+    );
+    const embedder = health.runtime?.embedder;
+    const models = embedder
+      ? [{
+          name: embedder.model,
+          display_name: embedder.model,
+          size: '',
+          is_local: true,
+          is_registered: true,
+          dimension: embedder.dimension,
+          family: null,
+          is_likely_embedding: true,
+        }]
+      : [];
+    return { models, count: models.length, local_count: models.length, registered_count: models.length };
   }
 
   /**
@@ -1216,9 +836,7 @@ class ApiClient {
           if (typeof window !== 'undefined') {
             // Clear the cached profile (non-sensitive) and re-authenticate.
             localStorage.removeItem('nlpforge_user');
-            if (!window.location.pathname.startsWith('/auth')) {
-              window.location.href = '/auth/login';
-            }
+            redirectToLogin();
           }
         }
         
@@ -1239,64 +857,6 @@ class ApiClient {
       }
       throw error;
     }
-  }
-
-  /**
-   * Check re-embedding impact when switching models
-   */
-  async checkReembeddingImpact(newModel: string): Promise<{
-    impact: 'none' | 'low' | 'medium' | 'high';
-    message: string;
-    affected_datasets: Array<{
-      dataset_id: string;
-      name: string;
-      embedding_count: number;
-      embedding_model: string;
-    }>;
-    reembedding_required: boolean;
-    total_embeddings_affected?: number;
-    current_model?: {
-      name: string;
-      dimension: number | null;
-    };
-    new_model?: {
-      name: string;
-      dimension: number | null;
-    };
-    warning?: string;
-  }> {
-    return this.request(`/api/v1/embeddings/reembedding-impact?new_model=${encodeURIComponent(newModel)}`);
-  }
-
-  /**
-   * Check embedding model compatibility for search
-   */
-  async checkEmbeddingCompatibility(
-    datasetId?: string,
-    templateId?: string
-  ): Promise<{
-    compatible: boolean;
-    current_model: string;
-    current_dimension: number;
-    dataset_model?: string;
-    dataset_dimension?: number;
-    dataset_info?: {
-      dataset_id: string;
-      name: string;
-      embedding_model: string;
-    };
-    message?: string;
-    options?: Array<{
-      action: string;
-      label: string;
-      description: string;
-      recommended: boolean;
-    }>;
-  }> {
-    const params = new URLSearchParams();
-    if (datasetId) params.append('dataset_id', datasetId);
-    if (templateId) params.append('template_id', templateId);
-    return this.request(`/api/v1/embeddings/check-compatibility?${params}`);
   }
 
   // ============================================================================

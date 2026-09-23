@@ -215,16 +215,13 @@ export class DatasetApiClient {
   }
 
   /**
-   * Embed dataset and store in Redis vector DB
+   * Embed a dataset's utterances into pgvector so they become routable.
+   * Uses the deployment's embedding model (EXECUTION_MODE); `embedding_model`
+   * in the request is ignored by the backend.
    */
   async embedDataset(data: EmbedDatasetRequest): Promise<EmbedDatasetResponse> {
     const response = await this.client.post<EmbedDatasetResponse>(
-      '/api/v1/datasets/embed',
-      {
-        dataset_id: data.dataset_id,
-        embedding_model: data.embedding_model || 'sentence-transformers/all-MiniLM-L6-v2',
-        vector_db_collection: data.vector_db_collection || 'api_templates',
-      }
+      `/api/v1/datasets/db/${data.dataset_id}/embed`
     );
     return response.data;
   }
@@ -249,7 +246,7 @@ export class DatasetApiClient {
    * Delete dataset
    */
   async deleteDataset(datasetId: string): Promise<{ message: string }> {
-    const response = await this.client.delete(`/api/v1/datasets/${datasetId}`);
+    const response = await this.client.delete(`/api/v1/datasets/db/${datasetId}`);
     return response.data;
   }
 }

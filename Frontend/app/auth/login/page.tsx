@@ -91,13 +91,13 @@ export default function LoginPage() {
           href="/"
           className="inline-flex items-center text-sm text-primary hover:text-primary/80 transition-colors mb-4"
         >
-          ← Return Home
+          ← Back to home
         </Link>
         <h1 className="text-3xl font-bold text-foreground mb-2">
-          Login
+          Sign in
         </h1>
         <p className="text-muted-foreground">
-          Welcome back! Please enter your details.
+          Welcome back. Sign in to route requests against your API catalogue.
         </p>
       </div>
 
@@ -121,7 +121,7 @@ export default function LoginPage() {
           className="mb-6 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-6 py-3 font-semibold text-primary transition-all duration-200 hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
-          Try the live demo — no signup needed
+          Explore the live demo — no sign-up
         </button>
       )}
 
@@ -155,7 +155,7 @@ export default function LoginPage() {
               href="/auth/forgot-password"
               className="text-sm text-primary hover:text-primary/80 transition-colors"
             >
-              Reset Password
+              Forgot password?
             </Link>
           </div>
           <div className="relative">
@@ -208,7 +208,7 @@ export default function LoginPage() {
               Signing in...
             </>
           ) : (
-            'Login'
+            'Sign in'
           )}
         </button>
       </form>

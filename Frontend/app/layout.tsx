@@ -3,7 +3,6 @@ import { Inter, Manrope, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Providers } from "./providers";
-import DemoBanner from "@/components/DemoBanner";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -24,13 +23,14 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NLPForge | AI-Powered API Testing Platform",
-  description: "Automate API testing using LLMs and vector search. Multi-tenant SaaS platform for intelligent test generation and execution.",
-  keywords: ["API testing", "LLM", "vector search", "automation", "SaaS", "NLP"],
-  authors: [{ name: "NLPForge Team" }],
+  title: "NLPForge — natural language to validated API calls",
+  description:
+    "A semantic API router: pgvector retrieval picks the endpoint, a schema-constrained LLM extracts a request body that validates against its JSON Schema. Routing accuracy measured on a held-out benchmark.",
+  keywords: ["semantic routing", "pgvector", "FastAPI", "LLM structured output", "API", "NLP"],
+  authors: [{ name: "Milan Soni" }],
   openGraph: {
-    title: "NLPForge - AI-Powered API Testing",
-    description: "Transform natural language into production-ready API tests",
+    title: "NLPForge",
+    description: "Turn a sentence into a validated API call.",
     type: "website",
   },
 };
@@ -52,7 +52,6 @@ export default function RootLayout({
         </a>
         <ThemeProvider>
           <Providers>
-            <DemoBanner />
             {children}
           </Providers>
         </ThemeProvider>

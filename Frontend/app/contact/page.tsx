@@ -116,8 +116,8 @@ export default function ContactPage() {
 
                                 {isSubmitted ? (
                                     <div className="text-center py-12">
-                                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                                            <CheckCircle2 className="w-8 h-8 text-green-600 dark:text-green-400" />
+                                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-success/10 dark:bg-success/30 flex items-center justify-center">
+                                            <CheckCircle2 className="w-8 h-8 text-success dark:text-success" />
                                         </div>
                                         <h3 className="text-xl font-semibold text-foreground mb-2">Message Sent!</h3>
                                         <p className="text-muted-foreground mb-6">

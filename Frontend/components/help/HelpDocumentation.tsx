@@ -101,11 +101,11 @@ const TemplatesContent = () => (
       <div>
         <h4 className="font-semibold mb-2">Template Status Workflow</h4>
         <div className="flex items-center gap-2 text-sm">
-          <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-medium">Draft</span>
+          <span className="px-2 py-1 bg-warning/10 text-warning rounded text-xs font-medium">Draft</span>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">Review</span>
+          <span className="px-2 py-1 bg-info/10 text-info rounded text-xs font-medium">Review</span>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">Approved</span>
+          <span className="px-2 py-1 bg-success/10 text-success rounded text-xs font-medium">Approved</span>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
           Only <strong>Approved</strong> templates are indexed for semantic search.
@@ -158,7 +158,7 @@ const DatasetsContent = () => (
       <div>
         <h4 className="font-semibold mb-2">Embedding to Vector DB</h4>
         <p className="text-sm text-muted-foreground">
-          After creating/uploading a dataset, embed it to Redis for semantic search:
+          After creating/uploading a dataset, embed it into pgvector so it becomes routable:
         </p>
         <ol className="text-sm text-muted-foreground mt-2 space-y-1 list-decimal list-inside">
           <li>Click the <strong>Embed</strong> button on any dataset</li>
@@ -182,7 +182,7 @@ const SearchContent = () => (
         <h4 className="font-semibold mb-2">How It Works</h4>
         <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
           <li>Your query is converted to a vector embedding</li>
-          <li>Vector similarity search finds closest matches in Redis</li>
+          <li>Vector similarity search (pgvector HNSW) finds the closest utterances</li>
           <li>Results are re-ranked using cross-encoder models</li>
           <li>Top matches are returned with confidence scores</li>
         </ol>
@@ -241,32 +241,32 @@ const SettingsContent = () => (
           <tbody className="text-muted-foreground">
             <tr className="border-b">
               <td className="py-2 font-medium">nomic-embed-text</td>
-              <td className="py-2 text-emerald-600">Fast</td>
+              <td className="py-2 text-success">Fast</td>
               <td className="py-2">RAG, Long docs (Recommended)</td>
             </tr>
             <tr className="border-b">
               <td className="py-2">all-minilm</td>
-              <td className="py-2 text-emerald-600">Fastest</td>
+              <td className="py-2 text-success">Fastest</td>
               <td className="py-2">Prototyping, Edge devices</td>
             </tr>
             <tr className="border-b">
               <td className="py-2">mxbai-embed-large</td>
-              <td className="py-2 text-amber-600">Moderate</td>
+              <td className="py-2 text-warning">Moderate</td>
               <td className="py-2">State-of-the-art accuracy</td>
             </tr>
             <tr className="border-b">
               <td className="py-2">bge-m3</td>
-              <td className="py-2 text-amber-600">Moderate</td>
+              <td className="py-2 text-warning">Moderate</td>
               <td className="py-2">Multilingual (100+ langs)</td>
             </tr>
             <tr className="border-b">
               <td className="py-2">snowflake-arctic-embed</td>
-              <td className="py-2 text-emerald-600">Fast</td>
+              <td className="py-2 text-success">Fast</td>
               <td className="py-2">Enterprise retrieval</td>
             </tr>
             <tr>
               <td className="py-2">qwen3-embedding</td>
-              <td className="py-2 text-red-600">Slow</td>
+              <td className="py-2 text-destructive">Slow</td>
               <td className="py-2">Maximum quality (0.6-8B)</td>
             </tr>
           </tbody>
@@ -276,9 +276,9 @@ const SettingsContent = () => (
         </p>
       </div>
 
-      <div className="bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-        <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Important</p>
-        <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+      <div className="bg-warning/10 dark:bg-warning/30 border border-warning/25 dark:border-warning rounded-lg p-4">
+        <p className="text-sm font-medium text-warning dark:text-warning-foreground">Important</p>
+        <p className="text-sm text-warning dark:text-warning mt-1">
           Changing the embedding model requires re-embedding all datasets for consistent search results.
         </p>
       </div>

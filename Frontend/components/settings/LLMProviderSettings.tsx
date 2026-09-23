@@ -170,7 +170,7 @@ const ProviderCard = ({
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 rounded-xl hover:bg-blue-500/10"
+            className="h-9 w-9 rounded-xl hover:bg-info/10"
             onClick={onEdit}
             title="Edit Configuration"
           >
@@ -194,19 +194,19 @@ const ProviderCard = ({
         <div className={cn(
           "p-3 rounded-xl border transition-colors",
           config.has_api_key 
-            ? "bg-emerald-500/5 border-emerald-500/20" 
-            : "bg-amber-500/5 border-amber-500/20"
+            ? "bg-success/5 border-success/20" 
+            : "bg-warning/5 border-warning/20"
         )}>
           <div className="flex items-center gap-2">
             {config.has_api_key ? (
               <>
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">API Key Set</span>
+                <CheckCircle2 className="h-4 w-4 text-success" />
+                <span className="text-sm font-medium text-success dark:text-success">API Key Set</span>
               </>
             ) : (
               <>
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
-                <span className="text-sm font-medium text-amber-600 dark:text-amber-400">No API Key</span>
+                <AlertTriangle className="h-4 w-4 text-warning" />
+                <span className="text-sm font-medium text-warning dark:text-warning">No API Key</span>
               </>
             )}
           </div>
@@ -217,23 +217,23 @@ const ProviderCard = ({
           "p-3 rounded-xl border transition-colors",
           config.last_tested_at
             ? config.last_test_success
-              ? "bg-emerald-500/5 border-emerald-500/20"
-              : "bg-red-500/5 border-red-500/20"
+              ? "bg-success/5 border-success/20"
+              : "bg-destructive/5 border-destructive/20"
             : "bg-muted/30 border-border/40"
         )}>
           <div className="flex items-center gap-2">
             {config.last_tested_at ? (
               config.last_test_success ? (
                 <>
-                  <Zap className="h-4 w-4 text-emerald-500" />
-                  <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                  <Zap className="h-4 w-4 text-success" />
+                  <span className="text-sm font-medium text-success dark:text-success">
                     {typeof config.last_test_latency_ms === 'number' ? `${config.last_test_latency_ms}ms latency` : 'Connected'}
                   </span>
                 </>
               ) : (
                 <>
-                  <AlertTriangle className="h-4 w-4 text-red-500" />
-                  <span className="text-sm font-medium text-red-600 dark:text-red-400 truncate">
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                  <span className="text-sm font-medium text-destructive dark:text-destructive truncate">
                     Connection Failed
                   </span>
                 </>
@@ -572,10 +572,10 @@ const ProviderDialog = ({
                   }
                 }}
                 placeholder={providerInfo.baseUrlPlaceholder}
-                className={`h-12 rounded-xl ${baseUrlError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                className={`h-12 rounded-xl ${baseUrlError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
               />
               {baseUrlError && (
-                <p className="text-xs text-red-500 flex items-center gap-1.5">
+                <p className="text-xs text-destructive flex items-center gap-1.5">
                   <AlertTriangle className="h-3 w-3" />
                   {baseUrlError}
                 </p>
@@ -756,8 +756,8 @@ export const LLMProviderSettings = () => {
   if (error) {
     return (
       <div className="text-center py-20">
-        <div className="mx-auto w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center mb-4">
-          <AlertTriangle className="h-8 w-8 text-red-500" />
+        <div className="mx-auto w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
+          <AlertTriangle className="h-8 w-8 text-destructive" />
         </div>
         <h3 className="font-semibold text-lg text-foreground mb-2">Failed to Load</h3>
         <p className="text-muted-foreground">Could not load LLM configurations. Please try again.</p>
@@ -774,7 +774,7 @@ export const LLMProviderSettings = () => {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-border/40 bg-gradient-to-r from-muted/30 to-transparent">
           <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 shadow-lg shadow-purple-500/20">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-brand-2 shadow-lg shadow-primary/20">
               <Sparkles className="h-5 w-5 text-white" />
             </div>
             <div>
@@ -846,8 +846,8 @@ export const LLMProviderSettings = () => {
         <DialogContent className="sm:max-w-[420px] rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3 text-xl">
-              <div className="p-2.5 rounded-xl bg-red-500/10">
-                <Trash2 className="h-5 w-5 text-red-500" />
+              <div className="p-2.5 rounded-xl bg-destructive/10">
+                <Trash2 className="h-5 w-5 text-destructive" />
               </div>
               Delete LLM Provider
             </DialogTitle>

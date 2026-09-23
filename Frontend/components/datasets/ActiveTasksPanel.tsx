@@ -164,13 +164,13 @@ export function ActiveTasksPanel({ onTaskComplete, className }: ActiveTasksPanel
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'running':
-        return <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+        return <Loader2 className="w-4 h-4 animate-spin text-info" />
       case 'pending':
-        return <Clock className="w-4 h-4 text-amber-500" />
+        return <Clock className="w-4 h-4 text-warning" />
       case 'completed':
-        return <CheckCircle className="w-4 h-4 text-emerald-500" />
+        return <CheckCircle className="w-4 h-4 text-success" />
       case 'failed':
-        return <XCircle className="w-4 h-4 text-red-500" />
+        return <XCircle className="w-4 h-4 text-destructive" />
       default:
         return <Clock className="w-4 h-4 text-gray-400" />
     }
@@ -179,13 +179,13 @@ export function ActiveTasksPanel({ onTaskComplete, className }: ActiveTasksPanel
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'running':
-        return 'border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/30'
+        return 'border-info/25 bg-info/50 dark:border-info dark:bg-info/30'
       case 'pending':
-        return 'border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/30'
+        return 'border-warning/25 bg-warning/50 dark:border-warning dark:bg-warning/30'
       case 'completed':
-        return 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/30'
+        return 'border-success/25 bg-success/50 dark:border-success dark:bg-success/30'
       case 'failed':
-        return 'border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/30'
+        return 'border-destructive/25 bg-destructive/50 dark:border-destructive dark:bg-destructive/30'
       default:
         return 'border-gray-200 bg-gray-50/50 dark:border-gray-800 dark:bg-gray-950/30'
     }
@@ -224,11 +224,11 @@ export function ActiveTasksPanel({ onTaskComplete, className }: ActiveTasksPanel
         <div className="flex items-center gap-3">
           {runningCount > 0 ? (
             <div className="relative">
-              <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-pulse" />
+              <Loader2 className="w-5 h-5 animate-spin text-info" />
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-info rounded-full animate-pulse" />
             </div>
           ) : (
-            <CheckCircle className="w-5 h-5 text-emerald-500" />
+            <CheckCircle className="w-5 h-5 text-success" />
           )}
           <div>
             <h3 className="text-sm font-semibold text-foreground">
@@ -301,10 +301,10 @@ export function ActiveTasksPanel({ onTaskComplete, className }: ActiveTasksPanel
                   variant="outline" 
                   className={cn(
                     "text-[10px] px-1.5 py-0",
-                    task.status === 'running' && "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/50 dark:text-blue-300",
-                    task.status === 'pending' && "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-300",
-                    task.status === 'completed' && "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/50 dark:text-emerald-300",
-                    task.status === 'failed' && "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/50 dark:text-red-300"
+                    task.status === 'running' && "bg-info/10 text-info border-info/25 dark:bg-info/50 dark:text-info",
+                    task.status === 'pending' && "bg-warning/10 text-warning border-warning/25 dark:bg-warning/50 dark:text-warning",
+                    task.status === 'completed' && "bg-success/10 text-success border-success/25 dark:bg-success/50 dark:text-success",
+                    task.status === 'failed' && "bg-destructive/10 text-destructive border-destructive/25 dark:bg-destructive/50 dark:text-destructive"
                   )}
                 >
                   {task.status}
@@ -327,7 +327,7 @@ export function ActiveTasksPanel({ onTaskComplete, className }: ActiveTasksPanel
                   </div>
                   <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                     <div 
-                      className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                      className="h-full bg-info rounded-full transition-all duration-500"
                       style={{ width: `${task.progress}%` }}
                     />
                   </div>
@@ -336,12 +336,12 @@ export function ActiveTasksPanel({ onTaskComplete, className }: ActiveTasksPanel
 
               {/* Message for completed/failed */}
               {task.status === 'completed' && task.message && (
-                <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">
+                <p className="text-xs text-success dark:text-success mt-1">
                   {task.message}
                 </p>
               )}
               {task.status === 'failed' && task.error && (
-                <p className="text-xs text-red-700 dark:text-red-300 mt-1 line-clamp-2">
+                <p className="text-xs text-destructive dark:text-destructive mt-1 line-clamp-2">
                   {task.error}
                 </p>
               )}

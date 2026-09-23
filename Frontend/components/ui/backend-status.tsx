@@ -54,10 +54,10 @@ export function BackendStatus({ className = "", showText = true, variant = 'defa
       return {
         icon: Loader2,
         text: "Connecting...",
-        dotColor: "bg-blue-500",
-        borderColor: "border-blue-500/30",
-        bgColor: "bg-blue-500/10",
-        textColor: "text-blue-600 dark:text-blue-400",
+        dotColor: "bg-info",
+        borderColor: "border-info/30",
+        bgColor: "bg-info/10",
+        textColor: "text-info dark:text-info",
         animate: true
       };
     }
@@ -66,10 +66,10 @@ export function BackendStatus({ className = "", showText = true, variant = 'defa
       return {
         icon: WifiOff,
         text: "Offline",
-        dotColor: "bg-red-500",
-        borderColor: "border-red-500/30",
-        bgColor: "bg-red-500/10",
-        textColor: "text-red-600 dark:text-red-400",
+        dotColor: "bg-destructive",
+        borderColor: "border-destructive/30",
+        bgColor: "bg-destructive/10",
+        textColor: "text-destructive dark:text-destructive",
         animate: false
       };
     }
@@ -77,10 +77,10 @@ export function BackendStatus({ className = "", showText = true, variant = 'defa
     return {
       icon: Wifi,
       text: "Online",
-      dotColor: "bg-green-500",
-      borderColor: "border-green-500/30",
-      bgColor: "bg-green-500/10",
-      textColor: "text-green-600 dark:text-green-400",
+      dotColor: "bg-success",
+      borderColor: "border-success/30",
+      bgColor: "bg-success/10",
+      textColor: "text-success dark:text-success",
       animate: false
     };
   };

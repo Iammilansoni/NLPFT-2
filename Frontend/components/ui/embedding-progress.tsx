@@ -60,14 +60,14 @@ export function EmbeddingProgress({
         );
       case "in_progress":
         return (
-          <Badge variant="default" className="gap-1 bg-blue-500">
+          <Badge variant="default" className="gap-1 bg-info">
             <Loader2 className="h-3 w-3 animate-spin" />
             Embedding...
           </Badge>
         );
       case "completed":
         return (
-          <Badge variant="default" className="gap-1 bg-green-500">
+          <Badge variant="default" className="gap-1 bg-success">
             <CheckCircle2 className="h-3 w-3" />
             Completed
           </Badge>

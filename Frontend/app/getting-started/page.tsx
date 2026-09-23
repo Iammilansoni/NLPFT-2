@@ -35,11 +35,11 @@ export default function GettingStartedPage() {
             Getting Started Guide
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold text-foreground tracking-tight mb-6">
-            Your Journey with <span className="text-primary">NLPForge</span>
+            Getting started with <span className="text-primary">NLPForge</span>
           </h1>
           <p className="text-xl text-muted-foreground leading-relaxed max-w-3xl mx-auto">
-            Follow this step-by-step guide to set up NLPForge and start generating 
-            AI-powered API test cases from natural language queries.
+            From an empty catalogue to routing plain-English requests to validated
+            API calls. The demo account skips straight to the last step.
           </p>
         </div>
       </section>
@@ -49,20 +49,20 @@ export default function GettingStartedPage() {
         <div className="max-w-4xl mx-auto">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="p-4 rounded-xl border border-border bg-card text-center">
-              <div className="text-3xl font-bold text-primary mb-1">7</div>
-              <div className="text-sm text-muted-foreground">Phases</div>
+              <div className="text-3xl font-bold text-primary mb-1">20</div>
+              <div className="text-sm text-muted-foreground">Demo APIs seeded</div>
             </div>
             <div className="p-4 rounded-xl border border-border bg-card text-center">
-              <div className="text-3xl font-bold text-primary mb-1">~15</div>
-              <div className="text-sm text-muted-foreground">Minutes Setup</div>
+              <div className="text-3xl font-bold text-primary mb-1">1</div>
+              <div className="text-sm text-muted-foreground">docker compose up</div>
             </div>
             <div className="p-4 rounded-xl border border-border bg-card text-center">
-              <div className="text-3xl font-bold text-primary mb-1">∞</div>
-              <div className="text-sm text-muted-foreground">Test Cases</div>
+              <div className="text-3xl font-bold text-primary mb-1">3</div>
+              <div className="text-sm text-muted-foreground">Pipeline stages</div>
             </div>
             <div className="p-4 rounded-xl border border-border bg-card text-center">
-              <div className="text-3xl font-bold text-primary mb-1">100%</div>
-              <div className="text-sm text-muted-foreground">Local AI</div>
+              <div className="text-3xl font-bold text-primary mb-1">0</div>
+              <div className="text-sm text-muted-foreground">API keys needed locally</div>
             </div>
           </div>
         </div>
@@ -71,25 +71,25 @@ export default function GettingStartedPage() {
       {/* Prerequisites */}
       <section className="px-4 sm:px-6 lg:px-8 pb-12">
         <div className="max-w-4xl mx-auto">
-          <div className="p-6 rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30">
+          <div className="p-6 rounded-2xl border border-warning/25 dark:border-warning bg-warning/10 dark:bg-warning/30">
             <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center flex-shrink-0">
-                <Lightbulb className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              <div className="w-10 h-10 rounded-lg bg-warning/10 dark:bg-warning/50 flex items-center justify-center flex-shrink-0">
+                <Lightbulb className="w-5 h-5 text-warning dark:text-warning" />
               </div>
               <div>
-                <h3 className="font-semibold text-amber-800 dark:text-amber-200 mb-2">Prerequisites</h3>
-                <ul className="space-y-2 text-sm text-amber-700 dark:text-amber-300">
+                <h3 className="font-semibold text-warning dark:text-warning-foreground mb-2">Prerequisites</h3>
+                <ul className="space-y-2 text-sm text-warning dark:text-warning">
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4" />
-                    Valid email address for registration
+                    Docker with Compose v2.24+ (or Python 3.11 and Node 20 to run without Docker)
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4" />
-                    LLM API key (OpenAI, Google Gemini, or Anthropic) OR Ollama installed locally
+                    Nothing else for local mode: Ollama runs in the stack. A Gemini key is only needed for LLM dataset generation
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4" />
-                    API documentation for creating templates (endpoints, samples)
+                    For your own APIs: endpoint, method and a JSON Schema for each request body
                   </li>
                 </ul>
               </div>
@@ -121,7 +121,7 @@ export default function GettingStartedPage() {
               <tbody className="divide-y divide-border">
                 <tr>
                   <td className="px-4 py-3 text-sm">
-                    <span className="px-2 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-xs font-medium">
+                    <span className="px-2 py-1 rounded-full bg-success/10 dark:bg-success/30 text-success dark:text-success text-xs font-medium">
                       Authentication
                     </span>
                   </td>
@@ -130,7 +130,7 @@ export default function GettingStartedPage() {
                 </tr>
                 <tr>
                   <td className="px-4 py-3 text-sm">
-                    <span className="px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium">
+                    <span className="px-2 py-1 rounded-full bg-info/10 dark:bg-info/30 text-info dark:text-info text-xs font-medium">
                       Templates
                     </span>
                   </td>
@@ -139,7 +139,7 @@ export default function GettingStartedPage() {
                 </tr>
                 <tr>
                   <td className="px-4 py-3 text-sm">
-                    <span className="px-2 py-1 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 text-xs font-medium">
+                    <span className="px-2 py-1 rounded-full bg-warning/10 dark:bg-warning/30 text-warning dark:text-warning text-xs font-medium">
                       Settings
                     </span>
                   </td>
@@ -148,7 +148,7 @@ export default function GettingStartedPage() {
                 </tr>
                 <tr>
                   <td className="px-4 py-3 text-sm">
-                    <span className="px-2 py-1 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-medium">
+                    <span className="px-2 py-1 rounded-full bg-primary/10 dark:bg-primary/30 text-primary dark:text-primary text-xs font-medium">
                       Datasets
                     </span>
                   </td>
@@ -157,16 +157,16 @@ export default function GettingStartedPage() {
                 </tr>
                 <tr>
                   <td className="px-4 py-3 text-sm">
-                    <span className="px-2 py-1 rounded-full bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 text-xs font-medium">
+                    <span className="px-2 py-1 rounded-full bg-info/10 dark:bg-info/30 text-info dark:text-info text-xs font-medium">
                       Embedding
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">Generate vectors, store in Redis</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">Embed utterances into pgvector</td>
                   <td className="px-4 py-3 text-sm text-foreground">Searchable embeddings</td>
                 </tr>
                 <tr>
                   <td className="px-4 py-3 text-sm">
-                    <span className="px-2 py-1 rounded-full bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 text-xs font-medium">
+                    <span className="px-2 py-1 rounded-full bg-brand-2/10 dark:bg-brand-2/30 text-brand-2 dark:text-brand-2 text-xs font-medium">
                       Search
                     </span>
                   </td>
@@ -175,7 +175,7 @@ export default function GettingStartedPage() {
                 </tr>
                 <tr>
                   <td className="px-4 py-3 text-sm">
-                    <span className="px-2 py-1 rounded-full bg-lime-100 dark:bg-lime-900/30 text-lime-700 dark:text-lime-300 text-xs font-medium">
+                    <span className="px-2 py-1 rounded-full bg-success/10 dark:bg-success/30 text-success dark:text-success text-xs font-medium">
                       Output
                     </span>
                   </td>
@@ -197,7 +197,7 @@ export default function GettingStartedPage() {
             </div>
             <h2 className="text-2xl font-bold text-foreground mb-4">Ready to Begin?</h2>
             <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
-              Start your journey now and transform natural language into executable API test cases in minutes.
+              Open the demo tenant and route a request, or sign up and describe your own APIs.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Button asChild size="lg" className="h-12 px-8">

@@ -22,10 +22,10 @@ export function SimilarityBar({
   const percentage = Math.round(similarity * 100)
   
   const getColor = () => {
-    if (similarity >= 0.9) return "bg-green-500"
-    if (similarity >= 0.75) return "bg-blue-500"
-    if (similarity >= 0.5) return "bg-yellow-500"
-    return "bg-red-500"
+    if (similarity >= 0.9) return "bg-success"
+    if (similarity >= 0.75) return "bg-info"
+    if (similarity >= 0.5) return "bg-warning"
+    return "bg-destructive"
   }
 
   const getHeight = () => {

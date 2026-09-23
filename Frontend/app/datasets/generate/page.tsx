@@ -153,17 +153,17 @@ export default function DatasetGenerationPage() {
   };
 
   const handleEmbed = async () => {
-    if (!currentTaskId) return;
-
+    // Embedding targets the stored dataset, not the Celery task that produced it.
+    const datasetId = (statusData as any)?.dataset_id || (statusData as any)?.result?.dataset_id;
+    if (!datasetId) {
+      alert('The generated dataset was not stored; nothing to embed.');
+      return;
+    }
     try {
-      await embedMutation.mutateAsync({
-        dataset_id: currentTaskId,
-        embedding_model: embeddingModel,
-        vector_db_collection: 'api_templates',
-      });
-      alert('Dataset embedded successfully to Redis!');
+      const res: any = await embedMutation.mutateAsync({ dataset_id: datasetId });
+      alert(`Embedded ${res?.embedded_count ?? 0} utterances. They are now routable from the dashboard.`);
     } catch (error: any) {
-      alert(error.message || 'Failed to embed dataset');
+      alert(error?.response?.data?.detail?.message || error.message || 'Failed to embed dataset');
     }
   };
 
@@ -369,7 +369,7 @@ export default function DatasetGenerationPage() {
                   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white font-bold">
                     3
                   </div>
-                  <h2 className="text-xl font-semibold">Embed to Redis Vector Database</h2>
+                  <h2 className="text-xl font-semibold">Embed for routing</h2>
                 </div>
 
                 <div className="space-y-4">
@@ -392,7 +392,7 @@ export default function DatasetGenerationPage() {
                       )}
                     </select>
                     {registeredModels.length === 0 && (
-                      <p className="text-xs text-amber-600 mt-2">
+                      <p className="text-xs text-warning mt-2">
                         Go to Settings → Embeddings to pull and register Ollama models
                       </p>
                     )}
@@ -400,7 +400,7 @@ export default function DatasetGenerationPage() {
 
                   <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
                     <p className="text-xs text-muted-foreground">
-                      <strong>Redis Stack</strong> - Fast, scalable vector search with persistent storage
+                      <strong>pgvector</strong> - HNSW vector search inside PostgreSQL, scoped to your account
                     </p>
                   </div>
 
@@ -412,12 +412,12 @@ export default function DatasetGenerationPage() {
                     {embedMutation.isPending ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Embedding to Redis...
+                        Embedding...
                       </>
                     ) : (
                       <>
                         <Database className="w-4 h-4" />
-                        Embed to Redis
+                        Embed dataset
                       </>
                     )}
                   </button>
@@ -568,7 +568,7 @@ export default function DatasetGenerationPage() {
                               ) : (
                                 <>
                                   <Database className="w-4 h-4" />
-                                  Embed to Redis (Create Vectors)
+                                  Embed (create vectors)
                                 </>
                               )}
                             </button>
@@ -606,7 +606,7 @@ export default function DatasetGenerationPage() {
                   </div>
                   <div className="flex items-start gap-2">
                     <ChevronRight className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <span><strong>Click &quot;Embed to Redis&quot;</strong> to create vectors for search</span>
+                    <span><strong>Click &quot;Embed dataset&quot;</strong> to create vectors for search</span>
                   </div>
                 </div>
               </div>
@@ -617,7 +617,7 @@ export default function DatasetGenerationPage() {
 
       {/* Success Toast */}
       {showSuccess && (
-        <div className="fixed bottom-8 right-8 bg-green-600 text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 z-50">
+        <div className="fixed bottom-8 right-8 bg-success text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 z-50">
           <CheckCircle2 className="w-5 h-5" />
           <div>
             <p className="font-medium">Dataset Generated!</p>

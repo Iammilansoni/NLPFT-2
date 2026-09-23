@@ -131,8 +131,8 @@ function ResetPasswordForm() {
       <div className="min-h-screen flex items-center justify-center bg-background p-6">
         <div className="w-full max-w-md">
           <div className="bg-card border rounded-lg p-8 text-center">
-            <div className="w-14 h-14 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-              <AlertCircle className="w-7 h-7 text-red-600 dark:text-red-400" />
+            <div className="w-14 h-14 bg-destructive/10 dark:bg-destructive/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="w-7 h-7 text-destructive dark:text-destructive" />
             </div>
             <h2 className="text-xl font-semibold mb-2">Invalid Reset Link</h2>
             <p className="text-muted-foreground text-sm mb-6">
@@ -165,8 +165,8 @@ function ResetPasswordForm() {
       <div className="min-h-screen flex items-center justify-center bg-background p-6">
         <div className="w-full max-w-md">
           <div className="bg-card border rounded-lg p-8 text-center">
-            <div className="w-14 h-14 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-7 h-7 text-green-600 dark:text-green-400" />
+            <div className="w-14 h-14 bg-success/10 dark:bg-success/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-7 h-7 text-success dark:text-success" />
             </div>
             <h2 className="text-xl font-semibold mb-2">Password Reset!</h2>
             <p className="text-muted-foreground text-sm mb-6">
@@ -204,9 +204,9 @@ function ResetPasswordForm() {
 
           {/* Error message */}
           {error && (
-            <div className="mb-6 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            <div className="mb-6 p-3 bg-destructive/10 dark:bg-destructive/20 border border-destructive/25 dark:border-destructive rounded-md flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-destructive dark:text-destructive flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-destructive dark:text-destructive">{error}</p>
             </div>
           )}
 
@@ -240,8 +240,8 @@ function ResetPasswordForm() {
                   {['At least 8 characters', 'One uppercase letter', 'One lowercase letter', 'One digit'].map((req) => {
                     const isMet = !passwordErrors.includes(req);
                     return (
-                      <div key={req} className={`flex items-center gap-2 text-xs ${isMet ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
-                        <CheckCircle className={`w-3 h-3 ${isMet ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground/50'}`} />
+                      <div key={req} className={`flex items-center gap-2 text-xs ${isMet ? 'text-success dark:text-success' : 'text-muted-foreground'}`}>
+                        <CheckCircle className={`w-3 h-3 ${isMet ? 'text-success dark:text-success' : 'text-muted-foreground/50'}`} />
                         {req}
                       </div>
                     );
@@ -259,7 +259,7 @@ function ResetPasswordForm() {
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={`w-full pl-9 pr-9 py-2.5 bg-background border rounded-md focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all text-sm ${confirmPassword && !passwordsMatch ? 'border-red-500' : 'border-border'
+                  className={`w-full pl-9 pr-9 py-2.5 bg-background border rounded-md focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all text-sm ${confirmPassword && !passwordsMatch ? 'border-destructive' : 'border-border'
                     }`}
                   placeholder="Confirm new password"
                   required
@@ -273,7 +273,7 @@ function ResetPasswordForm() {
                 </button>
               </div>
               {confirmPassword && !passwordsMatch && (
-                <p className="text-xs text-red-600 dark:text-red-400 mt-1">Passwords do not match</p>
+                <p className="text-xs text-destructive dark:text-destructive mt-1">Passwords do not match</p>
               )}
             </div>
 
