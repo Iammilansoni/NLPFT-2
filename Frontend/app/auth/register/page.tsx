@@ -12,6 +12,8 @@ import { AlertCircle, Eye, EyeOff, CheckCircle2, XCircle, Loader2 } from 'lucide
 import { useAuth } from '@/contexts/AuthContext';
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
 
+const GOOGLE_ENABLED = Boolean(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
+
 interface PasswordStrength {
   score: number;
   label: string;
@@ -311,18 +313,23 @@ export default function RegisterPage() {
         </Link>
       </p>
 
-      {/* Divider */}
-      <div className="relative my-8">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-border" />
+      {/* Google sign-in: only when a client id is configured */}
+      {GOOGLE_ENABLED && (
+        <>
+        {/* Divider */}
+        <div className="relative my-8">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-border" />
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-4 bg-background text-muted-foreground">or</span>
+          </div>
         </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-4 bg-background text-muted-foreground">or</span>
-        </div>
-      </div>
 
-      {/* Google Sign-In */}
-      <GoogleSignInButton onError={setError} />
+        {/* Google Sign-In */}
+        <GoogleSignInButton onError={setError} />
+        </>
+      )}
     </div>
   );
 }

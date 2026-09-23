@@ -424,3 +424,16 @@ async def test_missing_required_field_keeps_extracted_values():
     assert res.ok is False and res.degraded is False
     assert res.values == {"email": "a@b.com"}
     assert res.missing_required == ["password"]
+
+
+@pytest.mark.asyncio
+async def test_blank_or_placeholder_values_count_as_missing():
+    """A model filling a required field it has no value for with " " or "N/A"
+    must not pass validation: the field is reported missing instead."""
+    padded = json.dumps({"email": "a@b.com", "password": " "})
+    placeholder = json.dumps({"email": "a@b.com", "password": "N/A"})
+    svc = _svc_with_responses([padded, placeholder])
+    res = await svc.extract("log me in as a@b.com", SCHEMA)
+    assert res.ok is False
+    assert res.values == {"email": "a@b.com"}
+    assert res.missing_required == ["password"]

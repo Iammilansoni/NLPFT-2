@@ -96,6 +96,18 @@ class ExtractionResult:
         }
 
 
+_PLACEHOLDERS = {"", "null", "none", "n/a", "na", "unknown", "not provided", "not specified", "<string>", "string"}
+
+
+def _is_absent(value: Any) -> bool:
+    """True for values that mean "the request did not say"."""
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.strip().lower() in _PLACEHOLDERS
+    return False
+
+
 # ---------------------------------------------------------------------------
 # JSON Schema -> pydantic
 # ---------------------------------------------------------------------------
@@ -362,8 +374,11 @@ class StructuredExtractionService:
                 repair_error = "Output must be a JSON object, not an array or scalar."
                 continue
 
-            # Drop nulls so absent fields do not masquerade as explicit nulls.
-            parsed = {k: v for k, v in parsed.items() if v is not None}
+            # Drop nulls AND blank / placeholder strings so an absent field is
+            # reported as missing instead of passing validation with an invented
+            # value. Small models under a schema constraint tend to fill a
+            # required string they have no value for with " " or "N/A".
+            parsed = {k: v for k, v in parsed.items() if not _is_absent(v)}
             last_parsed = {k: v for k, v in parsed.items() if k in known_keys}
 
             try:
