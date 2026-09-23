@@ -74,8 +74,9 @@ class EnterpriseDatasetGenerator:
     
     PROVIDER PRIORITY:
     1. User's configured LLM provider from database (highest priority)
-    2. Gemini API key from environment (fallback)
-    3. Error if no provider available
+    2. Gemini API key from environment
+    3. Local mode: the stack's Ollama model (also used if Gemini fails)
+    4. Error if none is available
     """
     
     def __init__(self, datasets_dir: str = str(DATASETS_DIR), user_id: Optional[str] = None):
@@ -818,38 +819,51 @@ Return ONLY the JSON array, nothing else."""
             logger.info("Attempting Gemini fallback...")
         
         # Fallback to Gemini
+        local_mode = os.getenv("EXECUTION_MODE", "local").lower() == "local"
+
         if _gemini_available and _gemini_client:
             self.provider = "gemini"
             self.model_name = _gemini_model
-            return await self._call_gemini_api(system_prompt, user_prompt, num_examples)
-
-        # Local mode with nothing configured: use the Ollama model the stack
-        # already runs for extraction, so generation works with zero API keys.
-        if os.getenv("EXECUTION_MODE", "local").lower() == "local":
-            from app.llm.provider_factory import LLMProviderFactory
-            from app.llm.providers.base import LLMConfig
-
-            model = os.getenv("EXTRACTION_MODEL", "llama3.2:3b")
-            local = LLMProviderFactory.create(
-                "ollama", model, base_url=os.getenv("OLLAMA_HOST", "http://localhost:11434"), timeout=600.0
-            )
-            self.provider, self.model_name = "ollama", model
-            logger.info(f"No LLM provider configured; using local Ollama model {model}")
             try:
-                response = await local.generate(
-                    prompt=user_prompt, system_prompt=system_prompt, config=LLMConfig(max_tokens=4096)
-                )
-                return response.content
-            finally:
-                if hasattr(local, "close"):
-                    await local.close()
-        
+                return await self._call_gemini_api(system_prompt, user_prompt, num_examples)
+            except Exception as exc:  # noqa: BLE001
+                if not local_mode:
+                    raise
+                # An expired or invalid key should not make generation unusable
+                # when a local model is running right next to the API.
+                logger.warning(f"Gemini unavailable ({exc}); falling back to the local Ollama model")
+
+        # Local mode with nothing (working) configured: use the Ollama model the
+        # stack already runs for extraction, so generation works with zero keys.
+        if local_mode:
+            return await self._call_local_ollama(system_prompt, user_prompt)
+
         raise ValueError(
             "No LLM provider available. "
             "Please configure a provider in Settings → LLM Providers, "
             "or set GEMINI_API_KEY in your environment for fallback."
         )
     
+    async def _call_local_ollama(self, system_prompt: str, user_prompt: str) -> str:
+        """Generate with the stack's local Ollama model (EXTRACTION_MODEL)."""
+        from app.llm.provider_factory import LLMProviderFactory
+        from app.llm.providers.base import LLMConfig
+
+        model = os.getenv("EXTRACTION_MODEL", "llama3.2:3b")
+        local = LLMProviderFactory.create(
+            "ollama", model, base_url=os.getenv("OLLAMA_HOST", "http://localhost:11434"), timeout=600.0
+        )
+        self.provider, self.model_name = "ollama", model
+        logger.info(f"Generating with local Ollama model {model}")
+        try:
+            response = await local.generate(
+                prompt=user_prompt, system_prompt=system_prompt, config=LLMConfig(max_tokens=4096)
+            )
+            return response.content
+        finally:
+            if hasattr(local, "close"):
+                await local.close()
+
     async def _call_gemini_api(self, system_prompt: str, user_prompt: str, num_examples: int) -> str:
         """
         Call Gemini API as fallback provider.
