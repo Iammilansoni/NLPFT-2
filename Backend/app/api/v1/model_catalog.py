@@ -18,14 +18,12 @@ from app.api.v1.auth import get_current_user
 from app.core.encryption import decrypt_api_key
 from app.core.postgres import get_db
 from app.core.rate_limit import limiter
-from app.llm.model_discovery import (
-    SUPPORTED_PROVIDERS,
-    DiscoveryError,
-    discover_models,
-    provider_label,
-)
+from app.llm.embeddings import EmbeddingError
+from app.llm.model_discovery import SUPPORTED_PROVIDERS, DiscoveryError, discover_models
+from app.llm.provider_registry import provider_label
 from app.models.database_models import LLMProviderConfig, User
 from app.services import model_catalog_service as catalog
+from app.services.model_access import resolve_credential
 
 router = APIRouter(prefix="/model-catalog", tags=["Model Catalogue"])
 
@@ -92,6 +90,14 @@ async def discover(
             except Exception:  # noqa: BLE001
                 return {"ok": False, "error": "The saved API key can't be decrypted. Enter it again.", "error_code": "AUTH", "models": []}
         base_url = base_url or config.base_url
+    elif not api_key:
+        # No key typed: list with whatever this user can already use for the
+        # provider (their saved connection, or a deployment-wide key).
+        try:
+            credential = await resolve_credential(db, current_user.u_id, body.provider)
+            api_key, base_url = credential.api_key, base_url or credential.base_url
+        except EmbeddingError:
+            pass  # public listings work without one; others report NO_KEY below
     try:
         models = await discover_models(body.provider, api_key, base_url)
     except DiscoveryError as exc:

@@ -7,15 +7,18 @@ hand-maintained list that is stale the week after it is written. The model
 catalogue (`app.services.model_catalog_service`) calls this on a schedule and
 when a user saves a connection; the settings UI reads the catalogue.
 
-Every fetcher returns `DiscoveredModel`s with the same shape:
+Providers are described in `provider_registry`; listing is done per wire
+protocol, so every OpenAI-compatible provider shares one lister.
+
+Every lister returns `DiscoveredModel`s with the same shape:
 
     kind        "llm" or "embedding" -- decided from what the provider reports
-                (Ollama capabilities, Gemini supportedGenerationMethods,
-                OpenRouter output modalities), with a name heuristic only for
-                OpenAI-style listings that carry no capability data.
+                (Ollama capabilities, Gemini supportedGenerationMethods, a
+                model `type`, output modalities), with a name heuristic only
+                for listings that carry no capability data.
     dimension   embedding width. Taken from provider metadata when it exists
-                (Ollama reports it); otherwise measured by `probe_dimension`,
-                never guessed from the model name.
+                (Ollama, the built-in ONNX models); otherwise measured by
+                `probe_dimension`, never guessed from the model name.
 
 A failed listing raises `DiscoveryError` with a sentence a user can act on.
 Callers must treat a failure as "we don't know", never as "the provider has no
@@ -37,46 +40,23 @@ from urllib.parse import urlparse
 import httpx
 
 from app.core.logger import logger
+from app.llm import provider_registry as registry
+from app.llm.provider_registry import ProviderSpec, provider_label
 
 REQUEST_TIMEOUT = float(os.getenv("MODEL_DISCOVERY_TIMEOUT", "20"))
-
-# Public endpoints of OpenAI-compatible providers. The LLM provider factory
-# uses the same table, so a provider's chat and listing URLs cannot drift.
-OPENAI_COMPATIBLE_BASE_URLS: Dict[str, str] = {
-    "openai": "https://api.openai.com/v1",
-    "groq": "https://api.groq.com/openai/v1",
-    "openrouter": "https://openrouter.ai/api/v1",
-    "deepseek": "https://api.deepseek.com/v1",
-    "grok": "https://api.x.ai/v1",
-}
-GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
-ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1"
 HUGGINGFACE_HUB_URL = "https://huggingface.co/api"
 
-PROVIDER_LABELS: Dict[str, str] = {
-    "ollama": "Ollama",
-    "google": "Google Gemini",
-    "groq": "Groq",
-    "openrouter": "OpenRouter",
-    "openai": "OpenAI",
-    "anthropic": "Anthropic",
-    "deepseek": "DeepSeek",
-    "grok": "xAI Grok",
-    "huggingface": "Hugging Face",
-    "custom": "Custom endpoint",
-}
-
-# Model families in OpenAI-style listings that cannot answer a text prompt.
-# Only consulted when the provider gives no capability metadata.
+# Model families that cannot answer a text prompt or embed text. Only consulted
+# when the provider gives no capability metadata.
 _NON_TEXT_MARKERS = (
     "whisper", "tts", "transcribe", "audio", "realtime", "dall-e", "image",
     "moderation", "guard", "orpheus", "sora", "playai", "computer-use",
-    "search-preview", "veo", "imagen", "lyria", "native-audio",
+    "search-preview", "veo", "imagen", "lyria", "native-audio", "rerank",
+    "ocr", "flux", "stable-diffusion", "sdxl", "vision-only",
 )
-
-
-def provider_label(provider: str) -> str:
-    return PROVIDER_LABELS.get(provider, provider)
+# Values of a listing's `type` field (Together, Jina, ...).
+_EMBEDDING_TYPES = {"embedding", "embeddings", "text-embedding"}
+_CHAT_TYPES = {"chat", "language", "llm", "text", "code", "completion"}
 
 
 @dataclass
@@ -116,6 +96,23 @@ def _is_text_model(model_id: str) -> bool:
     return not any(marker in lowered for marker in _NON_TEXT_MARKERS)
 
 
+def _classify_entry(entry: Dict[str, Any]) -> Optional[str]:
+    """Kind of one OpenAI-style listing entry, preferring the provider's own metadata."""
+    model_type = str(entry.get("type") or "").lower()
+    if model_type in _EMBEDDING_TYPES:
+        return "embedding"
+    if model_type and model_type not in _CHAT_TYPES:
+        return None  # image, audio, rerank, moderation...
+    outputs = (entry.get("architecture") or {}).get("output_modalities")
+    if outputs:
+        if "embeddings" in outputs:
+            return "embedding"
+        return "llm" if "text" in outputs and _is_text_model(entry["id"]) else None
+    if model_type in _CHAT_TYPES:
+        return "llm" if _is_text_model(entry["id"]) else None
+    return _classify_by_name(entry["id"])
+
+
 async def _get_json(
     client: httpx.AsyncClient,
     provider: str,
@@ -131,23 +128,29 @@ async def _get_json(
         raise DiscoveryError(f"{label} did not answer within {REQUEST_TIMEOUT:.0f}s.", "UNREACHABLE") from exc
     except httpx.HTTPError as exc:
         raise DiscoveryError(f"Couldn't reach {label} at {url}. Check the address and your network.", "UNREACHABLE") from exc
-
-    if response.status_code >= 400:
-        detail = _error_detail(response)
-        # Gemini answers a bad key with 400 "API key not valid", not 401.
-        if response.status_code in (401, 403) or "api key" in detail.lower():
-            raise DiscoveryError(f"{label} rejected the API key. Check that it is correct and still active.", "AUTH")
-        if response.status_code == 429:
-            raise DiscoveryError(f"{label} is rate-limiting requests. The next sync will try again.", "RATE_LIMITED")
-        suffix = f": {detail}" if detail else ""
-        raise DiscoveryError(f"{label} returned HTTP {response.status_code} when listing models{suffix}", "BAD_RESPONSE")
+    raise_for_provider_error(provider, response, "listing models")
     try:
         return response.json()
     except ValueError as exc:
         raise DiscoveryError(f"{label} returned something that isn't JSON when listing models.", "BAD_RESPONSE") from exc
 
 
-def _error_detail(response: httpx.Response) -> str:
+def raise_for_provider_error(provider: str, response: httpx.Response, action: str) -> None:
+    """Turn a provider's HTTP error into a DiscoveryError a user can act on."""
+    if response.status_code < 400:
+        return
+    label = provider_label(provider)
+    detail = error_detail(response)
+    # Gemini answers a bad key with 400 "API key not valid", not 401.
+    if response.status_code in (401, 403) or "api key" in detail.lower():
+        raise DiscoveryError(f"{label} rejected the API key. Check that it is correct and still active.", "AUTH")
+    if response.status_code == 429:
+        raise DiscoveryError(f"{label} is rate-limiting requests. Wait a minute and try again.", "RATE_LIMITED")
+    suffix = f": {detail}" if detail else ""
+    raise DiscoveryError(f"{label} returned HTTP {response.status_code} when {action}{suffix}", "BAD_RESPONSE")
+
+
+def error_detail(response: httpx.Response) -> str:
     """The provider's own error message, when it sends one in the usual shapes."""
     try:
         body = response.json()
@@ -158,18 +161,35 @@ def _error_detail(response: httpx.Response) -> str:
         return str(error.get("message") or "")[:200]
     if isinstance(error, str):
         return error[:200]
-    return str(body.get("message") or "")[:200] if isinstance(body, dict) else ""
+    if isinstance(body, dict):
+        return str(body.get("message") or body.get("detail") or "")[:200]
+    return ""
 
 
-def _require_key(provider: str, api_key: Optional[str]) -> str:
-    if not api_key:
-        raise DiscoveryError(f"{provider_label(provider)} needs an API key to list its models.", "NO_KEY")
+def _require_key(spec: ProviderSpec, api_key: Optional[str]) -> Optional[str]:
+    if spec.list_requires_key and not api_key:
+        raise DiscoveryError(f"{spec.label} needs an API key to list its models.", "NO_KEY")
     return api_key
 
 
+def _bearer(api_key: Optional[str]) -> Optional[Dict[str, str]]:
+    return {"Authorization": f"Bearer {api_key}"} if api_key else None
+
+
+def ollama_base_url(base_url: Optional[str]) -> str:
+    return (base_url or os.getenv("OLLAMA_HOST") or "http://localhost:11434").rstrip("/")
+
+
+def resolved_base_url(spec: ProviderSpec, base_url: Optional[str]) -> str:
+    return (base_url or spec.base_url).rstrip("/")
+
+
 # ---------------------------------------------------------------------------
-# Per-provider fetchers
+# Listers, one per wire protocol
 # ---------------------------------------------------------------------------
+
+_Lister = Callable[[httpx.AsyncClient, ProviderSpec, Optional[str], Optional[str]], Awaitable[List[DiscoveredModel]]]
+
 
 def _ollama_model_id(name: str) -> str:
     # Ollama treats "x" and "x:latest" as the same model; datasets and settings
@@ -177,9 +197,9 @@ def _ollama_model_id(name: str) -> str:
     return name[: -len(":latest")] if name.endswith(":latest") else name
 
 
-async def _discover_ollama(client: httpx.AsyncClient, api_key: Optional[str], base_url: Optional[str]) -> List[DiscoveredModel]:
-    base = (base_url or os.getenv("OLLAMA_HOST") or "http://localhost:11434").rstrip("/")
-    tags = await _get_json(client, "ollama", f"{base}/api/tags")
+async def _list_ollama(client: httpx.AsyncClient, spec: ProviderSpec, api_key: Optional[str], base_url: Optional[str]) -> List[DiscoveredModel]:
+    base = ollama_base_url(base_url)
+    tags = await _get_json(client, spec.id, f"{base}/api/tags")
 
     async def describe(entry: Dict[str, Any]) -> Optional[DiscoveredModel]:
         name = entry.get("name") or entry.get("model")
@@ -234,15 +254,44 @@ async def _discover_ollama(client: httpx.AsyncClient, api_key: Optional[str], ba
     return [m for m in described if m]
 
 
-async def _discover_gemini(client: httpx.AsyncClient, api_key: Optional[str], base_url: Optional[str]) -> List[DiscoveredModel]:
-    key = _require_key("google", api_key)
+async def _list_builtin(client: httpx.AsyncClient, spec: ProviderSpec, api_key: Optional[str], base_url: Optional[str]) -> List[DiscoveredModel]:
+    """The ONNX models the installed fastembed release can run, with their exact widths."""
+    def supported() -> List[Dict[str, Any]]:
+        from fastembed import TextEmbedding
+
+        return TextEmbedding.list_supported_models()
+
+    try:
+        entries = await asyncio.to_thread(supported)
+    except ImportError as exc:
+        raise DiscoveryError("Built-in models need the fastembed package, which this image does not include.", "UNSUPPORTED") from exc
+    models = []
+    for entry in entries:
+        size = entry.get("size_in_GB")
+        models.append(DiscoveredModel(
+            model_id=entry["model"],
+            kind="embedding",
+            display_name=entry["model"].split("/")[-1],
+            description=" · ".join(
+                part for part in ((entry.get("description") or "")[:200], f"{size:.2f} GB download" if size else None) if part
+            ),
+            dimension=int(entry["dim"]) if entry.get("dim") else None,
+            is_local=True,
+            is_free=True,
+            metadata={"license": entry.get("license")},
+        ))
+    return models
+
+
+async def _list_gemini(client: httpx.AsyncClient, spec: ProviderSpec, api_key: Optional[str], base_url: Optional[str]) -> List[DiscoveredModel]:
+    key = _require_key(spec, api_key)
     models: List[DiscoveredModel] = []
     page_token: Optional[str] = None
     while True:
         params: Dict[str, Any] = {"pageSize": 1000}
         if page_token:
             params["pageToken"] = page_token
-        data = await _get_json(client, "google", f"{GEMINI_BASE_URL}/models", headers={"x-goog-api-key": key}, params=params)
+        data = await _get_json(client, spec.id, f"{spec.base_url}/models", headers={"x-goog-api-key": key}, params=params)
         for entry in data.get("models", []):
             model_id = entry.get("name", "").removeprefix("models/")
             methods = entry.get("supportedGenerationMethods") or []
@@ -285,23 +334,22 @@ def _openrouter_entry(entry: Dict[str, Any], kind: str) -> DiscoveredModel:
     )
 
 
-async def _discover_openrouter(client: httpx.AsyncClient, api_key: Optional[str], base_url: Optional[str]) -> List[DiscoveredModel]:
-    # The listing is public; a key is only needed later to measure embedding
-    # dimensions and to generate.
-    base = (base_url or OPENAI_COMPATIBLE_BASE_URLS["openrouter"]).rstrip("/")
-    headers = {"Authorization": f"Bearer {api_key}"} if api_key else None
+async def _list_openrouter(client: httpx.AsyncClient, spec: ProviderSpec, api_key: Optional[str], base_url: Optional[str]) -> List[DiscoveredModel]:
+    # The listing is public; a key is only needed to generate and embed.
+    base = resolved_base_url(spec, None)
+    headers = _bearer(api_key)
     if api_key:
         # The listing ignores the key, so check it separately: a typo should
         # surface when the connection is set up, not on the first generation.
-        await _get_json(client, "openrouter", f"{base}/key", headers=headers)
-    chat = await _get_json(client, "openrouter", f"{base}/models", headers=headers)
+        await _get_json(client, spec.id, f"{base}/key", headers=headers)
+    chat = await _get_json(client, spec.id, f"{base}/models", headers=headers)
     models = [
         _openrouter_entry(e, "llm")
         for e in chat.get("data", [])
         if e.get("id") and "text" in ((e.get("architecture") or {}).get("output_modalities") or ["text"])
     ]
     try:
-        embeddings = await _get_json(client, "openrouter", f"{base}/embeddings/models", headers=headers)
+        embeddings = await _get_json(client, spec.id, f"{base}/embeddings/models", headers=headers)
         models += [_openrouter_entry(e, "embedding") for e in embeddings.get("data", []) if e.get("id")]
     except DiscoveryError as exc:
         # Chat models are the core listing; a missing embeddings listing must
@@ -310,43 +358,42 @@ async def _discover_openrouter(client: httpx.AsyncClient, api_key: Optional[str]
     return models
 
 
-async def _discover_openai_compatible(
-    provider: str, client: httpx.AsyncClient, api_key: Optional[str], base_url: Optional[str]
-) -> List[DiscoveredModel]:
-    base = (base_url or OPENAI_COMPATIBLE_BASE_URLS.get(provider, "")).rstrip("/")
+async def _list_openai_compatible(client: httpx.AsyncClient, spec: ProviderSpec, api_key: Optional[str], base_url: Optional[str]) -> List[DiscoveredModel]:
+    if spec.id == "openrouter":
+        return await _list_openrouter(client, spec, api_key, base_url)
+    base = resolved_base_url(spec, base_url)
     if not base:
-        raise DiscoveryError("A custom endpoint needs a base URL before its models can be listed.", "NO_KEY")
-    headers = {"Authorization": f"Bearer {api_key}"} if api_key else None
-    if provider != "custom":
-        _require_key(provider, api_key)
-    data = await _get_json(client, provider, f"{base}/models", headers=headers)
+        raise DiscoveryError(f"{spec.label} needs a server URL before its models can be listed.", "NO_KEY")
+    _require_key(spec, api_key)
+    data = await _get_json(client, spec.id, f"{base}/models", headers=_bearer(api_key))
+    entries = data if isinstance(data, list) else data.get("data", [])  # Together returns a bare list
     models: List[DiscoveredModel] = []
-    for entry in data.get("data", []):
-        model_id = entry.get("id")
+    for entry in entries:
+        model_id = entry.get("id") if isinstance(entry, dict) else None
         if not model_id or entry.get("active") is False:
             continue
-        kind = _classify_by_name(model_id)
+        kind = _classify_entry(entry)
         if kind is None:
             continue
+        owner = entry.get("owned_by") or entry.get("organization")
         models.append(DiscoveredModel(
             model_id=model_id,
             kind=kind,
-            display_name=entry.get("name") or model_id,
-            description=f"by {entry['owned_by']}" if entry.get("owned_by") else "",
+            display_name=entry.get("display_name") or entry.get("name") or model_id,
+            description=f"by {owner}" if owner else "",
             context_tokens=entry.get("context_window") or entry.get("context_length"),
-            metadata={"owned_by": entry.get("owned_by")},
+            metadata={"owned_by": owner},
         ))
     return models
 
 
-async def _discover_anthropic(client: httpx.AsyncClient, api_key: Optional[str], base_url: Optional[str]) -> List[DiscoveredModel]:
-    key = _require_key("anthropic", api_key)
+async def _list_anthropic(client: httpx.AsyncClient, spec: ProviderSpec, api_key: Optional[str], base_url: Optional[str]) -> List[DiscoveredModel]:
+    key = _require_key(spec, api_key)
     headers = {"x-api-key": key, "anthropic-version": "2023-06-01"}
-    base = (base_url or ANTHROPIC_BASE_URL).rstrip("/")
     models: List[DiscoveredModel] = []
     params: Dict[str, Any] = {"limit": 1000}
     while True:
-        data = await _get_json(client, "anthropic", f"{base}/models", headers=headers, params=params)
+        data = await _get_json(client, spec.id, f"{spec.base_url}/models", headers=headers, params=params)
         for entry in data.get("data", []):
             if entry.get("id"):
                 models.append(DiscoveredModel(
@@ -357,14 +404,13 @@ async def _discover_anthropic(client: httpx.AsyncClient, api_key: Optional[str],
         params["after_id"] = data.get("last_id")
 
 
-async def _discover_huggingface(client: httpx.AsyncClient, api_key: Optional[str], base_url: Optional[str]) -> List[DiscoveredModel]:
+async def _list_huggingface(client: httpx.AsyncClient, spec: ProviderSpec, api_key: Optional[str], base_url: Optional[str]) -> List[DiscoveredModel]:
     # The Hub hosts millions of models; list the ones an inference provider
-    # is actually serving, most popular first.
-    headers = {"Authorization": f"Bearer {api_key}"} if api_key else None
+    # is actually serving, most downloaded first.
     models: List[DiscoveredModel] = []
     for tag, kind in (("text-generation", "llm"), ("feature-extraction", "embedding")):
         data = await _get_json(
-            client, "huggingface", f"{HUGGINGFACE_HUB_URL}/models", headers=headers,
+            client, spec.id, f"{HUGGINGFACE_HUB_URL}/models", headers=_bearer(api_key),
             params={"pipeline_tag": tag, "inference_provider": "all", "sort": "downloads", "limit": 100},
         )
         models += [
@@ -374,38 +420,33 @@ async def _discover_huggingface(client: httpx.AsyncClient, api_key: Optional[str
     return models
 
 
-_Fetcher = Callable[[httpx.AsyncClient, Optional[str], Optional[str]], Awaitable[List[DiscoveredModel]]]
-
-_FETCHERS: Dict[str, _Fetcher] = {
-    "ollama": _discover_ollama,
-    "google": _discover_gemini,
-    "openrouter": _discover_openrouter,
-    "anthropic": _discover_anthropic,
-    "huggingface": _discover_huggingface,
-    **{
-        p: (lambda client, key, url, _p=p: _discover_openai_compatible(_p, client, key, url))
-        for p in ("openai", "groq", "deepseek", "grok", "custom")
-    },
+_LISTERS: Dict[str, _Lister] = {
+    registry.OLLAMA: _list_ollama,
+    registry.BUILTIN: _list_builtin,
+    registry.GEMINI: _list_gemini,
+    registry.OPENAI: _list_openai_compatible,
+    registry.XAI: _list_openai_compatible,
+    registry.CUSTOM: _list_openai_compatible,
+    registry.ANTHROPIC: _list_anthropic,
+    registry.HUGGINGFACE: _list_huggingface,
 }
 
-SUPPORTED_PROVIDERS = tuple(_FETCHERS)
+SUPPORTED_PROVIDERS = tuple(p.id for p in registry.PROVIDERS)
 
 
-_CUSTOM_BASE_URL_PROVIDERS = ("ollama", "custom")
-
-
-def _check_base_url(provider: str, base_url: Optional[str]) -> Optional[str]:
+def check_base_url(provider: str, base_url: Optional[str]) -> Optional[str]:
     """
     Hosted providers always use their public endpoint; only self-hosted ones
-    take a user-supplied URL. Private addresses stay allowed (a local LLM
+    take a user-supplied URL. Private addresses stay allowed (a local model
     server is the point of "custom"), but link-local ones never are: that range
-    holds cloud metadata services, which a listing request must not reach.
+    holds cloud metadata services, which the server must not be made to call.
     """
-    if not base_url or provider not in _CUSTOM_BASE_URL_PROVIDERS:
+    spec = registry.get_provider(provider)
+    if not base_url or spec is None or not spec.custom_base_url:
         return None
     parsed = urlparse(base_url)
     if parsed.scheme not in ("http", "https") or not parsed.hostname:
-        raise DiscoveryError("The base URL must start with http:// or https://.", "BAD_RESPONSE")
+        raise DiscoveryError("The server URL must start with http:// or https://.", "BAD_RESPONSE")
     try:
         address = ipaddress.ip_address(socket.gethostbyname(parsed.hostname))
     except (socket.gaierror, ValueError) as exc:
@@ -415,24 +456,24 @@ def _check_base_url(provider: str, base_url: Optional[str]) -> Optional[str]:
     return base_url
 
 
+# Kept for callers and tests that use the original name.
+_check_base_url = check_base_url
+
+
 async def discover_models(provider: str, api_key: Optional[str] = None, base_url: Optional[str] = None) -> List[DiscoveredModel]:
     """List the models `provider` serves for this credential. Raises DiscoveryError."""
-    fetcher = _FETCHERS.get(provider)
-    if fetcher is None:
+    spec = registry.get_provider(provider)
+    if spec is None:
         raise DiscoveryError(f"Listing models is not supported for '{provider}'.", "UNSUPPORTED")
-    base_url = await asyncio.to_thread(_check_base_url, provider, base_url)
+    base_url = await asyncio.to_thread(check_base_url, provider, base_url)
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-        models = await fetcher(client, api_key, base_url)
+        models = await _LISTERS[spec.api](client, spec, api_key, base_url)
     # A provider listing the same id twice (OpenRouter chat + embeddings) keeps the first.
     unique: Dict[str, DiscoveredModel] = {}
     for model in models:
         unique.setdefault(model.model_id, model)
     return list(unique.values())
 
-
-# ---------------------------------------------------------------------------
-# Dimension probing
-# ---------------------------------------------------------------------------
 
 async def probe_dimension(provider: str, model_id: str, api_key: Optional[str], base_url: Optional[str] = None) -> Optional[int]:
     """
@@ -441,40 +482,11 @@ async def probe_dimension(provider: str, model_id: str, api_key: Optional[str], 
     Returns None when it cannot be measured (no key, provider error). The
     catalogue then shows the dimension as unknown rather than inventing one.
     """
-    probe_text = "dimension probe"
+    from app.llm.embeddings import EmbeddingError, embed_texts
+
     try:
-        base_url = await asyncio.to_thread(_check_base_url, provider, base_url)
-    except DiscoveryError:
+        vectors = await embed_texts(provider, model_id, ["dimension probe"], api_key=api_key, base_url=base_url)
+    except EmbeddingError as exc:
+        logger.warning(f"Could not measure dimension of {provider}/{model_id}: {exc.message}")
         return None
-    try:
-        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-            if provider == "ollama":
-                base = (base_url or os.getenv("OLLAMA_HOST") or "http://localhost:11434").rstrip("/")
-                response = await client.post(f"{base}/api/embed", json={"model": model_id, "input": probe_text})
-                vectors = response.json().get("embeddings") or []
-                return len(vectors[0]) if vectors else None
-            if provider == "google":
-                if not api_key:
-                    return None
-                response = await client.post(
-                    f"{GEMINI_BASE_URL}/models/{model_id}:embedContent",
-                    headers={"x-goog-api-key": api_key},
-                    json={"content": {"parts": [{"text": probe_text}]}},
-                )
-                values = (response.json().get("embedding") or {}).get("values") or []
-                return len(values) or None
-            base = (base_url or OPENAI_COMPATIBLE_BASE_URLS.get(provider, "")).rstrip("/")
-            if not base or not api_key:
-                return None
-            response = await client.post(
-                f"{base}/embeddings",
-                headers={"Authorization": f"Bearer {api_key}"},
-                json={"model": model_id, "input": probe_text},
-            )
-            data = response.json().get("data") or []
-            if not data:
-                return None
-            return len(data[0].get("embedding") or []) or None
-    except (httpx.HTTPError, ValueError, KeyError, IndexError) as exc:
-        logger.warning(f"Could not measure dimension of {provider}/{model_id}: {exc}")
-        return None
+    return len(vectors[0]) if vectors and vectors[0] else None

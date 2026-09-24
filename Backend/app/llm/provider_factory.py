@@ -18,16 +18,12 @@ Usage:
     )
 """
 
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, List, Optional, Type
 
 from app.core.logger import logger
-from app.llm.model_discovery import OPENAI_COMPATIBLE_BASE_URLS
+from app.llm import provider_registry as registry
 from app.llm.providers.anthropic_provider import AnthropicProvider
-from app.llm.providers.base import (
-    BaseLLMProvider,
-    ProviderError,
-    ProviderType,
-)
+from app.llm.providers.base import BaseLLMProvider, ProviderError
 from app.llm.providers.custom_provider import CustomHTTPProvider
 from app.llm.providers.google_provider import GoogleProvider
 from app.llm.providers.grok_provider import GrokProvider
@@ -35,27 +31,17 @@ from app.llm.providers.huggingface_provider import HuggingFaceProvider
 from app.llm.providers.ollama_provider import OllamaLLMProvider
 from app.llm.providers.openai_provider import OpenAIProvider
 
-# =============================================================================
-# PROVIDER REGISTRY
-# =============================================================================
-
-PROVIDER_CLASSES: Dict[ProviderType, Type[BaseLLMProvider]] = {
-    ProviderType.OPENAI: OpenAIProvider,
-    ProviderType.GOOGLE: GoogleProvider,
-    ProviderType.OLLAMA: OllamaLLMProvider,
-    ProviderType.GROK: GrokProvider,  # xAI Grok
-    ProviderType.DEEPSEEK: OpenAIProvider,  # DeepSeek uses OpenAI-compatible API
-    ProviderType.GROQ: OpenAIProvider,  # Groq uses OpenAI-compatible API
-    ProviderType.OPENROUTER: OpenAIProvider,  # OpenRouter uses OpenAI-compatible API
-    ProviderType.ANTHROPIC: AnthropicProvider,  # Anthropic Claude
-    ProviderType.HUGGINGFACE: HuggingFaceProvider,  # HuggingFace Inference
-    ProviderType.CUSTOM: CustomHTTPProvider,  # Custom HTTP endpoints
-}
-
-# Default base URLs for providers using OpenAI-compatible API
-COMPATIBLE_BASE_URLS: Dict[ProviderType, str] = {
-    ptype: OPENAI_COMPATIBLE_BASE_URLS[ptype.value]
-    for ptype in (ProviderType.DEEPSEEK, ProviderType.GROQ, ProviderType.OPENROUTER)
+# Chat class per wire protocol. Every OpenAI-compatible provider in the
+# registry (Groq, OpenRouter, Mistral, Together, ...) shares OpenAIProvider and
+# differs only by its registry base URL.
+CHAT_CLASSES: Dict[str, Type[BaseLLMProvider]] = {
+    registry.OPENAI: OpenAIProvider,
+    registry.GEMINI: GoogleProvider,
+    registry.OLLAMA: OllamaLLMProvider,
+    registry.XAI: GrokProvider,
+    registry.ANTHROPIC: AnthropicProvider,
+    registry.HUGGINGFACE: HuggingFaceProvider,
+    registry.CUSTOM: CustomHTTPProvider,
 }
 
 
@@ -102,28 +88,23 @@ class LLMProviderFactory:
         Raises:
             ProviderError: If provider type is unsupported
         """
-        # Parse provider type
-        try:
-            ptype = ProviderType(provider_type.lower())
-        except ValueError:
-            raise ProviderError(
-                f"Unsupported provider type: '{provider_type}'. "
-                f"Supported: {[p.value for p in PROVIDER_CLASSES.keys()]}"
-            )
-        
-        # Get provider class
-        provider_class = PROVIDER_CLASSES.get(ptype)
-        if not provider_class:
-            raise ProviderError(f"Provider not implemented: {ptype.value}")
-        
-        # Handle OpenAI-compatible providers with custom base URLs
-        if ptype in COMPATIBLE_BASE_URLS and not base_url:
-            base_url = COMPATIBLE_BASE_URLS[ptype]
-        
-        # Create provider instance
-        logger.info(f"Creating {ptype.value} provider with model: {model}")
-        
-        provider = provider_class(
+        spec = registry.get_provider(provider_type.lower())
+        if spec is None or not spec.chat or spec.api not in CHAT_CLASSES:
+            chat_ids = [p.id for p in registry.PROVIDERS if p.chat]
+            raise ProviderError(f"'{provider_type}' is not a chat provider. Supported: {chat_ids}")
+
+        # Only self-hosted providers (Ollama, custom) take a user-supplied URL.
+        # OpenAI-compatible hosts use their registry endpoint; Gemini, Anthropic
+        # and Hugging Face classes already know theirs.
+        if spec.custom_base_url:
+            base_url = base_url or None
+        elif spec.api in (registry.OPENAI, registry.XAI):
+            base_url = spec.base_url
+        else:
+            base_url = None
+
+        logger.info(f"Creating {spec.id} provider with model: {model}")
+        provider = CHAT_CLASSES[spec.api](
             model=model,
             api_key=api_key,
             base_url=base_url,
@@ -131,9 +112,9 @@ class LLMProviderFactory:
             max_retries=max_retries,
             **kwargs,
         )
-        provider._catalog_provider = ptype.value
+        provider._catalog_provider = spec.id
         return provider
-    
+
     @classmethod
     def create_from_db_config(
         cls,
@@ -187,94 +168,14 @@ class LLMProviderFactory:
         )
     
     @classmethod
-    def get_supported_providers(cls) -> Dict[str, Dict[str, Any]]:
-        """
-        Get information about supported providers.
-        
-        Returns:
-            Dictionary of provider info
-        """
-        return {
-            ProviderType.OPENAI.value: {
-                "name": "OpenAI",
-                "description": "GPT-5.x, o3/o4 Reasoning, GPT-4.1, GPT-4o, Open-Weight OSS",
-                "requires_api_key": True,
-                "supports_custom_base_url": True,
-                "implemented": True,
-            },
-            ProviderType.GOOGLE.value: {
-                "name": "Google Gemini",
-                "description": "Gemini 3.0, 2.5 Pro/Flash, 2.0 Flash, 1.5 series",
-                "requires_api_key": True,
-                "supports_custom_base_url": False,
-                "implemented": True,
-            },
-            ProviderType.GROK.value: {
-                "name": "xAI Grok",
-                "description": "Grok 4/3 models from xAI with reasoning and vision capabilities",
-                "requires_api_key": True,
-                "supports_custom_base_url": False,
-                "implemented": True,
-            },
-            ProviderType.GROQ.value: {
-                "name": "Groq",
-                "description": "Open-weight models (Llama, Qwen, GPT-OSS) on Groq's fast inference hardware",
-                "requires_api_key": True,
-                "supports_custom_base_url": False,
-                "implemented": True,
-            },
-            ProviderType.OPENROUTER.value: {
-                "name": "OpenRouter",
-                "description": "One key for hundreds of models from every major lab, including free ones",
-                "requires_api_key": True,
-                "supports_custom_base_url": False,
-                "implemented": True,
-            },
-            ProviderType.OLLAMA.value: {
-                "name": "Ollama",
-                "description": "Local LLMs (Llama, Mistral, Qwen, DeepSeek, etc.)",
-                "requires_api_key": False,
-                "supports_custom_base_url": True,
-                "implemented": True,
-            },
-            ProviderType.DEEPSEEK.value: {
-                "name": "DeepSeek",
-                "description": "DeepSeek Chat, Coder, and R1 Reasoning models",
-                "requires_api_key": True,
-                "supports_custom_base_url": True,
-                "implemented": True,
-            },
-            ProviderType.ANTHROPIC.value: {
-                "name": "Anthropic Claude",
-                "description": "Claude 4 Opus/Sonnet, Claude 3.5 Sonnet/Haiku, Claude 3 Opus",
-                "requires_api_key": True,
-                "supports_custom_base_url": False,
-                "implemented": True,
-            },
-            ProviderType.HUGGINGFACE.value: {
-                "name": "HuggingFace",
-                "description": "Inference API and custom endpoints",
-                "requires_api_key": True,
-                "supports_custom_base_url": True,
-                "implemented": True,
-            },
-            ProviderType.CUSTOM.value: {
-                "name": "Custom HTTP",
-                "description": "Custom HTTP endpoints with configurable request/response format",
-                "requires_api_key": False,
-                "supports_custom_base_url": True,
-                "implemented": True,
-            },
-        }
-    
+    def get_supported_providers(cls) -> List[Dict[str, Any]]:
+        """Every provider in the registry, in display order, for the settings UI."""
+        return [spec.public_dict() for spec in registry.PROVIDERS]
+
     @classmethod
     def is_provider_implemented(cls, provider_type: str) -> bool:
-        """Check if a provider is implemented"""
-        try:
-            ptype = ProviderType(provider_type.lower())
-            return ptype in PROVIDER_CLASSES
-        except ValueError:
-            return False
+        """True for any registry provider a connection can be saved for."""
+        return registry.get_provider(provider_type.lower()) is not None
 
 
 # =============================================================================

@@ -166,20 +166,16 @@ class OnnxEmbedder(Embedder):
 
 
 class OllamaEmbedder(Embedder):
-    """Local-mode embedder, reusing the app's own Ollama service."""
+    """Local-mode embedder, through the app's own embedding client."""
 
     def __init__(self, model: str = "nomic-embed-text") -> None:
-        from app.services.ollama_embedding_service import get_ollama_service
-
         self.name = f"ollama:{model}"
         self.model = model
-        self._svc = get_ollama_service()
 
     def encode(self, texts: Sequence[str]) -> np.ndarray:
-        async def _run() -> List[List[float]]:
-            return await self._svc.generate_embeddings_batch(self.model, list(texts))
+        from app.llm.embeddings import embed_texts
 
-        vecs = np.array(asyncio.run(_run()), dtype=np.float32)
+        vecs = np.array(asyncio.run(embed_texts("ollama", self.model, list(texts))), dtype=np.float32)
         self.dim = vecs.shape[1]
         norms = np.linalg.norm(vecs, axis=1, keepdims=True)
         return vecs / np.clip(norms, 1e-9, None)

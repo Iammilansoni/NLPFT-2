@@ -55,6 +55,8 @@ export interface StatsResponse {
   total_intents: number
   unique_apis: number
   model: string
+  /** The embedding model the current user searches with. */
+  embedding?: { provider_label: string; model_id: string; dimension: number; is_default: boolean; label: string }
   index_name: string
   total_runs: number
   success_rate: number

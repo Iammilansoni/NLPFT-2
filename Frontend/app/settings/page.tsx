@@ -32,6 +32,7 @@ import {
   Plus,
   Layers,
   Boxes,
+  Workflow,
   Eye,
   EyeOff,
   Settings2,
@@ -45,7 +46,6 @@ import { cn } from '@/lib/utils'
 import { apiClient } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import authService from '@/lib/auth'
-import { DEFAULT_EMBEDDING_MODEL, formatModelName } from '@/lib/constants/embedding-models'
 import {
   Dialog,
   DialogContent,
@@ -58,6 +58,7 @@ import { OnboardingTour } from '@/components/onboarding/OnboardingTour'
 import { LLMProviderSettings } from '@/components/settings/LLMProviderSettings'
 import { RuntimeInfoPanel } from '@/components/settings/RuntimeInfoPanel'
 import { ModelCatalogPanel } from '@/components/settings/ModelCatalogPanel'
+import { EmbeddingSettings } from '@/components/settings/EmbeddingSettings'
 import { PageHeader } from '@/components/ui/page-header'
 
 // ============================================================================
@@ -68,8 +69,9 @@ const NAV_ITEMS = [
   { id: 'profile', label: 'Profile', icon: UserCircle, description: 'Manage your account information', color: 'from-info to-primary' },
   { id: 'security', label: 'Security', icon: Shield, description: 'Password, 2FA, and sessions', color: 'from-success to-success' },
   { id: 'llm-providers', label: 'AI Providers', icon: Sparkles, description: 'Configure LLM integrations', color: 'from-primary to-brand-2' },
+  { id: 'embeddings', label: 'Embedding model', icon: Layers, description: 'How requests become vectors', color: 'from-success to-info' },
   { id: 'catalogue', label: 'Model catalogue', icon: Boxes, description: 'Every model your providers serve', color: 'from-info to-primary' },
-  { id: 'models', label: 'Pipeline', icon: Layers, description: 'How queries are routed', color: 'from-warning to-warning' },
+  { id: 'models', label: 'Pipeline', icon: Workflow, description: 'How queries are routed', color: 'from-warning to-warning' },
 ] as const
 
 type TabValue = typeof NAV_ITEMS[number]['id']
@@ -178,98 +180,6 @@ const SettingRow = ({ icon: Icon, title, description, children, iconColor = "tex
 )
 
 // ============================================================================
-// MODEL SELECTION CARD (Dynamic from API)
-// ============================================================================
-
-interface RegisteredModel {
-  name: string
-  display_name: string
-  dimension: number | null
-  size?: string
-  is_registered: boolean
-  is_local: boolean
-}
-
-interface ModelCardProps {
-  model: RegisteredModel
-  isSelected: boolean
-  isCurrentlyActive: boolean
-  onSelect: () => void
-}
-
-const ModelCard = ({ model, isSelected, isCurrentlyActive, onSelect }: ModelCardProps) => {
-  return (
-    <button
-      onClick={onSelect}
-      className={cn(
-        "relative w-full text-left rounded-2xl border p-5 group",
-        "bg-card/60 backdrop-blur-sm",
-        "transition-all duration-300 ease-out",
-        "hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5",
-        "active:scale-[0.995]",
-        isSelected
-          ? "border-primary bg-gradient-to-br from-primary/10 via-primary/5 to-transparent ring-2 ring-primary/30 shadow-lg shadow-primary/10"
-          : "border-border/40 hover:border-border/60"
-      )}
-    >
-      {isSelected && (
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent rounded-2xl" />
-      )}
-
-      <div className="relative flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4 flex-1 min-w-0">
-          {/* Model Icon */}
-          <div className={cn(
-            "p-3 rounded-xl transition-all duration-300",
-            isSelected 
-              ? "bg-primary/20 ring-2 ring-primary/20" 
-              : "bg-muted/50 group-hover:bg-muted/80"
-          )}>
-            <Database className={cn(
-              "h-5 w-5 transition-colors",
-              isSelected ? "text-primary" : "text-muted-foreground"
-            )} />
-          </div>
-
-          {/* Model Info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h3 className="text-base font-semibold text-foreground truncate">
-                {model.display_name || formatModelName(model.name)}
-              </h3>
-              {model.dimension && (
-                <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-muted/80 text-muted-foreground border border-border/50">
-                  {model.dimension}D
-                </span>
-              )}
-              {isCurrentlyActive && !isSelected && (
-                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-success/10 text-success border border-success/20 flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3" />
-                  Active
-                </span>
-              )}
-            </div>
-            {model.size && (
-              <p className="text-xs text-muted-foreground mt-1">{model.size}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Selection indicator */}
-        <div className={cn(
-          "flex-shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all duration-300",
-          isSelected
-            ? "border-primary bg-primary shadow-lg shadow-primary/30"
-            : "border-muted-foreground/20 group-hover:border-muted-foreground/40"
-        )}>
-          {isSelected && <Check className="h-3.5 w-3.5 text-primary-foreground" strokeWidth={3} />}
-        </div>
-      </div>
-    </button>
-  )
-}
-
-// ============================================================================
 // NAVIGATION ITEM COMPONENT
 // ============================================================================
 
@@ -332,7 +242,6 @@ const NavItem = ({ item, isActive, onClick }: NavItemProps) => {
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabValue>('profile')
-  const [selectedModel, setSelectedModel] = useState('')
   const queryClient = useQueryClient()
   const { user, isLoading: authLoading } = useAuth()
 
@@ -356,12 +265,6 @@ export default function SettingsPage() {
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
-  // Model change confirmation dialog state
-  const [isModelConfirmDialogOpen, setIsModelConfirmDialogOpen] = useState(false)
-  
-  // Ollama health status
-  const [ollamaStatus, setOllamaStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking')
-  
   // Security alerts state - initialize from localStorage
   const [securityAlertsEnabled, setSecurityAlertsEnabled] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -371,19 +274,11 @@ export default function SettingsPage() {
     return true
   })
   
-  const [reembeddingImpact, setReembeddingImpact] = useState<{
-    impact: 'none' | 'low' | 'medium' | 'high';
-    message: string;
-    affected_datasets: Array<{
-      dataset_id: string;
-      name: string;
-      embedding_count: number;
-      embedding_model: string;
-    }>;
-    reembedding_required: boolean;
-    total_embeddings_affected?: number;
-  } | null>(null)
-  const [isLoadingImpact, setIsLoadingImpact] = useState(false)
+  // Deep links such as /settings?tab=embeddings open that tab.
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab')
+    if (tab && NAV_ITEMS.some(item => item.id === tab)) setActiveTab(tab as TabValue)
+  }, [])
 
   // Update form when user loads
   useEffect(() => {
@@ -394,27 +289,6 @@ export default function SettingsPage() {
       })
     }
   }, [user])
-
-  // Check Ollama health status
-  useEffect(() => {
-    const checkOllamaHealth = async () => {
-      setOllamaStatus('checking')
-      try {
-        // Check Ollama directly via the backend's embedding models endpoint
-        // This indirectly verifies Ollama is running since it queries Ollama
-        const response = await apiClient.listEmbeddingModels()
-        // If we get a response with models data, Ollama is likely connected
-        setOllamaStatus(response?.models ? 'connected' : 'disconnected')
-      } catch (error) {
-        setOllamaStatus('disconnected')
-      }
-    }
-    
-    checkOllamaHealth()
-    // Re-check every 30 seconds
-    const interval = setInterval(checkOllamaHealth, 30000)
-    return () => clearInterval(interval)
-  }, [])
 
   // Handle password change
   const handlePasswordChange = async () => {
@@ -475,100 +349,6 @@ export default function SettingsPage() {
       setIsPasswordChanging(false)
     }
   }
-
-  // Fetch user settings
-  const { data: settings, isLoading: settingsLoading } = useQuery({
-    queryKey: ['userSettings'],
-    queryFn: () => apiClient.getUserSettings(),
-  })
-
-  // Fetch registered embedding models from API
-  const { data: embeddingModelsData, isLoading: embeddingModelsLoading, refetch: refetchEmbeddingModels } = useQuery({
-    queryKey: ['embedding-models-available'],
-    queryFn: () => apiClient.listEmbeddingModels(),
-    staleTime: 60000,
-  })
-
-  // Get only registered models for selection
-  const registeredModels = (embeddingModelsData?.models || []).filter(m => m.is_registered)
-
-  // Update selected model when settings load
-  useEffect(() => {
-    if (settings?.default_embedding_model) {
-      setSelectedModel(settings.default_embedding_model)
-    } else {
-      setSelectedModel(DEFAULT_EMBEDDING_MODEL)
-    }
-  }, [settings])
-
-  // Find current model info from API data
-  const getModelInfo = (modelName: string) => {
-    return registeredModels.find(m => m.name === modelName)
-  }
-
-  // Mutation to update settings
-  const updateSettingsMutation = useMutation({
-    mutationFn: (data: { default_embedding_model?: string; embedding_dimension?: number }) =>
-      apiClient.updateUserSettings(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['userSettings'] })
-      const modelInfo = getModelInfo(selectedModel)
-      toast({
-        title: "Settings Saved",
-        description: `Default model updated to ${modelInfo?.display_name || formatModelName(selectedModel)}`,
-      })
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Update Failed",
-        description: error?.detail || "Failed to update settings",
-        variant: "destructive",
-      })
-    },
-  })
-
-  const handleSaveModel = async () => {
-    const model = getModelInfo(selectedModel)
-    if (!model || !model.dimension) {
-      toast({
-        title: "Invalid Model",
-        description: "Please select a registered model with known dimensions",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (settings?.default_embedding_model && settings.default_embedding_model !== selectedModel) {
-      setIsLoadingImpact(true)
-      try {
-        setReembeddingImpact(null)
-      } catch (error) {
-        console.error('Failed to check re-embedding impact:', error)
-        setReembeddingImpact(null)
-      } finally {
-        setIsLoadingImpact(false)
-      }
-      setIsModelConfirmDialogOpen(true)
-    } else {
-      updateSettingsMutation.mutate({
-        default_embedding_model: selectedModel,
-        embedding_dimension: model.dimension
-      })
-    }
-  }
-
-  const handleConfirmModelChange = () => {
-    const model = getModelInfo(selectedModel)
-    if (model && model.dimension) {
-      updateSettingsMutation.mutate({
-        default_embedding_model: selectedModel,
-        embedding_dimension: model.dimension
-      })
-    }
-    setIsModelConfirmDialogOpen(false)
-  }
-
-  const hasModelChanged = settings?.default_embedding_model !== selectedModel
 
   // Copy to clipboard utility
   const copyToClipboard = async (text: string, label: string) => {
@@ -910,6 +690,8 @@ export default function SettingsPage() {
         return renderSecuritySection()
       case 'llm-providers':
         return <LLMProviderSettings />
+      case 'embeddings':
+        return <EmbeddingSettings onOpenProviders={() => setActiveTab('llm-providers')} />
       case 'catalogue':
         return <ModelCatalogPanel />
       case 'models':
@@ -1092,144 +874,6 @@ export default function SettingsPage() {
       </Dialog>
 
       {/* Model Change Confirmation Dialog */}
-      <Dialog open={isModelConfirmDialogOpen} onOpenChange={setIsModelConfirmDialogOpen}>
-        <DialogContent className="sm:max-w-lg rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-3 text-xl">
-              <div className="p-2.5 rounded-xl bg-warning/10">
-                <AlertTriangle className="h-5 w-5 text-warning" />
-              </div>
-              Change Embedding Model
-            </DialogTitle>
-            <DialogDescription className="pt-2">
-              This change may require re-embedding existing datasets.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-4 space-y-5">
-            {/* Model Comparison */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-5 rounded-xl bg-muted/30 border border-border/40">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Current Model</p>
-                <p className="font-bold text-lg text-foreground">{settings?.default_embedding_model || 'None'}</p>
-                <p className="text-xs text-muted-foreground mt-1 font-mono">{settings?.embedding_dimension || 0}D vectors</p>
-              </div>
-              <div className="p-5 rounded-xl bg-primary/5 border border-primary/30">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">New Model</p>
-                <p className="font-bold text-lg text-primary">{formatModelName(selectedModel)}</p>
-                <p className="text-xs text-primary/70 mt-1 font-mono">{getModelInfo(selectedModel)?.dimension || 0}D vectors</p>
-              </div>
-            </div>
-            
-            {/* Impact Assessment */}
-            {isLoadingImpact ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mr-3" />
-                <span className="text-muted-foreground">Analyzing impact...</span>
-              </div>
-            ) : reembeddingImpact?.reembedding_required ? (
-              <div className={cn(
-                "rounded-xl border p-5",
-                reembeddingImpact.impact === 'high' 
-                  ? "bg-destructive/10 border-destructive/30" 
-                  : reembeddingImpact.impact === 'medium'
-                    ? "bg-warning/10 border-warning/30"
-                    : "bg-warning/10 border-warning/30"
-              )}>
-                <div className="flex items-start gap-4">
-                  <div className={cn(
-                    "p-2.5 rounded-xl",
-                    reembeddingImpact.impact === 'high' ? "bg-destructive/20" : 
-                    reembeddingImpact.impact === 'medium' ? "bg-warning/20" : "bg-warning/20"
-                  )}>
-                    <AlertTriangle className={cn(
-                      "h-5 w-5",
-                      reembeddingImpact.impact === 'high' ? "text-destructive" : 
-                      reembeddingImpact.impact === 'medium' ? "text-warning" : "text-warning"
-                    )} />
-                  </div>
-                  <div className="flex-1">
-                    <p className={cn(
-                      "font-bold",
-                      reembeddingImpact.impact === 'high' ? "text-destructive dark:text-destructive" : 
-                      reembeddingImpact.impact === 'medium' ? "text-warning dark:text-warning" : "text-warning dark:text-warning"
-                    )}>
-                      {reembeddingImpact.impact === 'high' ? 'High Impact' : 
-                       reembeddingImpact.impact === 'medium' ? 'Medium Impact' : 'Low Impact'}
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {reembeddingImpact.message}
-                    </p>
-                    
-                    {reembeddingImpact.affected_datasets?.length > 0 && (
-                      <div className="mt-4 pt-4 border-t border-border/30">
-                        <p className="text-xs font-semibold text-muted-foreground mb-3">Affected Datasets:</p>
-                        <ul className="space-y-2">
-                          {reembeddingImpact.affected_datasets.slice(0, 5).map((d) => (
-                            <li key={d.dataset_id} className="text-xs flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/30">
-                              <span className="truncate max-w-[200px] font-medium">{d.name}</span>
-                              <span className="text-muted-foreground font-mono">{d.embedding_count} vectors</span>
-                            </li>
-                          ))}
-                          {reembeddingImpact.affected_datasets.length > 5 && (
-                            <li className="text-xs text-muted-foreground text-center py-2">
-                              +{reembeddingImpact.affected_datasets.length - 5} more datasets...
-                            </li>
-                          )}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : reembeddingImpact?.impact === 'none' ? (
-              <div className="rounded-xl border bg-success/10 border-success/30 p-5">
-                <div className="flex items-center gap-4">
-                  <div className="p-2.5 rounded-xl bg-success/20">
-                    <CheckCircle2 className="h-5 w-5 text-success" />
-                  </div>
-                  <p className="text-sm text-success dark:text-success font-semibold">
-                    No existing embeddings will be affected.
-                  </p>
-                </div>
-              </div>
-            ) : null}
-            
-            <p className="text-xs text-muted-foreground pt-2 flex items-start gap-2">
-              <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
-              <span>Vectors from different models occupy different vector spaces and cannot be compared directly.</span>
-            </p>
-          </div>
-
-          <DialogFooter className="gap-3 sm:gap-3">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsModelConfirmDialogOpen(false)
-                setReembeddingImpact(null)
-              }}
-              className="rounded-xl"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConfirmModelChange}
-              disabled={updateSettingsMutation.isPending}
-              variant={reembeddingImpact?.impact === 'high' ? 'destructive' : 'default'}
-              className="rounded-xl min-w-[140px]"
-            >
-              {updateSettingsMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Confirm Change'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

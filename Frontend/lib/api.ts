@@ -24,6 +24,9 @@ import type {
   ModelCatalogResponse,
   ModelCatalogSyncResult,
   ModelDiscoveryResponse,
+  ProviderInfo,
+  EmbeddingSettingsResponse,
+  EmbedQueuedResponse,
 } from './api-types';
 import { getApiBase } from './runtime-config';
 
@@ -373,21 +376,6 @@ class ApiClient {
     });
   }
 
-  /**
-   * Embed a dataset to Redis for vector search
-   */
-  async embedDatasetById(datasetId: string, model?: string): Promise<{
-    success: boolean;
-    dataset_id: string;
-    embedding_status: string;
-    model: string;
-    message: string;
-  }> {
-    const params = model ? `?model=${encodeURIComponent(model)}` : '';
-    return this.request(`/api/v1/datasets/db/${datasetId}/embed${params}`, {
-      method: 'POST',
-    });
-  }
 
   /**
    * Get paginated rows for a dataset
@@ -429,31 +417,6 @@ class ApiClient {
 
 
   // ============================================================================
-  // Query API
-  // ============================================================================
-
-  // ============================================================================
-  // Run API (Query Execution & Results)
-  // ============================================================================
-
-  // ============================================================================
-  // User Settings API
-  // ============================================================================
-
-  async getUserSettings(): Promise<any> {
-    return this.request('/api/v1/user/settings', {
-      method: 'GET',
-    });
-  }
-
-  async updateUserSettings(data: { default_embedding_model?: string; embedding_dimension?: number }): Promise<any> {
-    return this.request('/api/v1/user/settings', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  // ============================================================================
   // Audit Logs API
   // ============================================================================
 
@@ -487,76 +450,6 @@ class ApiClient {
 
   async getAuditStats(days: number = 30): Promise<any> {
     return this.request(`/api/v1/audit/stats?days=${days}`);
-  }
-
-  // ============================================================================
-  // Embedding Governance API
-  // ============================================================================
-
-  async setEmbeddingModel(modelName: string): Promise<any> {
-    return this.request('/api/v1/datasets/settings/embedding-model', {
-      method: 'POST',
-      body: JSON.stringify({ model_name: modelName }),
-    });
-  }
-
-  async reembedDataset(
-    datasetId: string,
-    options?: { model?: string; force?: boolean; chunk_size?: number }
-  ): Promise<{ task_id: string; message: string; dataset_id: string }> {
-    return this.request(`/api/v1/datasets/${datasetId}/reembed`, {
-      method: 'POST',
-      body: JSON.stringify({
-        model: options?.model,
-        force: options?.force ?? true,
-        chunk_size: options?.chunk_size ?? 100,
-      }),
-    });
-  }
-
-  async getEmbeddingStatus(datasetId: string): Promise<any> {
-    return this.request(`/api/v1/datasets/${datasetId}/embedding-status`);
-  }
-
-  // ============================================================================
-  // Multi-Model Embedding Validation API
-  // ============================================================================
-
-  /**
-   * Preflight check before search - validates model alignment
-   * Call this BEFORE performing any semantic search
-   */
-  async preflightCheck(datasetId?: string): Promise<{
-    ready: boolean;
-    user_model: string;
-    user_dimension: number;
-    datasets_checked: number;
-    compatible_datasets: number;
-    incompatible_datasets: Array<{
-      dataset_id: string;
-      dataset_name: string;
-      dataset_model: string;
-      dataset_dimension: number;
-    }>;
-    message: string;
-  }> {
-    const params = datasetId ? `?dataset_id=${encodeURIComponent(datasetId)}` : '';
-    return this.request(`/api/v1/model-validation/preflight-check${params}`);
-  }
-
-  /**
-   * Get list of all available embedding models
-   */
-  async getAvailableModels(): Promise<{
-    models: Array<{
-      model_id: string;
-      dimension: number;
-      redis_index_name: string;
-      redis_namespace: string;
-    }>;
-    default_model: string;
-  }> {
-    return this.request('/api/v1/model-validation/available-models');
   }
 
   // ============================================================================
@@ -709,47 +602,45 @@ class ApiClient {
     return this.request('/api/v1/llm-config/default');
   }
 
-  /**
-   * Get list of supported LLM providers
-   */
-  async getLLMProviders(): Promise<{
-    providers: Record<string, {
-      name: string;
-      description: string;
-      requires_api_key: boolean;
-      supports_custom_base_url: boolean;
-      implemented?: boolean;
-    }>;
-    implemented: string[];
-  }> {
+  // ============================================================================
+  // Providers and embedding models
+  // ============================================================================
+
+  /** Every provider the backend supports, and how this user can reach each one. */
+  async getProviders(): Promise<{ providers: ProviderInfo[] }> {
     return this.request('/api/v1/llm-config/providers');
   }
 
-  /**
-   * List available Ollama LLM models
-   */
-  async listOllamaLLMModels(): Promise<{
-    models: Array<{
-      id: string;
-      name: string;
-      description?: string;
-      context_length: number;
-      is_local: boolean;
-    }>;
-    local_count: number;
-  }> {
-    return this.request('/api/v1/llm-config/ollama/models');
+  /** Active embedding model, embedding providers, and datasets grouped by the model that embedded them. */
+  async getEmbeddingSettings(): Promise<EmbeddingSettingsResponse> {
+    return this.request('/api/v1/embeddings/settings');
   }
 
-  /**
-   * Pull an Ollama LLM model
-   */
-  async pullOllamaLLMModel(modelName: string): Promise<{
-    status: string;
-    message: string;
-  }> {
-    return this.request(`/api/v1/llm-config/ollama/pull?model_name=${encodeURIComponent(modelName)}`, {
+  /** Switch the embedding model. The backend makes one real call to verify it and measure its dimension. */
+  async chooseEmbeddingModel(provider: string, modelId: string): Promise<EmbeddingSettingsResponse> {
+    return this.request('/api/v1/embeddings/settings', {
+      method: 'PUT',
+      body: JSON.stringify({ provider, model_id: modelId }),
+    });
+  }
+
+  /** Go back to the deployment's default embedding model. */
+  async resetEmbeddingModel(): Promise<EmbeddingSettingsResponse> {
+    return this.request('/api/v1/embeddings/settings', { method: 'DELETE' });
+  }
+
+  /** Embed (or with `force`, re-embed) one dataset with the active model, on the worker. */
+  async embedDataset(datasetId: string, force = false): Promise<EmbedQueuedResponse> {
+    return this.request(`/api/v1/embeddings/datasets/${datasetId}/embed${force ? '?force=true' : ''}`, {
       method: 'POST',
+    });
+  }
+
+  /** Re-embed datasets with the active model; omit ids to re-embed every dataset on another model. */
+  async reembedDatasets(datasetIds?: string[]): Promise<{ queued: number; failed: any[]; message: string }> {
+    return this.request('/api/v1/embeddings/reembed', {
+      method: 'POST',
+      body: JSON.stringify({ dataset_ids: datasetIds ?? null }),
     });
   }
 
@@ -786,114 +677,6 @@ class ApiClient {
         config_id: body.configId || null,
       }),
     });
-  }
-
-  // ============================================================================
-  // Embedding Model API
-  // ============================================================================
-
-  /**
-   * The embedding model this deployment routes with.
-   *
-   * There is exactly one: it is set per deployment (EXECUTION_MODE) because every
-   * indexed vector and every query must come from the same model. Returned in the
-   * list shape older callers expect.
-   */
-  async listEmbeddingModels(): Promise<{
-    models: Array<{
-      name: string;
-      display_name: string;
-      size: string;
-      is_local: boolean;
-      is_registered: boolean;
-      dimension: number | null;
-      family: string | null;
-      is_likely_embedding?: boolean;
-    }>;
-    count: number;
-    local_count: number;
-    registered_count: number;
-  }> {
-    const health = await this.request<{ runtime?: { embedder?: { model: string; dimension: number } } }>(
-      '/api/v1/health'
-    );
-    const embedder = health.runtime?.embedder;
-    const models = embedder
-      ? [{
-          name: embedder.model,
-          display_name: embedder.model,
-          size: '',
-          is_local: true,
-          is_registered: true,
-          dimension: embedder.dimension,
-          family: null,
-          is_likely_embedding: true,
-        }]
-      : [];
-    return { models, count: models.length, local_count: models.length, registered_count: models.length };
-  }
-
-  /**
-   * Pull an Ollama embedding model
-   * Note: This operation can take several minutes for larger models.
-   * Uses a 10-minute timeout to accommodate large model downloads.
-   */
-  async pullEmbeddingModel(modelName: string): Promise<{
-    model_id: string;
-    dimension: number;
-    display_name: string;
-    redis_index: string;
-    status: string;
-  }> {
-    const params = new URLSearchParams({ model_name: modelName });
-    const url = `${this.baseUrl}/api/v1/embeddings/models/pull?${params}`;
-    
-    // SECURITY: auth via HttpOnly cookie (credentials: 'include' below).
-    // No client-side token handling.
-
-    // Use AbortController for timeout (10 minutes for large model pulls)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minute timeout
-    
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        signal: controller.signal,
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        // Handle 401 Unauthorized - same as main request method
-        if (response.status === 401) {
-          if (typeof window !== 'undefined') {
-            // Clear the cached profile (non-sensitive) and re-authenticate.
-            localStorage.removeItem('nlpforge_user');
-            redirectToLogin();
-          }
-        }
-        
-        let errorData;
-        try {
-          errorData = await response.json();
-        } catch {
-          errorData = { error: `HTTP ${response.status}`, detail: `HTTP ${response.status}` };
-        }
-        throw { ...errorData, status: response.status };
-      }
-      
-      return await response.json();
-    } catch (error) {
-      clearTimeout(timeoutId);
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw { detail: 'Model pull timed out. The model may still be downloading in the background.' };
-      }
-      throw error;
-    }
   }
 
   // ============================================================================

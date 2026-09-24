@@ -175,7 +175,7 @@ async def test_search_sql_scopes_to_the_bound_tenant():
         session,
         query_vector=[0.1] * 384,
         embedding_model="bge-small",
-        dimension=384,
+        dimension=384, embedding_provider="builtin",
         top_k=25,
     )
 
@@ -193,12 +193,24 @@ async def test_search_filters_on_dimension_to_hit_the_partial_index():
     """
     session = _RecordingSession(rows=[])
     await PgVectorStore().search(
-        session, [0.1] * 768, embedding_model="mpnet", dimension=768
+        session, [0.1] * 768, embedding_model="mpnet", dimension=768, embedding_provider="builtin"
     )
     sql = session.sql
     assert "dimension = :dim" in sql
+    assert "embedding_provider = :provider" in sql, "same model name from two providers must not mix"
     assert "vector(768)" in sql, "cast must match the partial index expression"
     assert "<=>" in sql, "must use the cosine distance operator"
+
+
+@pytest.mark.asyncio
+async def test_wide_vectors_search_through_halfvec():
+    """pgvector's HNSW caps `vector` at 2000 dims; wider models use the halfvec index."""
+    session = _RecordingSession()
+    await PgVectorStore().search(
+        session, [0.1] * 3072, embedding_model="gemini-embedding-001", dimension=3072, embedding_provider="google"
+    )
+    assert "halfvec(3072)" in session.sql
+    assert "CAST(:qvec AS halfvec)" in session.sql
 
 
 @pytest.mark.asyncio
@@ -206,7 +218,7 @@ async def test_search_rejects_dimension_mismatch():
     """A 384-dim query against a 768-dim index is a bug, not a degraded result."""
     with pytest.raises(ValueError, match="dimension"):
         await PgVectorStore().search(
-            _RecordingSession(), [0.1] * 384, embedding_model="m", dimension=768
+            _RecordingSession(), [0.1] * 384, embedding_model="m", dimension=768, embedding_provider="builtin"
         )
 
 
@@ -233,7 +245,7 @@ async def test_search_maps_distance_to_similarity():
         ]
     )
     result = await PgVectorStore().search(
-        session, [0.1] * 384, embedding_model="bge-small", dimension=384
+        session, [0.1] * 384, embedding_model="bge-small", dimension=384, embedding_provider="builtin"
     )
     row = result.rows[0]
     assert row["similarity"] == pytest.approx(0.75)
@@ -254,7 +266,7 @@ async def test_upsert_derives_tenant_from_session_not_arguments():
 
     rows = [{"t_id": uuid.uuid4(), "query": "hello", "api_name": "X"}]
     n = await store.upsert_rows(
-        session, rows, [[0.1] * 384], embedding_model="bge-small", dimension=384
+        session, rows, [[0.1] * 384], embedding_model="bge-small", dimension=384, embedding_provider="builtin"
     )
 
     assert n == 1
@@ -272,7 +284,7 @@ async def test_upsert_rejects_wrong_dimension_vector():
             [{"query": "x"}],
             [[0.1] * 128],
             embedding_model="bge-small",
-            dimension=384,
+            dimension=384, embedding_provider="builtin",
         )
 
 
@@ -284,7 +296,7 @@ async def test_upsert_rejects_length_mismatch():
             [{"query": "a"}, {"query": "b"}],
             [[0.1] * 384],
             embedding_model="m",
-            dimension=384,
+            dimension=384, embedding_provider="builtin",
         )
 
 

@@ -463,3 +463,30 @@ async def _sync_model_catalog_async(user_id: Optional[str], provider: Optional[s
         # asyncio.run() closes this loop; pooled asyncpg connections bound to
         # it would be unusable by the next task's loop.
         await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Dataset embedding
+# ---------------------------------------------------------------------------
+
+@celery_app.task(name="nlpforge.embed_dataset", max_retries=0, soft_time_limit=3600, time_limit=3700)
+def embed_dataset_task(user_id: str, dataset_id: str) -> Dict[str, Any]:
+    """
+    Embed a dataset with the user's embedding model. Queued by
+    multi_model_embedding_service.queue_embedding after its checks passed;
+    progress and errors are written to the dataset row the UI polls.
+    """
+    return asyncio.run(_embed_dataset_async(user_id, dataset_id))
+
+
+async def _embed_dataset_async(user_id: str, dataset_id: str) -> Dict[str, Any]:
+    from app.core.postgres import AsyncSessionLocal, engine
+    from app.services.multi_model_embedding_service import get_multi_model_embedding_service
+
+    try:
+        async with AsyncSessionLocal() as db:
+            return await get_multi_model_embedding_service().embed_dataset(
+                db, uuid.UUID(user_id), uuid.UUID(dataset_id), force_reembed=True
+            )
+    finally:
+        await engine.dispose()

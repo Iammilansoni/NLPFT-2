@@ -40,6 +40,14 @@ one request resolves to one endpoint.
 ## Key features
 
 - **Semantic routing:** pgvector HNSW search over example utterances, max-pooled per template.
+- **Any model, any provider:** chat and embedding models from ~20 providers (Ollama, built-in
+  ONNX, Gemini, OpenAI, Anthropic, Mistral, Groq, OpenRouter, Cohere, NVIDIA, ...). Model lists
+  are fetched live, never hard-coded, and a provider's models appear once any key can reach it.
+- **Model lifecycle:** new models appear automatically; models a provider stops serving are
+  marked deprecated, then retired, then removed once nothing uses them.
+- **Embedding safety:** every dataset records the provider, model and dimension that embedded
+  it. Searching with a different model is refused with two fixes offered (switch model, or
+  re-embed), instead of comparing incompatible vectors.
 - **Structured extraction:** JSON-Schema-constrained decoding, Pydantic validation, one repair
   retry, and missing required fields reported explicitly.
 - **Honest failure signalling:** every response carries per-stage outcomes and `degraded`, so
@@ -107,7 +115,8 @@ Backend/
     api/v1/            REST endpoints (query, templates, datasets, auth, settings)
     services/          routing pipeline, pgvector store, extraction, embedding
     nlp/               ranking, URL detection, BM25/RRF (benchmark arm)
-    core/              config, tenancy (RLS), runtime (embedder), rate limiting
+    llm/               provider registry, live model discovery, embedding clients
+    core/              config, tenancy (RLS), runtime (default embedder), rate limiting
     demo_catalogue*.py the 20-template catalogue shared by the demo seed and the benchmark
   alembic/             migrations (pgvector, HNSW, RLS)
   scripts/             demo seed, migrations runner, Redis→pgvector backfill
@@ -172,9 +181,10 @@ in-process ONNX embeddings. That path is provided but has not been exercised end
 2. **Templates:** add your own API with its method, endpoint, JSON Schema and samples, then
    submit it for review.
 3. **Datasets:** generate example utterances for an approved template, or upload a CSV with a
-   `query` column. Embedding makes them routable. Generation uses the provider set in
-   **Settings → LLM Providers**; without one it falls back to `GEMINI_API_KEY`, then to the
-   local Ollama model.
+   `query` column. Embedding makes them routable, using your model from
+   **Settings → Embedding model**. Each dataset shows the model that embedded it. Generation
+   uses the provider set in **Settings → AI Providers**; without one it falls back to
+   `GEMINI_API_KEY`, then to the local Ollama model.
 4. **API:** `POST /api/v1/query/semantic-search` with `{"query": "..."}`. OpenAPI docs are at
    http://localhost:8000/docs.
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { getAllProviders } from '@/lib/constants/llm-providers'
+import { useProviders } from '@/hooks/useProviders'
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import {
@@ -25,7 +25,10 @@ const SECTIONS = [
 
 const API_ENDPOINTS = [
   { method: 'POST', path: '/api/v1/query/semantic-search', desc: 'Route a natural-language request: template + extracted body' },
-  { method: 'GET', path: '/api/v1/query/health', desc: 'Routing readiness: embedder reachable, vectors indexed' },
+  { method: 'GET', path: '/api/v1/query/health', desc: 'Routing readiness: your embedding model reachable, vectors indexed for it' },
+  { method: 'GET', path: '/api/v1/embeddings/settings', desc: 'Your embedding model, embedding providers, datasets grouped by model' },
+  { method: 'PUT', path: '/api/v1/embeddings/settings', desc: "Choose any provider's embedding model (verified and measured)" },
+  { method: 'GET', path: '/api/v1/model-catalog', desc: 'Every model your providers serve, with lifecycle status' },
   { method: 'GET', path: '/api/v1/templates/', desc: 'List your API templates' },
   { method: 'POST', path: '/api/v1/templates/', desc: 'Create a template' },
   { method: 'GET', path: '/api/v1/templates/{id}', desc: 'Get a template' },
@@ -75,6 +78,7 @@ function CodeBlock({ code }: { code: string }) {
 
 export default function DocsPage() {
   const [active, setActive] = useState('getting-started')
+  const { providers } = useProviders()
 
   return (
     <div className="min-h-screen bg-background pt-16">
@@ -293,16 +297,19 @@ Content-Type: application/json
                   </p>
                 </div>
                 <div className="grid gap-4">
-                  {getAllProviders().map(p => (
+                  {providers.map(p => (
                     <div key={p.id} className="flex items-start gap-4 p-4 rounded-xl border border-border/60 bg-card">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-foreground text-sm">{p.name}</span>
+                          <span className="font-semibold text-foreground text-sm">{p.label}</span>
                           {p.local && <span className="text-xs px-2 py-0.5 rounded-full bg-info/10 text-info font-medium">Runs locally</span>}
-                          {p.freeTier && !p.local && <span className="text-xs px-2 py-0.5 rounded-full bg-success/10 text-success font-medium">Free tier</span>}
+                          {p.free_tier && !p.local && <span className="text-xs px-2 py-0.5 rounded-full bg-success/10 text-success font-medium">Free tier</span>}
                         </div>
                         <p className="text-xs text-muted-foreground">{p.description}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{p.requiresApiKey ? 'Needs an API key.' : 'No API key needed.'}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {[p.chat && 'Chat models', p.embeddings && 'Embedding models'].filter(Boolean).join(' · ')}
+                          {' · '}{p.requires_key ? 'Needs an API key' : 'No API key needed'}
+                        </p>
                       </div>
                     </div>
                   ))}

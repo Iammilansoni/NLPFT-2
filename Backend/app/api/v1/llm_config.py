@@ -20,7 +20,6 @@ from app.api.v1.auth import get_current_user
 from app.core.logger import logger
 from app.core.postgres import get_db
 from app.llm.provider_factory import LLMProviderFactory
-from app.llm.providers.base import ProviderType
 from app.models.database_models import User
 from app.services.llm_config_service import (
     LLMConfigService,
@@ -55,23 +54,28 @@ def refresh_model_catalog(user_id: UUID) -> None:
 # PROVIDER INFO
 # =============================================================================
 
-@router.get("/providers", summary="List available LLM providers")
+@router.get("/providers", summary="List every supported provider")
 async def list_providers(
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
-    Get information about all supported LLM providers.
-    
-    Returns provider name, description, requirements, and default models.
-    Requires authentication.
+    Every provider NLPForge can use (app.llm.provider_registry), whether or not
+    anyone has a key for it, plus how this user can currently reach each one:
+    their own connection, a deployment-wide key, or no key needed.
     """
-    return {
-        "providers": LLMProviderFactory.get_supported_providers(),
-        "implemented": [
-            p.value for p in ProviderType 
-            if LLMProviderFactory.is_provider_implemented(p.value)
-        ],
-    }
+    from app.llm.embeddings import EmbeddingError
+    from app.services.model_access import ResolvedCredential, resolve_credential
+
+    providers = []
+    for info in LLMProviderFactory.get_supported_providers():
+        try:
+            credential: ResolvedCredential = await resolve_credential(db, current_user.u_id, info["id"])
+            access = credential.source
+        except EmbeddingError:
+            access = None
+        providers.append({**info, "access": access})
+    return {"providers": providers}
 
 
 # =============================================================================
@@ -143,12 +147,10 @@ async def create_config(
     
     The API key will be encrypted before storage.
     """
-    # Validate provider
     if not LLMProviderFactory.is_provider_implemented(data.provider):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Provider '{data.provider}' is not implemented. "
-                   f"Available: {[p.value for p in ProviderType if LLMProviderFactory.is_provider_implemented(p.value)]}",
+            detail=f"Unknown provider '{data.provider}'.",
         )
     
     try:

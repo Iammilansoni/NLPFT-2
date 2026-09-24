@@ -44,6 +44,7 @@ psutil==5.9.6  # System resource monitoring
 
 # Reranking (FlashRank for two-stage retrieval)
 flashrank>=0.2.0  # Cross-encoder reranking with ms-marco-MiniLM-L-12-v2
+fastembed>=0.4.0  # "Built-in" embedding provider: ONNX models run in-process, no server or key
 
 # Utilities and tools
 python-dotenv==1.0.0  # Environment variable management

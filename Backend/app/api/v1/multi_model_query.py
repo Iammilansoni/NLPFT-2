@@ -15,12 +15,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth import get_current_user
-from app.core.embedding_model_registry import get_embedding_registry
 from app.core.postgres import get_db
 from app.core.rate_limit import limiter
 from app.models.schemas import UserResponse
 from app.nlp.cross_encoder_reranker import STAGE1_TOP_K
-from app.services.multi_model_embedding_service import get_multi_model_embedding_service
+from app.services.multi_model_embedding_service import (
+    get_multi_model_embedding_service,
+    queue_embedding,
+)
 from app.services.multi_model_semantic_service import get_multi_model_semantic_service
 
 router = APIRouter(prefix="/query", tags=["multi-model-query"])
@@ -98,15 +100,15 @@ class SemanticQueryResponse(BaseModel):
     success: bool
     error: Optional[str] = None
     message: Optional[str] = None
-    
+
     # Stage-by-stage visibility
     stage1_vector_search: Optional[List[dict]] = None
     stage2_reranking: Optional[List[dict]] = None
     final_output: Optional[FinalOutput] = None
-    
+
     # Metadata
     metadata: Optional[dict] = None
-    
+
     # Stage 3
     extracted_request_body: Optional[dict] = None
     extraction: Optional[ExtractionInfo] = None
@@ -116,20 +118,15 @@ class SemanticQueryResponse(BaseModel):
     degraded: bool = False
     alternatives: Optional[List[dict]] = None
 
+    # Model governance: how to make datasets from other embedding models searchable
+    options: Optional[List[dict]] = None
+
     # Flat fields kept for existing clients
     api_name: Optional[str] = None
     endpoint: Optional[str] = None
     method: Optional[str] = None
     base_url: Optional[str] = None
     confidence: Optional[float] = None
-
-
-class ReembedRequest(BaseModel):
-    """Re-embed request"""
-    new_model_id: Optional[str] = Field(
-        None, 
-        description="New model to use (updates Settings)"
-    )
 
 
 # =============================================================================
@@ -145,21 +142,20 @@ async def semantic_search(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Perform semantic search with model governance.
-    
-    ❗ IMPORTANT:
-    - Uses embedding model from Settings (source of truth)
-    - Validates model compatibility with dataset
-    - Returns clear error if mismatch detected
-    - Never silently uses wrong model
-    
+    Route a natural-language request to one API template.
+
+    Searches with the caller's embedding model (Settings -> Embedding model).
+    Datasets embedded with another model are never compared against it: they
+    come back in `metadata.excluded_datasets`, with `options` to switch model
+    or re-embed.
+
     Returns:
     - Stage 1: Vector search results
     - Stage 2: Re-ranked results
     - Final: Best matching API template
     """
     service = get_multi_model_semantic_service()
-    
+
     # Parse optional UUIDs
     dataset_id = uuid.UUID(body.dataset_id) if body.dataset_id else None
     template_id = uuid.UUID(body.template_id) if body.template_id else None
@@ -174,7 +170,7 @@ async def semantic_search(
         include_alternatives=body.include_alternatives,
         include_slot_extraction=body.include_slot_extraction,
     )
-    
+
     return result
 
 
@@ -183,61 +179,20 @@ async def embed_dataset(
     dataset_id: uuid.UUID,
     current_user: Annotated[UserResponse, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),
-    force_reembed: bool = Query(False, description="Force re-embedding")
+    force_reembed: bool = Query(False, description="Replace vectors made with another model"),
 ):
-    """
-    Embed a dataset using Settings model.
-    
-    ❗ Uses model from Settings (source of truth)
-    
-    Args:
-        dataset_id: Dataset UUID
-        force_reembed: If True, re-embed even if already done
-        
-    Returns:
-        Embedding status with progress info
-    """
-    service = get_multi_model_embedding_service()
-    
-    result = await service.embed_dataset(
-        db=db,
-        user_id=current_user.u_id,
-        dataset_id=dataset_id,
-        force_reembed=force_reembed
-    )
-    
-    return result
+    """Embed a dataset with the caller's embedding model, on the worker."""
+    return await queue_embedding(db, current_user.u_id, dataset_id, force_reembed=force_reembed)
 
 
 @router.post("/datasets/{dataset_id}/reembed")
 async def reembed_dataset(
     dataset_id: uuid.UUID,
-    request: ReembedRequest,
     current_user: Annotated[UserResponse, Depends(get_current_user)],
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
-    """
-    Re-embed a dataset with a new model.
-    
-    ❗ This updates Settings if new_model_id provided
-    
-    Args:
-        dataset_id: Dataset UUID
-        new_model_id: Optional new model (updates Settings)
-        
-    Returns:
-        Re-embedding status
-    """
-    service = get_multi_model_embedding_service()
-    
-    result = await service.reembed_dataset(
-        db=db,
-        user_id=current_user.u_id,
-        dataset_id=dataset_id,
-        new_model_id=request.new_model_id
-    )
-    
-    return result
+    """Replace a dataset's vectors using the caller's embedding model."""
+    return await queue_embedding(db, current_user.u_id, dataset_id, force_reembed=True)
 
 
 @router.get("/datasets/{dataset_id}/embedding-status")
@@ -248,56 +203,47 @@ async def get_embedding_status(
 ):
     """
     Get embedding status for a dataset.
-    
+
     Returns:
         Embedding status with progress and model info
     """
     service = get_multi_model_embedding_service()
-    
+
     result = await service.get_embedding_status(
         db=db,
         user_id=current_user.u_id,
         dataset_id=dataset_id
     )
-    
+
     return result
-
-
-@router.get("/models")
-async def list_embedding_models(
-    current_user: Annotated[UserResponse, Depends(get_current_user)]
-):
-    """
-    List all available embedding models.
-    
-    Returns:
-        List of models with dimensions and capabilities
-    """
-    registry = get_embedding_registry()
-    
-    return {
-        "models": registry.list_models(),
-        "default_model": registry.DEFAULT_MODEL_ID,
-        "count": len(registry.list_model_ids())
-    }
 
 
 @router.get("/health")
 async def query_service_health(
-    current_user: Annotated[UserResponse, Depends(get_current_user)]
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
 ):
-    """Routing readiness for the caller: embedder reachable + indexed vectors."""
-    from app.core.runtime import get_embedder
+    """Routing readiness for the caller: their embedding model reachable + vectors indexed for it."""
     from app.core.tenancy import tenant_session
+    from app.llm.embeddings import EmbeddingError
+    from app.services.model_access import active_embedding, embedder_for
     from app.services.pgvector_store import get_pgvector_store
 
-    embedder = get_embedder()
-    embedder_ok = await embedder.health()
+    active = await active_embedding(db, current_user.u_id)
+    try:
+        embedder_ok = await (await embedder_for(db, current_user.u_id, active)).health()
+        problem = None if embedder_ok else f"{active.label} is not reachable."
+    except EmbeddingError as exc:
+        embedder_ok, problem = False, exc.message
     async with tenant_session(current_user.u_id) as tdb:
         stats = await get_pgvector_store().stats(tdb)
+    indexed = sum(
+        m["rows"] for m in stats["by_model"]
+        if active.matches(m["provider"], m["model"], m["dimension"])
+    )
     return {
-        "status": "ok" if embedder_ok and stats["total_rows"] else "not_ready",
-        "embedder": {"model": embedder.model_id, "dimension": embedder.dimension,
-                     "reachable": embedder_ok},
+        "status": "ok" if embedder_ok and indexed else "not_ready",
+        "embedding": {**active.to_dict(), "reachable": embedder_ok, "problem": problem},
+        "indexed_rows_for_active_model": indexed,
         "vectors": stats,
     }

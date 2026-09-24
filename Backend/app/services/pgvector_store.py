@@ -21,7 +21,6 @@ Secondary wins: one less service to run and pay for, vectors transactionally
 consistent with the templates they reference (no more orphaned index entries),
 and joins against relational data without a round trip.
 
-v1's Redis vectors can be copied here with scripts/backfill_redis_to_pgvector.py.
 
 INTERACTION WITH RLS -- THE IMPORTANT PART
 ------------------------------------------
@@ -47,6 +46,26 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logger import logger
+
+# pgvector's HNSW index caps: 2000 dimensions for `vector`, 4000 for `halfvec`
+# (16-bit floats, half the memory, negligible recall loss for cosine search).
+HNSW_VECTOR_MAX_DIM = 2000
+HNSW_HALFVEC_MAX_DIM = 4000
+
+
+def vector_expression(dimension: int) -> tuple[str, str]:
+    """
+    The column expression and query cast for vectors of this width.
+
+    Search must use exactly the expression its partial index was built on, or
+    the planner cannot use the index. Wider than 4000 has no HNSW support in
+    pgvector, so those models are searched exactly (fine at this scale).
+    """
+    if dimension <= HNSW_VECTOR_MAX_DIM:
+        return f"embedding::vector({dimension})", "vector"
+    if dimension <= HNSW_HALFVEC_MAX_DIM:
+        return f"embedding::halfvec({dimension})", "halfvec"
+    return "embedding", "vector"
 
 
 def to_pgvector(vec: Sequence[float]) -> str:
@@ -92,6 +111,7 @@ class PgVectorStore:
         embeddings: Sequence[Sequence[float]],
         embedding_model: str,
         dimension: int,
+        embedding_provider: str,
     ) -> int:
         """
         Insert indexed utterances with their vectors.
@@ -127,6 +147,7 @@ class PgVectorStore:
                     "test_category": row.get("test_category"),
                     "intent_type": row.get("intent_type"),
                     "notes": row.get("notes"),
+                    "embedding_provider": embedding_provider,
                     "embedding_model": embedding_model,
                     "dimension": dimension,
                     "embedding": to_pgvector(arr),
@@ -139,22 +160,47 @@ class PgVectorStore:
                 INSERT INTO {self.TABLE}
                     (u_id, t_id, dataset_id, query, api_name, endpoint, method,
                      scenario_type, test_category, intent_type, notes,
-                     embedding_model, dimension, embedding)
+                     embedding_provider, embedding_model, dimension, embedding)
                 VALUES
                     (current_setting('app.tenant_id')::uuid,
                      CAST(:t_id AS uuid), CAST(:dataset_id AS uuid), :query,
                      :api_name, :endpoint, :method, :scenario_type,
                      :test_category, :intent_type, :notes,
-                     :embedding_model, :dimension, CAST(:embedding AS vector))
+                     :embedding_provider, :embedding_model, :dimension, CAST(:embedding AS vector))
                 """
             ),
             payload,
         )
         logger.info(
             f"pgvector: inserted {len(payload)} rows "
-            f"(model={embedding_model}, dim={dimension})"
+            f"(provider={embedding_provider}, model={embedding_model}, dim={dimension})"
         )
         return len(payload)
+
+    async def ensure_index(self, db: AsyncSession, dimension: int) -> bool:
+        """
+        Make sure a partial HNSW index exists for this dimension.
+
+        Called before a model of a new width is first indexed. Creating an index
+        needs the table owner; when the app runs as a restricted role the index
+        must come from a migration instead, and search stays correct (exact) in
+        the meantime -- so a failure is logged, never raised.
+        """
+        if dimension > HNSW_HALFVEC_MAX_DIM:
+            logger.info(f"pgvector: {dimension}-dim vectors exceed HNSW limits; searched exactly")
+            return False
+        expr, cast = vector_expression(dimension)
+        try:
+            await db.execute(text(
+                f"CREATE INDEX IF NOT EXISTS idx_vector_rows_hnsw_{int(dimension)} ON {self.TABLE} "
+                f"USING hnsw (({expr}) {cast}_cosine_ops) WHERE dimension = {int(dimension)}"
+            ))
+            await db.commit()
+            return True
+        except Exception as exc:  # noqa: BLE001 - see docstring
+            await db.rollback()
+            logger.warning(f"pgvector: could not create an index for {dimension}-dim vectors: {exc}")
+            return False
 
     # ------------------------------------------------------------------
     # Read path
@@ -166,6 +212,7 @@ class PgVectorStore:
         query_vector: Sequence[float],
         embedding_model: str,
         dimension: int,
+        embedding_provider: str,
         top_k: int = 25,
         dataset_id: Optional[uuid.UUID] = None,
         template_id: Optional[uuid.UUID] = None,
@@ -197,10 +244,12 @@ class PgVectorStore:
         filters = [
             "u_id = current_setting('app.tenant_id', true)::uuid",
             "dimension = :dim",
+            "embedding_provider = :provider",
             "embedding_model = :model",
         ]
         params: Dict[str, Any] = {
             "dim": dimension,
+            "provider": embedding_provider,
             "model": embedding_model,
             "qvec": to_pgvector(arr),
             "k": top_k,
@@ -212,14 +261,15 @@ class PgVectorStore:
             filters.append("t_id = CAST(:template_id AS uuid)")
             params["template_id"] = str(template_id)
 
+        expr, cast = vector_expression(dimension)
         sql = f"""
             SELECT row_uid, t_id, dataset_id, query, api_name, endpoint, method,
                    scenario_type, test_category, intent_type, notes,
                    embedding_model,
-                   (embedding::vector({dimension}) <=> CAST(:qvec AS vector)) AS distance
+                   ({expr} <=> CAST(:qvec AS {cast})) AS distance
             FROM {self.TABLE}
             WHERE {' AND '.join(filters)}
-            ORDER BY embedding::vector({dimension}) <=> CAST(:qvec AS vector)
+            ORDER BY {expr} <=> CAST(:qvec AS {cast})
             LIMIT :k
         """
 
@@ -295,16 +345,17 @@ class PgVectorStore:
         result = await db.execute(
             text(
                 f"""
-                SELECT embedding_model, dimension, COUNT(*) AS n
+                SELECT embedding_provider, embedding_model, dimension, COUNT(*) AS n
                 FROM {self.TABLE}
                 WHERE u_id = current_setting('app.tenant_id', true)::uuid
-                GROUP BY embedding_model, dimension
+                GROUP BY embedding_provider, embedding_model, dimension
                 ORDER BY n DESC
                 """
             )
         )
         by_model = [
-            {"model": r["embedding_model"], "dimension": r["dimension"], "rows": int(r["n"])}
+            {"provider": r["embedding_provider"], "model": r["embedding_model"],
+             "dimension": r["dimension"], "rows": int(r["n"])}
             for r in result.mappings()
         ]
         return {"backend": "pgvector", "total_rows": sum(m["rows"] for m in by_model),

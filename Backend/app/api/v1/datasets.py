@@ -38,7 +38,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.auth import get_current_user
 from app.core.config import DATASETS_DIR
 from app.core.logger import logger
-from app.core.models_config import EMBEDDING_TOOLTIP, get_all_embedding_models, get_all_llms
 from app.core.postgres import get_db
 from app.models.database_models import (
     CSVData,
@@ -48,17 +47,17 @@ from app.models.database_models import (
     Parameter,
     Template,
     User,
-    UserSettings,
 )
 from app.models.schemas.embedding_schemas import (
-    ReembedDatasetRequest,
-    ReembedDatasetResponse,
     SearchDatasetRequest,
 )
 from app.nlp.dataset_generator import get_enterprise_dataset_generator
 from app.services.audit_service import get_audit_service
 from app.services.dataset_task_manager import get_task_manager
-from app.services.multi_model_embedding_service import get_multi_model_embedding_service
+from app.services.multi_model_embedding_service import (
+    dataset_embedding,
+    get_multi_model_embedding_service,
+)
 
 router = APIRouter(prefix="/datasets", tags=["Datasets"])
 os.makedirs(DATASETS_DIR, exist_ok=True)
@@ -702,8 +701,17 @@ async def list_datasets(
             )
             for t_id, api_name in templates_result:
                 template_names[str(t_id)] = api_name
-        
+
+        from app.services.model_access import active_embedding
+        active = await active_embedding(db, current_user.u_id)
+
+        def matches_active(d: Dataset) -> Optional[bool]:
+            if not d.embedding_model:
+                return None
+            return active.matches(d.embedding_provider or "ollama", d.embedding_model, d.embedding_dimension)
+
         return {
+            "active_embedding": active.to_dict(),
             "total": total,
             "skip": skip,
             "limit": limit,
@@ -716,7 +724,11 @@ async def list_datasets(
                     "total_rows": d.total_rows,
                     "embedded_rows": d.embedded_rows,
                     "embedding_status": d.embedding_status,
+                    "embedding_progress": d.embedding_progress,
+                    "embedding_error": d.embedding_error,
                     "embedding_model": d.embedding_model,
+                    "embedding": dataset_embedding(d),
+                    "matches_active_embedding": matches_active(d),
                     "source_type": "AI_GENERATED" if d.generated_with_llm else "CSV_UPLOAD",
                     "generated_with_llm": d.generated_with_llm,
                     "created_at": d.created_at.isoformat() + "Z" if d.created_at else None,
@@ -985,6 +997,9 @@ async def list_datasets_from_db(
                     "embedded_rows": d.embedded_rows,
                     "embedding_status": d.embedding_status,
                     "embedding_model": d.embedding_model,
+                    "embedding": dataset_embedding(d),
+                    "embedding_error": d.embedding_error,
+                    "embedding_progress": d.embedding_progress,
                     "generated_with_llm": d.generated_with_llm,
                     "created_at": d.created_at.isoformat() if d.created_at else None
                 }
@@ -1244,66 +1259,28 @@ async def rename_dataset(
 @router.post("/db/{dataset_id}/embed")
 async def embed_dataset_endpoint(
     dataset_id: str,
-    force_reembed: bool = Query(False, description="Force re-embed even if already embedded"),
+    force_reembed: bool = Query(False, description="Replace vectors made with another embedding model"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Embed a dataset to Redis for vector search.
-    
-    User Isolation: Only allows embedding datasets owned by the current user.
-    
-    Uses multi_model_embedding_service which:
-    1. Gets embedding model from user's Settings
-    2. Stores vectors in model-specific Redis index
-    3. Uses proper key format: vector:{model_namespace}:{user_id}:{dataset_id}:{row_id}
-    
-    This ensures vectors are stored in the same location that semantic search looks.
-    """
-    
-    try:
-        embedding_service = get_multi_model_embedding_service()
-        
-        result = await embedding_service.embed_dataset(
-            db=db,
-            user_id=current_user.u_id,
-            dataset_id=UUID(dataset_id),
-            force_reembed=force_reembed,
-            batch_size=32
-        )
-        
-        if not result.get("success"):
-            # Return error response with appropriate status code
-            error_code = result.get("error")
-            if error_code == "MODEL_MISMATCH":
-                raise HTTPException(status_code=409, detail=result)
-            elif error_code == "DATASET_NOT_FOUND":
-                raise HTTPException(status_code=404, detail=result.get("message", "Dataset not found"))
-            elif error_code == "OLLAMA_UNAVAILABLE":
-                raise HTTPException(status_code=503, detail=result.get("message", "Ollama not available"))
-            else:
-                raise HTTPException(status_code=500, detail=result.get("message", "Embedding failed"))
-        
-        return {
-            "success": True,
-            "dataset_id": result.get("dataset_id"),
-            "embedding_status": result.get("status", "completed"),
-            "model": result.get("model_id"),
-            "dimension": result.get("dimension"),
-            "vector_store": result.get("vector_store", "pgvector"),
-            "total_rows": result.get("total_rows"),
-            "unroutable_rows": result.get("unroutable_rows", 0),
-            "embedded_count": result.get("embedded_count"),
-            "failed_count": result.get("failed_count"),
-            "message": f"Embedded {result.get('embedded_count', 0)} rows successfully"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error embedding dataset: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    Embed a dataset with the user's embedding model, on the Celery worker.
 
+    Returns immediately with status in_progress; poll the dataset for progress.
+    A dataset already embedded with a different model answers 409 MODEL_MISMATCH
+    with the options to switch model or re-embed (force_reembed=true).
+    """
+    from app.services.multi_model_embedding_service import queue_embedding
+
+    result = await queue_embedding(db, current_user.u_id, UUID(dataset_id), force_reembed=force_reembed)
+    if not result.get("success"):
+        error_code = result.get("error")
+        if error_code in ("MODEL_MISMATCH", "EMBEDDING_IN_PROGRESS"):
+            raise HTTPException(status_code=409, detail=result)
+        if error_code == "DATASET_NOT_FOUND":
+            raise HTTPException(status_code=404, detail=result.get("message", "Dataset not found"))
+        raise HTTPException(status_code=400, detail=result)
+    return result
 
 @router.get("/preview/task/{task_id}")
 async def preview_dataset_by_task(
@@ -1719,118 +1696,6 @@ async def preview_dataset_by_filename(
         raise HTTPException(status_code=500, detail=f"Error reading CSV: {str(e)}")
 
 
-# ============= SETTINGS =============
-
-@router.get("/settings/models")
-async def get_available_models():
-    """
-    Get list of available embedding models and LLMs with metadata
-    
-    Returns:
-        - embedding_models: List with dimension, context, speed info
-        - llms: List of LLMs for dataset generation
-        - tooltip: Explanation text for users
-    """
-    return {
-        "embedding_models": get_all_embedding_models(),
-        "llms": get_all_llms(),
-        "tooltip": EMBEDDING_TOOLTIP,
-        "info": {
-            "dimension_explanation": "Dimension = vector length. Larger usually = more accurate but slower & memory-heavy.",
-            "recommendation": "For most use cases, 384-dim models provide good balance of speed and accuracy."
-        }
-    }
-
-
-@router.get("/settings")
-async def get_user_settings(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """Get user's embedding settings"""
-    result = await db.execute(
-        select(UserSettings).where(UserSettings.u_id == current_user.u_id)
-    )
-    settings = result.scalar_one_or_none()
-    
-    from app.core.models_config import DEFAULT_DATASET_LLM, DEFAULT_EMBEDDING_MODEL
-    
-    return {
-        "user_id": str(current_user.u_id),
-        "default_embedding_model": settings.default_embedding_model if settings else DEFAULT_EMBEDDING_MODEL,
-        "preferred_llm": settings.preferred_llm if settings else DEFAULT_DATASET_LLM
-    }
-
-
-@router.post("/settings/embedding-model")
-async def set_default_embedding_model(
-    model_name: str,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """Set user's default embedding model"""
-    result = await db.execute(
-        select(UserSettings).where(UserSettings.u_id == current_user.u_id)
-    )
-    settings = result.scalar_one_or_none()
-    
-    if not settings:
-        settings = UserSettings(
-            u_id=current_user.u_id,
-            default_embedding_model=model_name
-        )
-        db.add(settings)
-    else:
-        settings.default_embedding_model = model_name
-    
-    await db.commit()
-    logger.info(f"Updated embedding model for user {current_user.u_id}: {model_name}")
-    
-    return {
-        "user_id": str(current_user.u_id),
-        "default_embedding_model": model_name,
-        "message": "Default embedding model updated"
-    }
-
-
-@router.post("/settings/llm")
-async def set_preferred_llm(
-    llm_id: str,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """Set user's preferred LLM for dataset generation"""
-    try:
-        from app.core.models_config import get_llm_info
-        llm_info = get_llm_info(llm_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Unknown LLM: {llm_id}")
-    
-    result = await db.execute(
-        select(UserSettings).where(UserSettings.u_id == current_user.u_id)
-    )
-    settings = result.scalar_one_or_none()
-    
-    if not settings:
-        settings = UserSettings(
-            u_id=current_user.u_id,
-            preferred_llm=llm_id
-        )
-        db.add(settings)
-    else:
-        settings.preferred_llm = llm_id
-    
-    await db.commit()
-    logger.info(f"Updated preferred LLM for user {current_user.u_id}: {llm_id}")
-    
-    return {
-        "user_id": str(current_user.u_id),
-        "preferred_llm": llm_id,
-        "llm_info": llm_info.dict(),
-        "message": "Preferred LLM updated"
-    }
-
-
 # ============= DATASET-SPECIFIC OPERATIONS =============
 # These endpoints operate on individual datasets (not templates)
 
@@ -1867,6 +1732,7 @@ async def get_dataset_info(
         "user_id": str(dataset.u_id),
         "csv_path": dataset.csv_path,
         "total_rows": dataset.total_rows,
+        "embedding": dataset_embedding(dataset),
         "embedding_model": dataset.embedding_model,
         "embedding_dimension": dataset.embedding_dimension,
         "embedding_status": dataset.embedding_status,
@@ -1913,57 +1779,19 @@ async def get_dataset_embedding_status(
     )
 
 
-@router.post("/{dataset_id}/reembed", response_model=ReembedDatasetResponse)
+@router.post("/{dataset_id}/reembed")
 async def reembed_dataset(
     dataset_id: str,
-    request: ReembedDatasetRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Re-embed a dataset with a new embedding model
-    
-    This will:
-    1. Delete ALL existing embeddings for this dataset
-    2. Start a background task to embed with the specified model
-    3. Track progress (poll GET /{dataset_id}/embedding-status)
-    
-    Use Cases:
-    - User changed their default embedding model
-    - Frontend showed MODEL_MISMATCH error and user chose "Re-Embed"
-    - Upgrading to a higher-quality model
-    
-    Args:
-        model: New embedding model (uses user's default if None)
-        force: Force re-embed even if already embedded with same model
-        chunk_size: Rows per batch (10-500, default 100)
-    """
-    # See note on the embedding-status endpoint above: the enhanced service was
-    # deleted in the v2 refactor and this call has been dead since.
-    # `force` has no counterpart on the surviving implementation, which always
-    # re-embeds when asked, so it is accepted and ignored rather than silently
-    # changing behaviour.
-    from app.services.multi_model_embedding_service import (
-        get_multi_model_embedding_service,
-    )
+    """Replace a dataset's vectors using the user's current embedding model (runs on the worker)."""
+    from app.services.multi_model_embedding_service import queue_embedding
 
-    embedding_service = get_multi_model_embedding_service()
-    result = await embedding_service.reembed_dataset(
-        db=db,
-        user_id=current_user.u_id,
-        dataset_id=UUID(dataset_id),
-        new_model_id=request.model,
-        batch_size=request.chunk_size
-    )
-    
+    result = await queue_embedding(db, current_user.u_id, UUID(dataset_id), force_reembed=True)
     if not result.get("success"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=result
-        )
-    
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
     return result
-
 
 @router.post("/{dataset_id}/search")
 async def search_dataset(

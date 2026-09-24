@@ -171,18 +171,6 @@ async def lifespan(app: FastAPI):
     app.state.redis_connected    = redis_connected
     app.state.redis_error        = redis_error
 
-    # Auto-register Ollama embedding models
-    try:
-        from app.services.embedding_model_service import auto_register_local_embedding_models
-        result = await auto_register_local_embedding_models()
-        if result.get("registered"):
-            logger.info(
-                f"Auto-registered {len(result['registered'])} embedding model(s)",
-                extra={"extra": {"event_name": "embedding_auto_register", "models": result["registered"]}},
-            )
-    except Exception as exc:
-        logger.warning(f"Could not auto-register embedding models: {type(exc).__name__}: {exc}")
-
     # Recover stale embedding tasks
     if postgres_connected:
         try:

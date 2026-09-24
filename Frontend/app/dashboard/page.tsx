@@ -19,7 +19,8 @@ import { Button } from '@/components/ui/button'
 import { useQueryStats } from '@/hooks/useQuery'
 import { useTemplateStats } from '@/hooks/useTemplates'
 import { apiClient } from '@/lib/api'
-import type { SemanticRetrieveResponse } from '@/lib/api-types'
+import type { EmbeddingGroup, MismatchOption, SemanticRetrieveResponse } from '@/lib/api-types'
+import { ModelMismatchPanel } from '@/components/embeddings/ModelMismatchPanel'
 import { useToast } from '@/hooks/use-toast'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { JsonDisplay } from '@/components/ui/JsonDisplay'
@@ -95,6 +96,13 @@ export default function DashboardPage() {
   const [result, setResult] = useState<SemanticRetrieveResponse | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
+  // Datasets embedded with another model than the one this user searches with.
+  const [mismatch, setMismatch] = useState<{
+    message: string
+    options: MismatchOption[]
+    excluded?: EmbeddingGroup[]
+    blocking: boolean
+  } | null>(null)
   const [showStage1, setShowStage1] = useState(false)
 
   const { data: stats, isLoading, error } = useQueryStats()
@@ -105,15 +113,30 @@ export default function DashboardPage() {
     if (!q) return
     setIsSearching(true)
     setSearchError(null)
+    setMismatch(null)
     setShowStage1(false)
     try {
       const res = await apiClient.semanticRetrieve(q, 25, undefined, true, true)
       if (!res.success) {
         setResult(null)
-        setSearchError(res.message || res.error || 'No route found for this request.')
+        if (res.error === 'MODEL_MISMATCH' && res.options?.length) {
+          setMismatch({ message: res.message ?? '', options: res.options, excluded: res.metadata?.excluded_datasets, blocking: true })
+        } else {
+          setSearchError(res.message || res.error || 'No route found for this request.')
+        }
         return
       }
       setResult(res)
+      const excluded = res.metadata?.excluded_datasets ?? []
+      if (excluded.length && res.options?.length) {
+        const count = excluded.reduce((n, g) => n + g.datasets.length, 0)
+        setMismatch({
+          message: `${count} dataset(s) were not searched because they were embedded with a different model than yours (${res.metadata.embedding?.label}).`,
+          options: res.options,
+          excluded,
+          blocking: false,
+        })
+      }
     } catch (err: any) {
       const message = err?.detail?.message || err?.detail || err?.message || 'Request failed'
       setResult(null)
@@ -166,6 +189,19 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
+        )}
+
+        {mismatch && !isSearching && (
+          <ModelMismatchPanel
+            message={mismatch.message}
+            options={mismatch.options}
+            excluded={mismatch.excluded}
+            variant={mismatch.blocking ? 'error' : 'notice'}
+            onResolved={(how) => {
+              setMismatch(null)
+              if (how === 'switched') runSearch()
+            }}
+          />
         )}
 
         {searchError && !isSearching && (
@@ -226,7 +262,7 @@ export default function DashboardPage() {
                 status="ok"
                 lines={[
                   `${result.stage1_vector_search.length} utterances · pgvector HNSW`,
-                  `${result.metadata.embedding_model} (${result.metadata.embedding_dimension}-dim)`,
+                  result.metadata.embedding?.label ?? `${result.metadata.embedding_model} (${result.metadata.embedding_dimension}-dim)`,
                   `embed ${ms(timings?.embed)} · search ${ms(timings?.vector_search)}`,
                 ]}
               />
@@ -353,8 +389,12 @@ export default function DashboardPage() {
             />
             <MetricCard
               label="Embedding model"
-              value={stats?.model ?? '—'}
-              subtitle="Set per deployment"
+              value={stats?.embedding?.model_id ?? stats?.model ?? '—'}
+              subtitle={
+                stats?.embedding
+                  ? `${stats.embedding.provider_label} · ${stats.embedding.dimension}-dim${stats.embedding.is_default ? ' · default' : ''}`
+                  : 'Change it in Settings'
+              }
               icon={<Cpu className="w-5 h-5 text-white" />}
               gradient="from-brand-2 to-destructive"
             />

@@ -1,13 +1,10 @@
 """
 Database Models
 SQLAlchemy ORM models for PostgreSQL
-Enterprise schema with automatic embeddings support
 """
 
 from .database_models import (
     CSVData,
-    Embedding,
-    EmbeddingModel,
     ExpectedResponse,
     Metadata,
     Parameter,
@@ -25,7 +22,5 @@ __all__ = [
     "ExpectedResponse",
     "Metadata",
     "CSVData",
-    "EmbeddingModel",
-    "Embedding",
     "EmailVerification",
 ]

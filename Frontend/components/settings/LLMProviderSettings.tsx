@@ -53,13 +53,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ProviderIcon } from '@/components/ui/provider-icons'
-import {
-  LLM_PROVIDERS,
-  getAllProviders,
-  getProviderById,
-  type LLMProviderType,
-  type LLMProviderInfo,
-} from '@/lib/constants/llm-providers'
+import { describeAccess, useProviders } from '@/hooks/useProviders'
+import type { ProviderInfo } from '@/lib/api-types'
 import { ModelPicker, formatShortDate } from '@/components/settings/ModelPicker'
 import type { CatalogModel } from '@/lib/api-types'
 
@@ -93,7 +88,7 @@ interface LLMConfig {
 
 interface ProviderCardProps {
   config: LLMConfig
-  providerInfo: LLMProviderInfo
+  providerInfo: ProviderInfo
   /** Catalogue entry for the configured model; undefined when the catalogue hasn't listed it. */
   catalogModel?: CatalogModel
   onEdit: () => void
@@ -139,7 +134,7 @@ const ProviderCard = ({
               ? "bg-primary/10 ring-4 ring-primary/5" 
               : "bg-muted/50"
           )}>
-            <ProviderIcon provider={providerInfo.icon} size={28} className="text-foreground" />
+            <ProviderIcon provider={providerInfo.id} label={providerInfo.label} size={28} className="text-foreground" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -152,7 +147,7 @@ const ProviderCard = ({
               )}
             </div>
             <p className="text-sm text-muted-foreground mt-1">
-              {providerInfo.name} • <span className="font-mono text-xs">{config.model_name}</span>
+              {providerInfo.label} • <span className="font-mono text-xs">{config.model_name}</span>
             </p>
           </div>
         </div>
@@ -198,7 +193,7 @@ const ProviderCard = ({
         {/* API Key Status */}
         <div className={cn(
           "p-3 rounded-xl border transition-colors",
-          config.has_api_key || !providerInfo.requiresApiKey
+          config.has_api_key || !providerInfo.requires_key
             ? "bg-success/5 border-success/20"
             : "bg-warning/5 border-warning/20"
         )}>
@@ -208,7 +203,7 @@ const ProviderCard = ({
                 <CheckCircle2 className="h-4 w-4 text-success" />
                 <span className="text-sm font-medium text-success dark:text-success">API Key Set</span>
               </>
-            ) : !providerInfo.requiresApiKey ? (
+            ) : !providerInfo.requires_key ? (
               <>
                 <CheckCircle2 className="h-4 w-4 text-success" />
                 <span className="text-sm font-medium text-success dark:text-success">No key needed</span>
@@ -281,7 +276,7 @@ const ProviderCard = ({
       {catalogModel?.status === 'active' && catalogModel.shutdown_date && (
         <div role="status" className="mb-5 flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/5 p-3 text-sm text-warning">
           <Clock className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{providerInfo.name} will shut this model down on {formatShortDate(catalogModel.shutdown_date)}.</span>
+          <span>{providerInfo.label} will shut this model down on {formatShortDate(catalogModel.shutdown_date)}.</span>
         </div>
       )}
 
@@ -309,7 +304,7 @@ const ProviderCard = ({
 
 interface ProviderFormData {
   name: string
-  provider: LLMProviderType
+  provider: string
   model_name: string
   api_key: string
   base_url: string
@@ -356,7 +351,16 @@ const ProviderDialog = ({
   const [nameTouched, setNameTouched] = useState(false)
   const [showApiKey, setShowApiKey] = useState(false)
 
-  const providerInfo = getProviderById(formData.provider)
+  const { providers, getProvider } = useProviders()
+  // Only providers that need a saved connection; built-in models need none.
+  const connectable = providers.filter(p => p.chat || p.requires_key || p.custom_base_url)
+  const providerInfo: ProviderInfo = getProvider(formData.provider) ?? {
+    id: formData.provider, label: formData.provider, description: '', api: 'openai', base_url: '', key_url: '',
+    requires_key: false, list_requires_key: false, chat: true, embeddings: false, local: false,
+    free_tier: false, custom_base_url: false, embed_batch: 0, access: null,
+  }
+  // Providers without chat models (Jina) are connected for their embedding models.
+  const modelKind = providerInfo.chat ? 'llm' : 'embedding'
   const settledKey = useSettled(formData.api_key.trim(), 600)
   const settledBaseUrl = useSettled(formData.base_url.trim(), 600)
   const baseUrlError = formData.base_url && !isValidUrl(formData.base_url)
@@ -368,14 +372,14 @@ const ProviderDialog = ({
     if (editConfig) {
       setFormData({
         name: editConfig.name,
-        provider: editConfig.provider as LLMProviderType,
+        provider: editConfig.provider,
         model_name: editConfig.model_name,
         api_key: '',
         base_url: editConfig.base_url || '',
       })
       setNameTouched(true)
     } else {
-      setFormData({ ...EMPTY_FORM, name: LLM_PROVIDERS.ollama.name })
+      setFormData({ ...EMPTY_FORM, name: 'Ollama' })
       setNameTouched(false)
     }
     setShowApiKey(false)
@@ -383,7 +387,7 @@ const ProviderDialog = ({
 
   // A new connection to a keyed provider can't be listed until a key is typed;
   // an existing one lists with its saved key.
-  const canList = !providerInfo.requiresApiKey || !!settledKey || !!editConfig
+  const canList = !providerInfo.list_requires_key || !!settledKey || !!editConfig
   const discovery = useQuery({
     queryKey: ['model-discovery', formData.provider, settledKey, settledBaseUrl, editConfig?.config_id ?? null],
     queryFn: () => apiClient.discoverModels({
@@ -397,8 +401,8 @@ const ProviderDialog = ({
     retry: false,
   })
   const chatModels = useMemo(
-    () => (discovery.data?.models ?? []).filter(m => m.kind === 'llm'),
-    [discovery.data]
+    () => (discovery.data?.models ?? []).filter(m => m.kind === modelKind),
+    [discovery.data, modelKind]
   )
   const discoveryError = discovery.error
     ? 'Could not reach the server to list models.'
@@ -413,14 +417,14 @@ const ProviderDialog = ({
     }
   }, [chatModels, formData.model_name])
 
-  const handleProviderChange = (next: LLMProviderType) => {
+  const handleProviderChange = (next: string) => {
     setFormData(f => ({
       ...f,
       provider: next,
       model_name: '',
       api_key: '',
       base_url: '',
-      name: nameTouched ? f.name : LLM_PROVIDERS[next].name,
+      name: nameTouched ? f.name : getProvider(next)?.label ?? next,
     }))
   }
 
@@ -452,24 +456,27 @@ const ProviderDialog = ({
             <Label className="font-semibold">Provider</Label>
             <Select
               value={formData.provider}
-              onValueChange={(v: string) => handleProviderChange(v as LLMProviderType)}
+              onValueChange={(v: string) => handleProviderChange(v)}
               disabled={!!editConfig}
             >
               <SelectTrigger className="h-12 rounded-xl">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="rounded-xl">
-                {getAllProviders().map((provider) => (
+                {connectable.map((provider) => (
                   <SelectItem key={provider.id} value={provider.id} className="rounded-lg">
                     <div className="flex items-center gap-3 py-1">
-                      <ProviderIcon provider={provider.icon} size={20} />
+                      <ProviderIcon provider={provider.id} label={provider.label} size={20} />
                       <div className="flex flex-col">
                         <span className="font-medium">
-                          {provider.name}
+                          {provider.label}
                           {provider.local && <span className="ml-2 text-xs text-info">local</span>}
-                          {provider.freeTier && !provider.local && <span className="ml-2 text-xs text-success">free tier</span>}
+                          {provider.free_tier && !provider.local && <span className="ml-2 text-xs text-success">free tier</span>}
                         </span>
-                        <span className="text-xs text-muted-foreground">{provider.description}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {provider.description}
+                          {provider.access && provider.access !== 'none-needed' && ` · ${describeAccess(provider)}`}
+                        </span>
                       </div>
                     </div>
                   </SelectItem>
@@ -479,17 +486,17 @@ const ProviderDialog = ({
           </div>
 
           {/* API key */}
-          {(providerInfo.requiresApiKey || providerInfo.id === 'custom') && (
+          {(providerInfo.requires_key || providerInfo.id === 'custom') && (
             <div className="space-y-2">
               <div className="flex items-baseline justify-between gap-2">
                 <Label htmlFor="api_key" className="font-semibold">
                   API key{' '}
                   {editConfig && <span className="font-normal text-muted-foreground">(leave empty to keep the saved one)</span>}
-                  {!providerInfo.requiresApiKey && !editConfig && <span className="font-normal text-muted-foreground">(optional)</span>}
+                  {!providerInfo.requires_key && !editConfig && <span className="font-normal text-muted-foreground">(optional)</span>}
                 </Label>
-                {providerInfo.keyUrl && providerInfo.requiresApiKey && (
+                {providerInfo.key_url && providerInfo.requires_key && (
                   <a
-                    href={providerInfo.keyUrl}
+                    href={providerInfo.key_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
@@ -504,8 +511,8 @@ const ProviderDialog = ({
                   type={showApiKey ? 'text' : 'password'}
                   value={formData.api_key}
                   onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
-                  placeholder={providerInfo.apiKeyPlaceholder}
-                  required={providerInfo.requiresApiKey && !editConfig}
+                  placeholder={`Paste your ${providerInfo.label} API key`}
+                  required={providerInfo.requires_key && !editConfig && providerInfo.access !== 'deployment'}
                   autoComplete="off"
                   className="pr-12 h-12 rounded-xl"
                 />
@@ -522,13 +529,14 @@ const ProviderDialog = ({
               </div>
               <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                 <Shield className="h-3 w-3" />
-                Encrypted before it is stored. It is only sent to {providerInfo.name}.
+                Encrypted before it is stored. It is only sent to {providerInfo.label}.
+                {providerInfo.access === 'deployment' && !editConfig && ' Leave empty to use the key this deployment already has.'}
               </p>
             </div>
           )}
 
           {/* Server URL (self-hosted providers only) */}
-          {providerInfo.supportsCustomBaseUrl && (
+          {providerInfo.custom_base_url && (
             <div className="space-y-2">
               <Label htmlFor="base_url" className="font-semibold">
                 Server URL {providerInfo.id !== 'custom' && <span className="font-normal text-muted-foreground">(optional)</span>}
@@ -538,7 +546,7 @@ const ProviderDialog = ({
                 type="url"
                 value={formData.base_url}
                 onChange={(e) => setFormData({ ...formData, base_url: e.target.value })}
-                placeholder={providerInfo.baseUrlPlaceholder}
+                placeholder={providerInfo.id === 'ollama' ? 'Leave empty to use the bundled Ollama' : 'http://localhost:1234/v1'}
                 required={providerInfo.id === 'custom'}
                 className={cn('h-12 rounded-xl', baseUrlError && 'border-destructive focus-visible:ring-destructive')}
               />
@@ -630,6 +638,7 @@ const ProviderDialog = ({
 
 export const LLMProviderSettings = () => {
   const queryClient = useQueryClient()
+  const { getProvider } = useProviders()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editConfig, setEditConfig] = useState<LLMConfig | null>(null)
   const [testingConfigId, setTestingConfigId] = useState<string | null>(null)
@@ -838,7 +847,8 @@ export const LLMProviderSettings = () => {
           ) : (
             <div className="grid gap-4 lg:grid-cols-2">
               {configs.map((config) => {
-                const providerInfo = getProviderById(config.provider)
+                const providerInfo = getProvider(config.provider)
+                if (!providerInfo) return null
                 return (
                   <ProviderCard
                     key={config.config_id}

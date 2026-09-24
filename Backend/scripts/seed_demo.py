@@ -59,6 +59,10 @@ from app.services.pgvector_store import get_pgvector_store  # noqa: E402
 DEMO_USER_ID = uuid.UUID("00000000-0000-4000-8000-000000000d30")
 DEMO_EMAIL = os.getenv("SEED_DEMO_EMAIL", "demo@nlpforge.dev")
 DEMO_PASSWORD = os.getenv("SEED_DEMO_PASSWORD", "DemoForge!2026")
+# The demo utterances are one ordinary dataset, so the demo user can re-embed
+# them with any model and see the model-mismatch flow like any other user.
+DEMO_DATASET_ID = uuid.UUID("00000000-0000-4000-8000-00000000da7a")
+DEMO_DATASET_NAME = "Demo catalogue utterances"
 
 
 def load_api_surface() -> List[Dict[str, Any]]:
@@ -256,9 +260,10 @@ async def seed_vectors(
     """
     Embed every utterance and write it to vector_rows.
 
-    Embedding happens through the runtime adapter, so the vectors match whichever
-    EXECUTION_MODE this deployment runs — 768-dim in local mode, 384-dim in
-    cloud. Storing model+dimension per row is what makes that safe.
+    Embeds with the deployment default model (app.core.runtime), which is also
+    what a user who never picks a model searches with. Every row records the
+    provider, model and measured dimension, so a user who switches models is
+    told to re-embed instead of silently comparing incompatible vectors.
     """
     embedder = get_embedder()
 
@@ -269,7 +274,7 @@ async def seed_vectors(
             rows.append(
                 {
                     "t_id": ids[tpl["api_name"]],
-                    "dataset_id": None,
+                    "dataset_id": DEMO_DATASET_ID,
                     "query": utt,
                     "api_name": tpl["api_name"],
                     "endpoint": tpl["endpoint"],
@@ -281,7 +286,7 @@ async def seed_vectors(
             )
             texts.append(utt)
 
-    logger.info(f"Embedding {len(texts)} utterances with {embedder.model_id}...")
+    logger.info(f"Embedding {len(texts)} utterances with {embedder.provider}/{embedder.model_id}...")
     vectors = await embedder.embed(texts)
     if len(vectors) != len(texts):
         raise SystemExit(
@@ -290,18 +295,86 @@ async def seed_vectors(
         )
 
     store = get_pgvector_store()
+    async with AsyncSessionLocal() as plain:
+        await store.ensure_index(plain, embedder.dimension)
+    csv_path = write_demo_csv(rows)
     async with tenant_session(DEMO_USER_ID) as db:
         # Clear first so a re-run refreshes rather than duplicating.
-        await db.execute(text("DELETE FROM vector_rows WHERE test_category = 'demo_seed'"))
+        await db.execute(
+            text("DELETE FROM vector_rows WHERE test_category = 'demo_seed' OR dataset_id = CAST(:d AS uuid)"),
+            {"d": str(DEMO_DATASET_ID)},
+        )
+        await upsert_demo_dataset(db, rows, csv_path, embedder)
         written = await store.upsert_rows(
             db,
             rows,
             vectors,
             embedding_model=embedder.model_id,
             dimension=embedder.dimension,
+            embedding_provider=embedder.provider,
         )
     logger.info(f"Indexed {written} vectors")
     return written
+
+
+def write_demo_csv(rows: List[Dict[str, Any]]) -> str:
+    """The utterances as a dataset CSV, so re-embedding reads them like any upload."""
+    import csv
+
+    from app.core.config import DATASETS_DIR
+
+    path = DATASETS_DIR / "demo_catalogue_utterances.csv"
+    columns = ["query", "api_name", "endpoint", "method", "scenario_type", "test_category", "intent_type"]
+    with open(path, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=columns, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+    return str(path)
+
+
+async def upsert_demo_dataset(db, rows: List[Dict[str, Any]], csv_path: str, embedder) -> None:
+    """The dataset record (tagged with the model that embedded it) and its viewable rows."""
+    from sqlalchemy import delete
+
+    from app.models.database_models import CSVData, Dataset, utc_now
+
+    now = utc_now()
+    await db.merge(Dataset(
+        dataset_id=DEMO_DATASET_ID,
+        u_id=DEMO_USER_ID,
+        name=DEMO_DATASET_NAME,
+        description="Hand-written example requests for the 20 demo API templates (also the routing benchmark's index).",
+        csv_path=csv_path,
+        embedding_provider=embedder.provider,
+        embedding_model=embedder.model_id,
+        embedding_dimension=embedder.dimension,
+        embedding_status="completed",
+        embedding_progress=100,
+        embedding_error=None,
+        total_rows=len(rows),
+        embedded_rows=len(rows),
+        created_at=now,
+        embedding_started_at=now,
+        embedding_completed_at=now,
+    ))
+    await db.execute(delete(CSVData).where(CSVData.dataset_id == DEMO_DATASET_ID))
+    db.add_all([
+        CSVData(
+            u_id=DEMO_USER_ID,
+            t_id=row["t_id"],
+            dataset_id=DEMO_DATASET_ID,
+            query=row["query"],
+            api_name=row["api_name"],
+            endpoint=row["endpoint"],
+            data_category="valid",
+            embedded_with_model=embedder.model_id,
+            is_embedded=1,
+            intent_type=row["intent_type"],
+            created_at=now,
+        )
+        for row in rows
+    ])
+    await db.flush()
 
 
 async def verify(templates: List[Dict[str, Any]]) -> bool:
@@ -329,6 +402,7 @@ async def verify(templates: List[Dict[str, Any]]) -> bool:
             qv,
             embedding_model=embedder.model_id,
             dimension=embedder.dimension,
+            embedding_provider=embedder.provider,
             top_k=25,
         )
 

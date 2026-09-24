@@ -21,13 +21,12 @@ RUN useradd -m -u 1000 appuser
 COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN mkdir -p /app/datasets /app/.cache && chown -R appuser:appuser /app
+RUN mkdir -p /app/datasets /app/.cache/fastembed && chown -R appuser:appuser /app
 USER appuser
 
 COPY --chown=appuser:appuser app/ ./app/
 COPY --chown=appuser:appuser alembic.ini ./
 COPY --chown=appuser:appuser alembic/ ./alembic/
-COPY --chown=appuser:appuser config/ ./config/
 COPY --chown=appuser:appuser scripts/ ./scripts/
 # Boot scripts: init_db_direct.py, seed_admin.py
 COPY --chown=appuser:appuser *.py ./

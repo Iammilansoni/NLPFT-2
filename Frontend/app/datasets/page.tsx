@@ -52,6 +52,16 @@ import {
 } from "@/components/ui/tooltip"
 import { toast } from '@/hooks/use-toast'
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour'
+import { ModelMismatchPanel, apiErrorMessage } from '@/components/embeddings/ModelMismatchPanel'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { apiClient } from '@/lib/api'
+import type { MismatchOption } from '@/lib/api-types'
 
 interface DatasetRecord {
   api: string
@@ -114,6 +124,12 @@ interface PersistentDataset {
   embedded_rows: number
   embedding_status: string
   embedding_model?: string
+  embedding_progress?: number
+  embedding_error?: string | null
+  /** The model that produced this dataset's vectors (null until embedded). */
+  embedding?: { provider: string; provider_label: string; model_id: string; dimension: number; label: string } | null
+  /** False when the dataset was embedded with a different model than the one you search with. */
+  matches_active_embedding?: boolean | null
   source_type: 'AI_GENERATED' | 'CSV_UPLOAD'
   created_at: string
   updated_at?: string
@@ -149,6 +165,7 @@ export default function DatasetGeneratorPage() {
   const [renamingDataset, setRenamingDataset] = useState<PersistentDataset | null>(null)
   const [newDatasetName, setNewDatasetName] = useState('')
   const [embeddingDatasetId, setEmbeddingDatasetId] = useState<string | null>(null)
+  const [mismatch, setMismatch] = useState<{ message: string; options: MismatchOption[] } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
   const RAW_API_BASE = getApiBase()
@@ -499,40 +516,17 @@ export default function DatasetGeneratorPage() {
   const handleEmbedDataset = async (datasetId: string, forceReembed: boolean = false) => {
     setEmbeddingDatasetId(datasetId)
 
-    // Show start notification
-    toast({
-      title: forceReembed ? "Re-embedding Started" : "Embedding Started",
-      description: "Processing vectors with your current embedding model...",
-    })
-
     try {
-      const url = `${API_BASE}/api/v1/datasets/db/${datasetId}/embed${forceReembed ? '?force_reembed=true' : ''}`
-      const response = await fetch(url, withSession({
-        method: 'POST',
-      }))
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || 'Failed to embed dataset')
-      }
-
-      const result = await response.json()
-
-      // Show success notification
-      toast({
-        title: "✓ Embedding Completed",
-        description: `Successfully embedded ${result.embedded_count || 'all'} rows with ${result.model || 'current model'}`,
-      })
-
-      // Refresh datasets to show updated status
+      // Runs on the worker; the list polls while the dataset is in progress.
+      const result = await apiClient.embedDataset(datasetId, forceReembed)
+      toast({ title: forceReembed ? "Re-embedding started" : "Embedding started", description: result.message })
       await fetchAllTasks()
     } catch (err: any) {
-      toast({
-        title: "Embedding Failed",
-        description: err.message || formatError(err),
-        variant: "destructive",
-      })
-      setError(formatError(err))
+      if (err?.detail?.error === 'MODEL_MISMATCH') {
+        setMismatch({ message: err.detail.message, options: err.detail.options ?? [] })
+      } else {
+        toast({ title: "Could not start embedding", description: apiErrorMessage(err), variant: "destructive" })
+      }
     } finally {
       setEmbeddingDatasetId(null)
     }
@@ -1059,6 +1053,24 @@ export default function DatasetGeneratorPage() {
                           {dataset.template_name}
                         </div>
                       )}
+                      {dataset.embedding && (
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                          <span
+                            className="inline-flex max-w-full items-center truncate rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                            title={`Embedded with ${dataset.embedding.label}`}
+                          >
+                            {dataset.embedding.label}
+                          </span>
+                          {dataset.matches_active_embedding === false && (
+                            <span
+                              className="inline-flex items-center rounded-md bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning"
+                              title="Your embedding model is different, so search leaves this dataset out until it is re-embedded."
+                            >
+                              Different model: not searched
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Source */}
@@ -1086,7 +1098,16 @@ export default function DatasetGeneratorPage() {
                       ) : dataset.embedding_status === 'in_progress' ? (
                         <div className="flex items-center gap-1.5 text-xs text-info dark:text-info font-medium">
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          Processing
+                          Embedding {dataset.embedding_progress ? `${dataset.embedding_progress}%` : '…'}
+                        </div>
+                      ) : dataset.embedding_status === 'failed' ? (
+                        <div className="text-xs text-destructive" title={dataset.embedding_error ?? undefined}>
+                          <div className="flex items-center gap-1.5 font-medium">
+                            <AlertTriangle className="w-3.5 h-3.5" /> Failed
+                          </div>
+                          {dataset.embedding_error && (
+                            <p className="mt-0.5 line-clamp-2 text-[11px] text-destructive/80">{dataset.embedding_error}</p>
+                          )}
                         </div>
                       ) : (
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -1124,7 +1145,7 @@ export default function DatasetGeneratorPage() {
                         </Tooltip>
                       </TooltipProvider>
 
-                      {dataset.embedding_status !== 'completed' && dataset.embedding_status !== 'in_progress' && (
+                      {(dataset.embedding_status !== 'completed' || dataset.matches_active_embedding === false) && dataset.embedding_status !== 'in_progress' && (
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -1132,7 +1153,7 @@ export default function DatasetGeneratorPage() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-muted-foreground hover:text-info"
-                                onClick={() => handleEmbedDataset(dataset.dataset_id)}
+                                onClick={() => handleEmbedDataset(dataset.dataset_id, dataset.embedding_status === 'failed')}
                                 disabled={embeddingDatasetId === dataset.dataset_id}
                               >
                                 {embeddingDatasetId === dataset.dataset_id ? (
@@ -1142,7 +1163,9 @@ export default function DatasetGeneratorPage() {
                                 )}
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent>Generate Embeddings</TooltipContent>
+                            <TooltipContent>
+                              {dataset.matches_active_embedding === false ? 'Re-embed with your model' : 'Embed for routing'}
+                            </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
                       )}
@@ -1304,6 +1327,28 @@ export default function DatasetGeneratorPage() {
             </div>
           </div>
         )}
+
+        {/* Embedding model mismatch: switch model, or re-embed */}
+        <Dialog open={!!mismatch} onOpenChange={(open) => !open && setMismatch(null)}>
+          <DialogContent className="sm:max-w-[560px] rounded-2xl">
+            <DialogHeader>
+              <DialogTitle>Different embedding model</DialogTitle>
+              <DialogDescription>
+                This dataset&apos;s vectors come from another model than the one you search with.
+              </DialogDescription>
+            </DialogHeader>
+            {mismatch && (
+              <ModelMismatchPanel
+                message={mismatch.message}
+                options={mismatch.options}
+                onResolved={() => {
+                  setMismatch(null)
+                  fetchAllTasks()
+                }}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
 
       </main>
     </div>

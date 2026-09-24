@@ -12,6 +12,8 @@
 
 x-backend-env: &backend-env
   # In-network addresses. These override anything in .env on purpose.
+  # Built-in ONNX embedding models download here once and persist in a volume.
+  ONNX_CACHE_DIR: /app/.cache/fastembed
   DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-nlpforge}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-nlpforge}
   SYNC_DATABASE_URL: postgresql://${POSTGRES_USER:-nlpforge}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nlpforge}
   POSTGRES_HOST: postgres
@@ -128,6 +130,7 @@ services:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
       - backend_datasets:/app/datasets
+      - onnx_models:/app/.cache/fastembed
     depends_on:
       postgres:
         condition: service_healthy
@@ -158,6 +161,7 @@ services:
       <<: *backend-env
     volumes:
       - backend_datasets:/app/datasets  # worker writes generated CSVs, API serves them
+      - onnx_models:/app/.cache/fastembed
     depends_on:
       backend:
         condition: service_healthy
@@ -197,3 +201,4 @@ volumes:
   redis_data:
   backend_datasets:
   ollama_models:
+  onnx_models:

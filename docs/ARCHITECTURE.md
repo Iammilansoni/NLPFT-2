@@ -13,25 +13,27 @@ Browser ──► Next.js 16 (App Router)
            FastAPI ── auth · rate limiting (Redis) · structured errors · request tracing
               │
               ├── Routing pipeline      app/services/multi_model_semantic_service.py
-              │     Stage 1  embed + recall     app/core/runtime.py, app/services/pgvector_store.py
+              │     Stage 1  embed + recall     app/services/model_access.py, app/services/pgvector_store.py
               │     Stage 2  rank templates     app/nlp/cross_encoder_reranker.py
               │     Stage 3  extract body       app/services/structured_extraction_service.py
               │
               ├── Template catalogue    app/api/v1/template_builder.py  (draft → review → approved)
               ├── Datasets              app/api/v1/datasets.py → Celery worker → LLM generation
-              └── Embedding             app/services/multi_model_embedding_service.py → pgvector
+              ├── Embedding             app/services/multi_model_embedding_service.py → Celery worker → pgvector
+              └── Providers & models    app/llm/provider_registry.py, model_discovery.py, embeddings.py
 
-PostgreSQL 16 + pgvector   users, templates, datasets, vector_rows (HNSW), RLS policies
+PostgreSQL 16 + pgvector   users, templates, datasets, vector_rows (HNSW), model catalogue, RLS policies
 Redis                      Celery broker/results, rate-limit counters, JWT deny-list, breaker state
-Ollama (local mode)        nomic-embed-text (768-d) embeddings, llama3.2:3b extraction
+Ollama (local mode)        default embeddings (nomic-embed-text) and llama3.2:3b extraction
+Hosted providers           any of ~20 in the registry, with the user's own key or a deployment key
 ```
 
 ## Request flow: `POST /api/v1/query/semantic-search`
 
 | Step | What happens | Code |
 |---|---|---|
-| 1. Embed | The query is embedded with the deployment's single embedder (Ollama `nomic-embed-text` locally, ONNX `bge-small-en-v1.5` in cloud mode). | `core/runtime.py` |
-| 2. Recall | KNN over `vector_rows` inside a transaction bound to the caller's tenant: `u_id = current_setting('app.tenant_id')`, `dimension`, and `embedding_model` filters, HNSW cosine, top-25. | `services/pgvector_store.py` |
+| 1. Embed | The query is embedded with the caller's embedding model: their choice in Settings → Embedding model, else the deployment default (Ollama `nomic-embed-text` locally, in-process ONNX `bge-small-en-v1.5` in cloud mode). | `services/model_access.py` |
+| 2. Recall | KNN over `vector_rows` inside a transaction bound to the caller's tenant: `u_id = current_setting('app.tenant_id')`, plus `embedding_provider`, `embedding_model` and `dimension` filters, HNSW cosine, top-25. | `services/pgvector_store.py` |
 | 3. Rank | Row scores are max-pooled per template. The top template is the route. A FlashRank cross-encoder is implemented but off by default (see "Decisions" below). | `nlp/cross_encoder_reranker.py` |
 | 4. Resolve | The winning template (endpoint, method, request schema) is loaded from Postgres. | `multi_model_semantic_service.py` |
 | 5. Extract | The LLM decodes under the template's JSON Schema (Ollama `format`). Pydantic validates the result. On failure, one repair retry feeds the validation error back. Missing required fields are reported, never invented. The call goes through a Redis-backed circuit breaker. | `services/structured_extraction_service.py` |
@@ -43,7 +45,8 @@ Ollama (local mode)        nomic-embed-text (768-d) embeddings, llama3.2:3b extr
 |---|---|---|
 | Templates, parameters, samples, status | Postgres | Status is kept in the `metadata` table (draft/review/approved). |
 | Generated / uploaded datasets | Postgres `datasets`, `csv_data` + CSV on a shared volume | Written by the Celery worker. |
-| Routable vectors | Postgres `vector_rows` | One row per utterance, storing `embedding_model` and `dimension`. There is one partial HNSW index per dimension (384/768/1536). |
+| Routable vectors | Postgres `vector_rows` | One row per utterance, storing `embedding_provider`, `embedding_model` and `dimension`. A partial HNSW index per dimension is created the first time a model of that width is used: `vector` up to 2000 dims, `halfvec` up to 4000, exact search beyond. |
+| Embedding choice | Postgres `user_settings` | (provider, model, measured dimension); empty means the deployment default. |
 | Sessions | HttpOnly cookies (JWT) + Redis deny-list | Access tokens are short-lived; refresh tokens rotate. |
 | Model catalogue | Postgres `model_catalog`, `model_catalog_sources` | Every model each provider reports serving, with its lifecycle state and the health of each provider's last sync. |
 
@@ -51,8 +54,8 @@ Ollama (local mode)        nomic-embed-text (768-d) embeddings, llama3.2:3b extr
 
 No model list is written into the code. `app/llm/model_discovery.py` asks each
 provider what it serves right now (Ollama `/api/tags` + `/api/show`, Gemini
-`models.list`, the OpenAI-style `/models` of Groq, OpenRouter, OpenAI, DeepSeek and
-xAI, Anthropic `/v1/models`). Whether a model is for chat or embeddings comes from
+`models.list`, Anthropic `/v1/models`, the built-in ONNX library's own model list, and
+the OpenAI-style `/models` of every other provider in `app/llm/provider_registry.py`). Whether a model is for chat or embeddings comes from
 the provider's own metadata where it exists. An embedding model's dimension is read
 from provider metadata, or measured by embedding one string. It is never guessed from
 the name.
@@ -72,6 +75,32 @@ Models found with deployment or public credentials are shared. Models found with
 user's own key are visible only to that user, so private models (fine-tunes, custom
 endpoints) never leak between tenants. Only Ollama and custom endpoints accept a
 user-supplied URL, and link-local addresses such as cloud metadata services are refused.
+
+## Embedding models
+
+Each user picks an embedding model from any provider in
+`app/llm/provider_registry.py` that offers embeddings: local (Ollama, built-in ONNX,
+a custom server) or hosted (Gemini, OpenAI, Mistral, Cohere, NVIDIA, Jina, Together,
+OpenRouter, ...). A hosted provider is listed whether or not the deployment has a key
+for it: the user's own saved key is used first, then a deployment-wide key.
+
+Vectors from different models cannot be compared, so the triple
+**(provider, model, dimension)** is recorded on every dataset and vector row, and search
+filters on all three. Choosing a model makes one real embedding call, which verifies the
+key and model and measures the dimension instead of trusting a number.
+
+When data and search use different models, nothing is compared silently:
+
+| Situation | What the user sees |
+|---|---|
+| Searching a dataset embedded with another model | `MODEL_MISMATCH` with two options: switch to that model, or re-embed the dataset |
+| Nothing indexed for the active model, but other models have data | `MODEL_MISMATCH` listing those datasets, with *switch* and *re-embed all* |
+| Results found, but some datasets use other models | Results, plus `metadata.excluded_datasets` and the same options |
+| The provider needs a key the user doesn't have | `EMBEDDING_FAILED`, and the message says where to add one |
+
+Embedding runs on the Celery worker, so a free-tier provider's rate limits cannot time out
+a request. The client honours `Retry-After` and backs off. If a provider keeps refusing,
+the dataset records a plain-English reason.
 
 ## Tenancy
 
@@ -107,7 +136,8 @@ the 20-template demo catalogue, reproduced in CI on every push.
 | pgvector instead of Redis vectors | A single store keeps vectors transactionally consistent with templates, and tenancy can be enforced by Postgres. |
 | Constrained decoding + Pydantic + repair | Malformed JSON becomes unrepresentable. Validation errors are fed back once, and a failure is reported instead of returning `{}`. |
 
-Live measurement through the API in local mode (`nomic-embed-text` through pgvector): Hit@1
+Live measurement through the API in local mode (`nomic-embed-text` through pgvector, re-measured
+after per-user embedding models landed): Hit@1
 0.800 and Hit@3 0.967 over the same 180 queries.
 
 ## Failure behaviour
@@ -116,7 +146,8 @@ Live measurement through the API in local mode (`nomic-embed-text` through pgvec
 |---|---|
 | Embedder unreachable | `success: false, error: EMBEDDING_FAILED` |
 | No indexed utterances | `success: false, error: NO_RESULTS` with guidance to embed a dataset |
-| Dataset embedded with another model | `MODEL_MISMATCH`: the vectors are never compared across models |
+| Dataset embedded with another model | `MODEL_MISMATCH` with options to switch model or re-embed; vectors are never compared across models |
+| Provider rate-limits embedding | Retried with backoff on the worker; a persistent limit is recorded on the dataset in plain words |
 | LLM unreachable / circuit open | Route still returned. `extraction.ok=false, degraded=true`, with the reason |
 | Required field absent from the request | `extraction.ok=false`, partial `values`, `missing_required: [...]` |
 

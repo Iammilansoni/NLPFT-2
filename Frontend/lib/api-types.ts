@@ -457,6 +457,10 @@ export interface SemanticRetrieveMetadata {
   vector_score?: number;
   reranker_enabled?: boolean;
   timings_ms?: { embed: number; vector_search: number; ranking: number; extraction: number };
+  /** The embedding model this search used. */
+  embedding?: EmbeddingSelection;
+  /** Datasets left out because they were embedded with a different model. */
+  excluded_datasets?: EmbeddingGroup[];
 }
 
 export interface SemanticRetrieveResponse {
@@ -477,6 +481,8 @@ export interface SemanticRetrieveResponse {
   base_url?: string;
   confidence?: number;
   alternatives?: SemanticRetrieveStage2Result[];
+  /** How to make datasets from other embedding models searchable. */
+  options?: MismatchOption[] | null;
 }
 
 // ============================================================================
@@ -551,4 +557,82 @@ export interface ModelDiscoveryResponse {
   error_code?: string;
   provider_label?: string;
   models: CatalogModel[];
+}
+
+// ============================================================================
+// Providers and embedding models
+// ============================================================================
+
+/** One entry of the backend provider registry (GET /llm-config/providers). */
+export interface ProviderInfo {
+  id: string;
+  label: string;
+  description: string;
+  api: string;
+  base_url: string;
+  key_url: string;
+  requires_key: boolean;
+  list_requires_key: boolean;
+  chat: boolean;
+  embeddings: boolean;
+  local: boolean;
+  free_tier: boolean;
+  custom_base_url: boolean;
+  embed_batch: number;
+  /** How the current user can reach it: their own connection, a deployment key, no key needed, or not at all. */
+  access: 'connection' | 'deployment' | 'none-needed' | null;
+}
+
+/** The (provider, model, dimension) that search and embedding use. */
+export interface EmbeddingSelection {
+  provider: string;
+  provider_label: string;
+  model_id: string;
+  dimension: number;
+  is_default: boolean;
+  label: string;
+}
+
+/** Datasets whose vectors came from one embedding model. */
+export interface EmbeddingGroup {
+  provider: string;
+  provider_label: string;
+  model_id: string;
+  dimension: number;
+  label: string;
+  matches_active?: boolean;
+  datasets: Array<{ dataset_id: string; name: string; rows: number }>;
+}
+
+export interface EmbeddingSettingsResponse {
+  active: EmbeddingSelection;
+  deployment_default: { provider: string; provider_label: string; model_id: string; dimension: number };
+  providers: Array<ProviderInfo & { connected: boolean; credential_source: string | null }>;
+  models: CatalogModel[];
+  groups: EmbeddingGroup[];
+  needs_reembed: Array<{ dataset_id: string; name: string; rows: number }>;
+  message?: string;
+}
+
+/** A way out of a model mismatch, as offered by the backend. */
+export interface MismatchOption {
+  action: 'switch_model' | 'reembed' | 'reembed_all';
+  label: string;
+  description: string;
+  provider?: string;
+  model_id?: string;
+  dimension?: number;
+  dataset_id?: string;
+  dataset_ids?: string[];
+}
+
+export interface EmbedQueuedResponse {
+  success: boolean;
+  queued?: boolean;
+  dataset_id: string;
+  status: string;
+  provider?: string;
+  model_id?: string;
+  dimension?: number;
+  message: string;
 }

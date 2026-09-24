@@ -13,11 +13,12 @@ schema-valid request body for it.
 
 Model governance
 ----------------
-One embedder per deployment (`EXECUTION_MODE`): Ollama nomic-embed-text (768d)
-locally, in-process ONNX bge-small (384d) in cloud mode. Every vector row records
-the model and dimension that produced it and Stage 1 filters on both, so rows
-embedded by a different model are never compared against this query. A dataset
-embedded with another model is reported as MODEL_MISMATCH instead of searched.
+Each user searches with their own embedding model (Settings -> Embedding model,
+else the deployment default). Every vector row records the (provider, model,
+dimension) that produced it and Stage 1 filters on all three, so rows embedded
+by a different model are never compared against this query. Datasets indexed
+with another model are listed back to the caller with the two ways to make them
+searchable (switch model, or re-embed) instead of being silently skipped.
 
 Tenancy
 -------
@@ -37,15 +38,15 @@ from __future__ import annotations
 
 import time
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logger import logger
-from app.core.runtime import get_embedder
 from app.core.tenancy import tenant_session
+from app.llm.embeddings import EmbeddingError
 from app.models.database_models import Dataset, Template
 from app.models.schemas.embedding_schemas import ErrorCode
 from app.nlp.cross_encoder_reranker import (
@@ -55,16 +56,47 @@ from app.nlp.cross_encoder_reranker import (
     get_reranker,
 )
 from app.nlp.url_extraction import extract_url_from_query
+from app.services.model_access import EmbeddingSelection, active_embedding, embedder_for
+from app.services.multi_model_embedding_service import (
+    dataset_embedding,
+    embedding_groups,
+    mismatch_options,
+)
 from app.services.pgvector_store import get_pgvector_store
 from app.services.structured_extraction_service import get_structured_extraction_service
+
+
+def _other_models(groups: List[Dict[str, Any]], active: EmbeddingSelection) -> List[Dict[str, Any]]:
+    return [g for g in groups if not active.matches(g["provider"], g["model_id"], g["dimension"])]
+
+
+def _switch_options(others: List[Dict[str, Any]], active: EmbeddingSelection) -> List[Dict[str, Any]]:
+    """Ways to make datasets from other models searchable: switch to their model, or re-embed them."""
+    options = [
+        {
+            "action": "switch_model",
+            "label": f"Search with {g['model_id']}",
+            "description": f"Switch your embedding model to {g['label']} ({len(g['datasets'])} dataset(s) use it).",
+            "provider": g["provider"],
+            "model_id": g["model_id"],
+            "dimension": g["dimension"],
+        }
+        for g in others
+    ]
+    options.append({
+        "action": "reembed_all",
+        "label": f"Re-embed with {active.model_id}",
+        "description": f"Replace their vectors using {active.label}.",
+        "dataset_ids": [d["dataset_id"] for g in others for d in g["datasets"]],
+    })
+    return options
 
 
 class MultiModelSemanticRetrievalService:
     """The only service that performs routing. All query endpoints use it."""
 
     def __init__(self):
-        # Process-wide singletons, resolved once.
-        self.embedder = get_embedder()
+        # Process-wide singletons, resolved once. The embedder is per user.
         self.pgvector_store = get_pgvector_store()
         self.reranker = get_reranker()
         self.extractor = get_structured_extraction_service()
@@ -82,13 +114,13 @@ class MultiModelSemanticRetrievalService:
         include_slot_extraction: bool = True,
     ) -> Dict[str, Any]:
         start_time = time.perf_counter()
-        embedder = self.embedder
-        effective_model = embedder.model_id
-        dimension = embedder.dimension
+        active = await active_embedding(db, user_id)
+        effective_model = active.model_id
+        dimension = active.dimension
 
         logger.info(
             f"[route] query='{user_query[:50]}' user={str(user_id)[:8]} "
-            f"embedder={effective_model} dim={dimension} k={top_k}"
+            f"embedder={active.provider}/{effective_model} dim={dimension} k={top_k}"
         )
 
         # -- Model compatibility (only when scoped to a dataset/template) --------
@@ -102,21 +134,22 @@ class MultiModelSemanticRetrievalService:
                 ).limit(1)
             dataset = (await db.execute(stmt)).scalar_one_or_none()
 
-            if dataset and dataset.embedding_model and dataset.embedding_model != effective_model:
-                logger.warning(
-                    f"Model mismatch: runtime={effective_model} dataset={dataset.embedding_model}"
-                )
+            if dataset and dataset.embedding_model and not active.matches(
+                dataset.embedding_provider or "ollama", dataset.embedding_model, dataset.embedding_dimension
+            ):
+                embedded = dataset_embedding(dataset)
+                logger.warning(f"Model mismatch: active={active.label} dataset={embedded['label']}")
                 return {
                     "success": False,
                     "error": ErrorCode.MODEL_MISMATCH,
                     "message": (
-                        f"Model mismatch: this deployment embeds with "
-                        f"'{effective_model}', but the dataset was embedded with "
-                        f"'{dataset.embedding_model}'. Re-embed the dataset."
+                        f"This dataset was embedded with {embedded['label']}, but you are searching "
+                        f"with {active.label}. Vectors from different models can't be compared."
                     ),
+                    "options": mismatch_options(dataset, active),
                     "metadata": {
-                        "embedding_model": effective_model,
-                        "dataset_model": dataset.embedding_model,
+                        "embedding": active.to_dict(),
+                        "dataset_embedding": embedded,
                         "dataset_id": str(dataset.dataset_id),
                     },
                 }
@@ -124,10 +157,16 @@ class MultiModelSemanticRetrievalService:
         # -- Stage 1: embed + recall ---------------------------------------------
         embed_t0 = time.perf_counter()
         try:
+            embedder = await embedder_for(db, user_id, active)
             query_embedding = await embedder.embed_one(user_query)
+        except EmbeddingError as e:
+            logger.error(f"Embedding the query failed: {e.message}")
+            return {"success": False, "error": "EMBEDDING_FAILED", "message": e.message,
+                    "metadata": {"embedding": active.to_dict()}}
         except Exception as e:  # noqa: BLE001 - reported to the caller
             logger.error(f"Embedding generation failed: {e}")
-            return {"success": False, "error": "EMBEDDING_FAILED", "message": str(e)}
+            return {"success": False, "error": "EMBEDDING_FAILED", "message": str(e),
+                    "metadata": {"embedding": active.to_dict()}}
         embed_ms = (time.perf_counter() - embed_t0) * 1000
 
         if not query_embedding:
@@ -154,6 +193,7 @@ class MultiModelSemanticRetrievalService:
                 query_vector,
                 embedding_model=effective_model,
                 dimension=dimension,
+                embedding_provider=active.provider,
                 top_k=top_k,
                 dataset_id=dataset_id,
                 template_id=template_id,
@@ -171,7 +211,28 @@ class MultiModelSemanticRetrievalService:
             for r in search_results
         ]
 
+        # Datasets indexed with other models are invisible to this search: say so.
+        others = _other_models(await embedding_groups(db, user_id), active)
+        excluded = [
+            {**{k: g[k] for k in ("provider", "provider_label", "model_id", "dimension", "label")}, "datasets": g["datasets"]}
+            for g in others
+        ]
+
         if not search_results:
+            if others:
+                count = sum(len(g["datasets"]) for g in others)
+                return {
+                    "success": False,
+                    "error": ErrorCode.MODEL_MISMATCH,
+                    "message": (
+                        f"Nothing is indexed with your embedding model ({active.label}). "
+                        f"{count} dataset(s) were embedded with a different model, and vectors "
+                        f"from different models can't be compared."
+                    ),
+                    "options": _switch_options(others, active),
+                    "stage1_vector_search": [],
+                    "metadata": {"query": user_query, "embedding": active.to_dict(), "excluded_datasets": excluded},
+                }
             return {
                 "success": False,
                 "error": "NO_RESULTS",
@@ -182,6 +243,7 @@ class MultiModelSemanticRetrievalService:
                 "stage1_vector_search": [],
                 "metadata": {
                     "query": user_query,
+                    "embedding": active.to_dict(),
                     "embedding_model": effective_model,
                     "stage1_top_k": top_k,
                 },
@@ -274,8 +336,11 @@ class MultiModelSemanticRetrievalService:
             "method": template["method"],
             "base_url": template["base_url"],
             "confidence": confidence,
+            "options": _switch_options(others, active) if others else None,
             "metadata": {
                 "query": user_query,
+                "embedding": active.to_dict(),
+                "excluded_datasets": excluded,
                 "embedding_model": effective_model,
                 "embedding_dimension": dimension,
                 "stage1_top_k": top_k,

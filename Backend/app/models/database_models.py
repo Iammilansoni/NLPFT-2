@@ -1,45 +1,17 @@
 """
-PostgreSQL Database Models - Enterprise Multi-Tenant AI-Powered API Testing Platform
-Schema for complex domain APIs (Telecom, Defense, RF, Satellite, 5G/6G, Drones)
+PostgreSQL models for NLPForge.
 
-Platform Purpose:
-Understanding & testing cryptic domain APIs like:
-- Create_fft_with_no_pilot_signal()
-- Compute_phase_noise_map()
-- Generate_beamforming_vectors()
-- Run_harq_retransmission()
+Relational state lives here; routable vectors live in `vector_rows` (pgvector),
+which is created by migration and accessed through app.services.pgvector_store.
 
-Postman-Style Template Builder with strict validation (min 500 words, 3+ samples)
-LLM-powered dataset generation with high variation & error injection
-Multi-tenant isolation with approval workflow (draft→review→approved)
-Vector embeddings for semantic search (Redis)
-
-Dataset Generation Flow:
-1. User creates template with 500+ word description, JSON schema, samples, domain tags
-2. Template goes through approval workflow (draft → review → approved)
-3. LLM receives full template context + user's custom prompt
-4. LLM generates CSV with: 70% valid, 20% edge cases, 10% extreme scenarios
-5. Output includes: variations, typos, mistakes, boundary conditions, realistic noise
-6. CSV stored, embeddings created, semantic search enabled
-
-Automatic Embeddings → Redis Vector DB:
-After dataset generation:
-System automatically embeds dataset rows using user's selected model (Settings)
-Supported models: 384-dim (MiniLM, CPU-friendly), 768-dim (SBERT), 1536-dim (High accuracy)
-Vectors stored in Redis ONLY: embedding:{u_id}:{t_id}:{csv_id}
-Metadata stored in PostgreSQL: model_name, dimension, redis_namespace, timestamps
-Redis HNSW index created per-dimension (384/768/1536)
-High-speed similarity search with multi-tenant separation
-
-Tables (as per diagram):
-1. USERS - User authentication (u_id, user_name, email, password, created_at)
-2. USER_SETTINGS - Embedding model preferences (default_embedding_model, dimension, auto_embed_on_generation)
-3. TEMPLATES - API templates with domain context (min 500 words, 3+ samples, domain tags, JSON schema)
-4. PARAMETERS - API parameters (name, type, required, example, description)
-5. EXPECTED_RESPONSES - Expected API responses (status + fields JSON)
-6. METADATA - Template metadata (confidence, expert notes, security classification, status: draft→review→approved)
-7. CSV_DATA - LLM-generated test data with variations, errors, edge cases (70/20/10 split)
-8. EMBEDDINGS - Vector metadata (redis_key, model_name, dimension, redis_namespace, auto_generated)
+    users, user_settings        accounts and per-user preferences (embedding model)
+    llm_provider_configs        saved provider connections (encrypted API keys)
+    model_catalog(_sources)     every model each provider reports serving
+    templates, parameters,
+    expected_responses, metadata   the API catalogue and its review workflow
+    datasets, csv_data          example utterances per template, and which
+                                provider/model embedded them
+    audit_logs, test_runs       audit trail and evaluation runs
 """
 
 import uuid
@@ -106,29 +78,27 @@ class User(Base):
     expected_responses = relationship("ExpectedResponse", back_populates="user", cascade="all, delete-orphan")
     metadata_records = relationship("Metadata", back_populates="user", cascade="all, delete-orphan")
     csv_data = relationship("CSVData", back_populates="user", cascade="all, delete-orphan")
-    embeddings = relationship("Embedding", back_populates="user", cascade="all, delete-orphan")
     llm_configs = relationship("LLMProviderConfig", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserSettings(Base):
     """
     USER_SETTINGS table - User preferences for embedding models and LLMs
-    
-    Supported Embedding Models:
-    384-dim: MiniLM (CPU-friendly, fast)
-    768-dim: SBERT (balanced performance)
-    1536-dim: High accuracy (resource-intensive)
-    Future expansion supported
-    
-    After dataset generation, system automatically embeds rows using selected model
+
+    Embedding model: (embedding_provider, default_embedding_model,
+    embedding_dimension) is the user's choice from Settings -> Embedding model,
+    any provider in app.llm.provider_registry. embedding_provider NULL means
+    "use the deployment default" (app.core.runtime). The dimension is the
+    measured width of the model's vectors, never a guess.
     """
     __tablename__ = "user_settings"
     
     u_id = Column(UUID(as_uuid=True), ForeignKey("users.u_id", ondelete="CASCADE"), primary_key=True)
     
     # Embedding model preferences
-    default_embedding_model = Column(Text, nullable=False, default="nomic-embed-text")  # Default 768-dim Ollama model
-    embedding_dimension = Column(Integer, nullable=False, default=768)  # 384, 768, or 1024
+    embedding_provider = Column(Text, nullable=True)
+    default_embedding_model = Column(Text, nullable=True)
+    embedding_dimension = Column(Integer, nullable=True)
     
     # LLM preferences - Now links to LLMProviderConfig for dynamic configuration
     preferred_llm = Column(Text, nullable=True)  # Legacy field, kept for backward compatibility
@@ -336,7 +306,6 @@ class Template(Base):
     expected_responses = relationship("ExpectedResponse", back_populates="template", cascade="all, delete-orphan")
     metadata_records = relationship("Metadata", back_populates="template", cascade="all, delete-orphan")
     csv_data = relationship("CSVData", back_populates="template", cascade="all, delete-orphan")
-    embeddings = relationship("Embedding", back_populates="template")
     
     # Indexes for production performance
     __table_args__ = (
@@ -474,6 +443,7 @@ class Dataset(Base):
     csv_path = Column(Text, nullable=False)  # Path to the CSV file
     
     # Embedding model governance - ONE MODEL PER DATASET
+    embedding_provider = Column(Text, nullable=True)  # Provider id from app.llm.provider_registry
     embedding_model = Column(Text, nullable=True)  # Model used: e.g., "nomic-embed-text", "bge-small"
     embedding_dimension = Column(Integer, nullable=True)  # 384, 768, or 1024
     
@@ -575,7 +545,6 @@ class CSVData(Base):
     user = relationship("User", back_populates="csv_data")
     template = relationship("Template", back_populates="csv_data")
     dataset = relationship("Dataset", back_populates="csv_rows")
-    embeddings = relationship("Embedding", back_populates="csv_data")
     
     # Indexes
     __table_args__ = (
@@ -583,134 +552,6 @@ class CSVData(Base):
         Index('idx_csv_data_user', 'u_id'),
         Index('idx_csv_data_dataset', 'dataset_id'),
         Index('idx_csv_data_is_embedded', 'is_embedded'),
-    )
-
-
-class Model(Base):
-    """
-    MODELS table - Unified registry for all models (embedding + LLM)
-    
-   
-    
-    Single source of truth synced from config/models.json
-    """
-    __tablename__ = "models"
-    
-    model_id = Column(Text, primary_key=True)  # e.g., "BAAI/bge-small-en-v1.5" or "gemini-pro"
-    type = Column(Text, nullable=False)  # "embedding" or "llm"
-    name = Column(Text, nullable=False)  # Human-readable name
-    dimension = Column(Integer, nullable=True)  # For embedding models: 384, 768, 1536; NULL for LLMs
-    context_tokens = Column(Integer, nullable=False)  # Max context length
-    cpu_friendly = Column(Integer, nullable=False, default=0)  # 0=no, 1=yes
-    provider = Column(Text, nullable=False)  # sentence-transformers, google, openai, anthropic, local
-    notes = Column(Text, nullable=True)  # Use cases, notes
-    status = Column(Text, nullable=False, default="active")  # active, deprecated
-    
-    created_at = Column(TIMESTAMP, default=utc_now, nullable=False)
-    updated_at = Column(TIMESTAMP, default=utc_now, onupdate=utc_now)
-    
-    # Indexes
-    __table_args__ = (
-        Index('idx_models_type', 'type'),
-        Index('idx_models_status', 'status'),
-        Index('idx_models_dimension', 'dimension'),
-    )
-
-
-class EmbeddingModel(Base):
-    """
-    EMBEDDING_MODELS table - Registry of supported embedding models
-    
-    Supported Embedding Models (3+ models, future expansion supported):
-    384-dim: BAAI/bge-small-en-v1.5 (MiniLM, CPU-friendly, fast inference)
-    768-dim: sentence-transformers/all-mpnet-base-v2 (SBERT, balanced)
-    1536-dim: text-embedding-ada-002 (OpenAI, high accuracy)
-    Future: Custom fine-tuned models for domain-specific APIs
-    
-    Each model has:
-    - Fixed dimension (384/768/1536)
-    - Redis HNSW index namespace
-    - Performance characteristics
-    - Availability status
-    """
-    __tablename__ = "embedding_models"
-    
-    model_id = Column(Text, primary_key=True)  # e.g., "BAAI/bge-small-en-v1.5"
-    name = Column(Text, nullable=False)  # Human-readable name
-    dimension = Column(Integer, nullable=False)  # 384, 768, or 1536
-    provider = Column(Text, nullable=False)  # sentence-transformers, openai, custom
-    redis_namespace = Column(Text, nullable=False)  # e.g., "embeddings:384"
-    
-    # Performance characteristics
-    cpu_friendly = Column(Integer, nullable=False, default=0)  # 0=no, 1=yes
-    inference_speed = Column(Text, nullable=True)  # fast, medium, slow
-    accuracy_level = Column(Text, nullable=True)  # standard, high, very_high
-    
-    # Availability
-    is_active = Column(Integer, nullable=False, default=1)  # 0=disabled, 1=active
-    requires_api_key = Column(Integer, nullable=False, default=0)  # 0=no, 1=yes (for OpenAI)
-    
-    description = Column(Text, nullable=True)  # Use cases, notes
-    created_at = Column(TIMESTAMP, default=utc_now, nullable=False)
-    
-    # Indexes
-    __table_args__ = (
-        Index('idx_embedding_models_dimension', 'dimension'),
-        Index('idx_embedding_models_active', 'is_active'),
-    )
-
-
-class Embedding(Base):
-    """
-    EMBEDDINGS table - Vector embedding metadata for semantic search
-    Core fields from diagram: PK=emb_id, FK=u_id, FK=t_id, FK=csv_id, redis_key, created_at
-    
-    Automatic Embeddings → Redis Vector DB:
-    After dataset generation, system automatically embeds rows using user's selected model
-    
-    Supported Models (see embedding_models table):
-    384-dim: BAAI/bge-small-en-v1.5 (MiniLM, CPU-friendly)
-    768-dim: sentence-transformers/all-mpnet-base-v2 (SBERT)
-    1536-dim: OpenAI text-embedding-ada-002 (High accuracy)
-    
-    Redis Storage:
-    - Key format: embedding:{u_id}:{t_id}:{csv_id}
-    - HNSW index per dimension (384/768/1536)
-    - Multi-tenant separation by u_id
-    
-    PostgreSQL stores only metadata (model, dimension, namespace, timestamps)
-    """
-    __tablename__ = "embeddings"
-    
-    emb_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    u_id = Column(UUID(as_uuid=True), ForeignKey("users.u_id", ondelete="CASCADE"), nullable=False)
-    t_id = Column(UUID(as_uuid=True), ForeignKey("templates.t_id", ondelete="CASCADE"), nullable=True)
-    csv_id = Column(UUID(as_uuid=True), ForeignKey("csv_data.csv_id", ondelete="CASCADE"), nullable=True)
-    redis_key = Column(Text, nullable=False, unique=True)  # embedding:{u_id}:{t_id}:{csv_id}
-    
-    # Embedding model tracking
-    model_name = Column(Text, nullable=False)  # e.g., "BAAI/bge-small-en-v1.5"
-    dimension = Column(Integer, nullable=False)  # Vector dimension: 384, 768, or 1536
-    redis_namespace = Column(Text, nullable=False)  # e.g., "embeddings:384" or "embeddings:768"
-    
-    # Generation tracking
-    auto_generated = Column(Integer, nullable=False, default=1)  # 0=manual, 1=auto after dataset generation
-    
-    created_at = Column(TIMESTAMP, default=utc_now, nullable=False)
-    
-    # Relationships
-    user = relationship("User", back_populates="embeddings")
-    template = relationship("Template", back_populates="embeddings")
-    csv_data = relationship("CSVData", back_populates="embeddings")
-    
-    # Indexes for multi-tenant queries and dimension-based searches
-    __table_args__ = (
-        Index('idx_embeddings_user', 'u_id'),
-        Index('idx_embeddings_template', 't_id'),
-        Index('idx_embeddings_csv', 'csv_id'),
-        Index('idx_embeddings_dimension', 'dimension'),  # For HNSW index management
-        Index('idx_embeddings_namespace', 'redis_namespace'),  # For namespace queries
-        Index('idx_embeddings_model', 'model_name'),  # For model-specific queries
     )
 
 

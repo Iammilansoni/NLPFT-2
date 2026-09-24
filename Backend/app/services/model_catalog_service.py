@@ -26,6 +26,7 @@ Credentials come from two places:
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import os
 import uuid
 from dataclasses import dataclass
@@ -37,14 +38,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.encryption import decrypt_api_key
 from app.core.logger import logger
+from app.llm import provider_registry as registry
 from app.llm.model_discovery import (
     SUPPORTED_PROVIDERS,
     DiscoveredModel,
     DiscoveryError,
     discover_models,
     probe_dimension,
-    provider_label,
 )
+from app.llm.provider_registry import provider_label
 from app.models.database_models import (
     Dataset,
     LLMProviderConfig,
@@ -67,16 +69,6 @@ SYNC_INTERVAL_MINUTES = float(os.getenv("MODEL_CATALOG_SYNC_MINUTES", "360"))
 # Embedding dimensions measured per sync (each costs one tiny embed call).
 MAX_DIMENSION_PROBES = int(os.getenv("MODEL_MAX_DIMENSION_PROBES", "10"))
 
-# Environment variables that give the whole deployment access to a provider.
-ENV_API_KEYS: Dict[str, str] = {
-    "google": "GEMINI_API_KEY",
-    "groq": "GROQ_API_KEY",
-    "openrouter": "OPENROUTER_API_KEY",
-    "openai": "OPENAI_API_KEY",
-    "anthropic": "ANTHROPIC_API_KEY",
-    "deepseek": "DEEPSEEK_API_KEY",
-    "grok": "XAI_API_KEY",
-}
 # Providers whose model listing needs no key, synced for everyone.
 PUBLIC_LISTINGS = tuple(
     p.strip() for p in os.getenv("MODEL_CATALOG_PUBLIC_PROVIDERS", "openrouter").split(",") if p.strip()
@@ -126,9 +118,11 @@ def deployment_credentials() -> List[Credential]:
     creds: List[Credential] = []
     if os.getenv("EXECUTION_MODE", "local").lower() == "local" or os.getenv("OLLAMA_HOST"):
         creds.append(Credential(GLOBAL_SCOPE, "ollama", None, os.getenv("OLLAMA_HOST")))
-    for provider, env_var in ENV_API_KEYS.items():
-        if os.getenv(env_var):
-            creds.append(Credential(GLOBAL_SCOPE, provider, os.getenv(env_var), None))
+    if importlib.util.find_spec("fastembed") is not None:
+        creds.append(Credential(GLOBAL_SCOPE, "builtin", None, None))
+    for spec in registry.PROVIDERS:
+        if spec.env_key and os.getenv(spec.env_key):
+            creds.append(Credential(GLOBAL_SCOPE, spec.id, os.getenv(spec.env_key), None))
     keyed = {c.provider for c in creds}
     creds += [Credential(GLOBAL_SCOPE, p, None, None) for p in PUBLIC_LISTINGS if p not in keyed]
     return creds
