@@ -1,0 +1,12 @@
+# Secret-scanning exceptions. Everything listed here is fake sample data:
+# utterances like "reset my password to Blue#Sky42" are what the extractor is
+# tested on, and nlpforge_dev is the throwaway local-compose default.
+version: 2
+secret:
+  ignored_paths:
+    - "evals/extraction_cases.py"
+    - "Backend/tests/**"
+    - "Backend/app/demo_catalogue_details.py"
+  ignored_matches:
+    - name: local docker-compose default password
+      match: nlpforge_dev
