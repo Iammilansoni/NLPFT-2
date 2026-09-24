@@ -2,262 +2,249 @@
 
 # NLPForge
 
-**Turn a sentence into a validated API call.**
+### Turn a plain-English request into a validated API call.
 
-A semantic API router: vector retrieval picks the right endpoint from your API catalogue, and a
-schema-constrained LLM extracts a request body that validates against that endpoint's JSON Schema.
-Routing accuracy is measured on a held-out benchmark in CI.
+NLPForge picks the right endpoint from your API catalogue with vector search, then fills in a
+request body that passes the endpoint's JSON Schema. Rules read what's stated outright; an LLM
+fills only the rest, and any value it proposes has to appear in the request before it's used.
+**Measured, grounded, and runnable with zero API keys.**
 
-[Architecture](docs/ARCHITECTURE.md) · [Run it locally](#getting-started) · [Benchmark](#measured-results) · [Deployment](DEPLOYMENT.md)
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%20%2B%20pgvector-4169E1?logo=postgresql&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)
+![Ollama](https://img.shields.io/badge/Ollama-local%20LLM-000000?logo=ollama&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-227-2ea44f)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
-![NLPForge demo: a request is routed to Refund_Order and its body extracted; a request missing a password is reported, not invented](docs/demo.gif)
-
-FastAPI · PostgreSQL + pgvector · Ollama (nomic-embed-text, llama3.2) · Pydantic · Celery + Redis · Next.js 16
+[Demo](#demo) · [Results](#measured-results) · [Quick start](#quick-start) · [Architecture](docs/ARCHITECTURE.md) · [Benchmarks](evals/README.md)
 
 </div>
 
----
+<a id="demo"></a>
 
-## What is this?
+![NLPForge demo: a request routed to Refund_Order with its values read by rules; a missing password reported instead of invented; LLM and embedding models chosen from 20+ providers; an embedding-model mismatch explained with one-click fixes](docs/demo.gif)
 
-LLM agents are unreliable at choosing which API to call, because routing is usually left to a
-prompt. NLPForge treats routing as a **retrieval problem that can be measured**. You describe
-your APIs once as templates. For each request, it returns the one endpoint to call plus a
-request body that passes the endpoint's schema. When a value is missing, it says which one,
-instead of inventing it.
+<sub>The real app, recorded with [`scripts/record_demo.mjs`](scripts/record_demo.mjs): routing, grounded extraction, live model lists, and switching embedding models.</sub>
 
-```text
-"Refund 25 dollars on order 8820 because it arrived broken"
-        │
-        ▼
-POST /orders/{order_id}/refund
-{ "order_id": "8820", "amount": 25.0 }        extraction.ok = true · degraded = false
-```
+## At a glance
 
-It is deliberately **not an agent**. There is no planning loop and no multi-step execution:
-one request resolves to one endpoint.
+| | |
+|---|---|
+| **Routing** | **80%** right on the first pick, **97%** in the top 3: 180 held-out requests through the live API. CI blocks merges below 78%. |
+| **Extraction** | **98%** of extracted values correct. Invented values per 100 requests: **55 → 1**. |
+| **Speed** | ~100 ms to route. Simple requests are fully answered in **~250 ms with no LLM call**. |
+| **Models** | Chat and embedding models from **20+ providers**, local or cloud. Model lists are fetched live, never hard-coded. |
+| **Runs anywhere** | `docker compose up`: fully offline on Ollama, **no API key required**. |
 
-## Key features
-
-- **Semantic routing:** pgvector HNSW search over example utterances, max-pooled per template.
-- **Any model, any provider:** chat and embedding models from ~20 providers (Ollama, built-in
-  ONNX, Gemini, OpenAI, Anthropic, Mistral, Groq, OpenRouter, Cohere, NVIDIA, ...). Model lists
-  are fetched live, never hard-coded, and a provider's models appear once any key can reach it.
-- **Model lifecycle:** new models appear automatically; models a provider stops serving are
-  marked deprecated, then retired, then removed once nothing uses them.
-- **Embedding safety:** every dataset records the provider, model and dimension that embedded
-  it. Searching with a different model is refused with two fixes offered (switch model, or
-  re-embed), instead of comparing incompatible vectors.
-- **Grounded extraction:** values are read from the request by rules first (instant, exact).
-  An LLM is asked only for what is left, and every value it returns must appear in the request,
-  or it is reported as unverified instead of used. Each field says where it came from and how
-  sure it is. Works without any API key, on the local model; uses your own model if you connect one.
-- **Honest failure signalling:** every response carries per-stage outcomes and `degraded`, so
-  "the request had no values" is distinguishable from "the LLM was unreachable".
-- **Template catalogue:** documented APIs with a draft → review → approved workflow. Approval
-  requires complete documentation, samples and schemas.
-- **Dataset pipeline:** an LLM generates example utterances per template on Celery (your
-  configured provider, Gemini, or the local Ollama model), or you upload a CSV. Both are
-  embedded into pgvector and become routable.
-- **Multi-tenant:** a tenant predicate on every vector query plus PostgreSQL row-level security,
-  cookie-based JWT auth with refresh-token rotation, and a Redis-backed rate limiter.
-- **Two runtimes:** fully offline on Ollama, or cloud mode with in-process ONNX embeddings.
+**What this project demonstrates:** a measured retrieval pipeline (benchmarks in CI, not
+vibes) · a hybrid rules + LLM extractor with a grounding check against hallucination · async
+FastAPI with PostgreSQL + pgvector, row-level multi-tenancy, Celery and Redis · a provider-agnostic
+model layer with automatic lifecycle management · a Next.js 16 / TypeScript product UI ·
+227 tests.
 
 ## How it works
 
-| Stage | What happens | Implementation |
-|---|---|---|
-| **1 · Recall** | Embed the request and retrieve the top-25 most similar utterances for the caller's tenant | `nomic-embed-text` → pgvector HNSW (cosine) |
-| **2 · Rank** | Max-pool utterance scores per template; the best template is the route | `app/nlp/cross_encoder_reranker.py` (cross-encoder available, off by default) |
-| **3 · Extract** | Rules read what the request states outright. An LLM fills only the rest, and each value it returns must appear in the request | Schema-driven rules, then your model or local `llama3.2:3b`, Pydantic, grounding check |
-
 ```text
-Next.js ──/api/*──► FastAPI ──► Stage 1 embed ─► pgvector (RLS + tenant filter)
-                                 Stage 2 rank
-                                 Stage 3 extract ─► Ollama ─► Pydantic ─► response
-                    Celery ◄── dataset generation / embedding      Redis: queue · rate limits · JWT deny-list
+"Refund 25 dollars on order 8820 because it arrived broken"
+   │
+   ├─ 1 · Recall    embed the request → top-25 similar example requests (pgvector HNSW, per tenant)
+   ├─ 2 · Rank      max-pool scores per API → Refund_Order
+   └─ 3 · Extract   rules read  order_id = "8820", amount = 25          (no model needed)
+                    LLM only for what's left → every value checked against the request
+   ▼
+POST /orders/{order_id}/refund   { "order_id": "8820", "amount": 25 }   ok · 2 ms · rules only
 ```
 
-Full request flow, data model, tenancy design and failure behaviour are in
-**[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+It is deliberately **not an agent**: no planning loop, no multi-step execution. One request
+resolves to one endpoint, and when a value is missing it says which one instead of inventing it.
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/routing-result.png" alt="Routing result: Refund_Order, each stage's outcome, the extracted body, and where each value came from"></td>
+<td width="50%"><img src="docs/screenshots/missing-field.png" alt="A request with no email or password: both reported missing; the model's attempt to copy the sentence into them is shown as not used"></td>
+</tr>
+<tr>
+<td align="center"><sub>Every value says where it came from and how sure it is</sub></td>
+<td align="center"><sub>Missing values are reported, never made up</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/screenshots/embedding-model.png" alt="Embedding model settings: active model, datasets grouped by the model that embedded them, and 16 providers to choose from"></td>
+<td width="50%"><img src="docs/screenshots/model-catalogue.png" alt="Model catalogue: models listed live from each provider with sync health and lifecycle status"></td>
+</tr>
+<tr>
+<td align="center"><sub>Pick any embedding model; datasets are tagged with theirs</sub></td>
+<td align="center"><sub>Models listed live; retired ones phased out automatically</sub></td>
+</tr>
+</table>
+
+## Features
+
+- **Semantic routing:** vector search over example requests, max-pooled per API template.
+- **Grounded extraction:** schema-driven rules first (instant, exact). An LLM only for the
+  remaining fields, and its values must appear in the request or they're flagged, not used.
+  Per-field source and confidence.
+- **Any model, any provider:** Ollama, built-in ONNX, Gemini, OpenAI, Anthropic, Groq, OpenRouter,
+  Mistral, Cohere, NVIDIA, Together, Jina and more. Every provider is listed even without a
+  deployment key; users bring their own.
+- **Model lifecycle:** a scheduled job syncs each provider's live model list. New models appear;
+  ones a provider drops are deprecated, retired, then removed once nothing uses them. An outage
+  never retires anything.
+- **Embedding safety:** every dataset records the provider, model and dimension that embedded it.
+  Search never compares vectors from different models; it offers *switch model* or *re-embed*
+  instead. Wide models (for example 3072-dim) get a half-precision index automatically.
+- **API catalogue and datasets:** documented templates with a review workflow; an LLM generates
+  example requests on a Celery worker, or you upload a CSV.
+- **Multi-tenant and secure:** PostgreSQL row-level security plus a tenant filter on every
+  vector query, JWT cookies with refresh rotation, encrypted provider keys, rate limiting, and
+  SSRF checks on user-supplied model URLs.
 
 ## Measured results
 
-The benchmark has 180 held-out queries against 20 API templates, in four difficulty tiers.
-Sibling endpoints such as password-reset-request, reset-confirm and change-password are
-deliberately included as hard negatives. None of the queries appear in the indexed utterances.
+**Routing:** 180 held-out requests over 20 APIs, in four difficulty tiers. They include
+deliberately confusable siblings (reset-request vs reset-confirm vs change-password), and none
+appear in the index.
 
-| Strategy | Hit@1 | Hit@3 | Notes |
+| Strategy | Hit@1 | Hit@3 | |
 |---|---|---|---|
-| **Dense retrieval + max-pool (shipped)** | **0.822** | 0.983 | `bge-small`, exact search; `python evals/run_eval.py --embedder onnx` (CI gate ≥ 0.78) |
-| Same, through the live API (local mode) | 0.800 | 0.967 | `nomic-embed-text` via pgvector, full HTTP path |
-| Dense + BM25 hybrid (RRF) | 0.806 | 0.956 | wins hard negatives (0.650), loses paraphrases |
-| Dense + ms-marco cross-encoder | 0.739 | 0.944 | off-distribution for short commands, so disabled |
+| **Dense retrieval + max-pool (shipped)** | **0.822** | 0.983 | offline, `bge-small`; CI gate ≥ 0.78 |
+| Same, through the live API | 0.800 | 0.967 | `nomic-embed-text` via pgvector, full HTTP path |
+| Dense + BM25 hybrid (RRF) | 0.806 | 0.956 | wins confusable siblings, loses paraphrases |
+| Dense + cross-encoder rerank | 0.739 | 0.944 | trained on web search, not short commands, so off |
 | v1 weighted heuristic | 0.589 | 0.850 | what the first version shipped |
 
-The correct template is always in the top 25 (Recall@25 = 1.000), so all remaining error comes
-from ranking. Routing takes about 100 ms p50 through the API. Methodology and caveats are in
-**[evals/README.md](evals/README.md)**.
-
-**Extraction** is measured separately on 100 labelled requests (`evals/extraction_cases.py`).
-A fifth of them omit a required value on purpose, to catch invented ones. The model is the
-local `llama3.2:3b` on CPU, with no API key:
+**Extraction:** 100 labelled requests. A fifth omit a required value on purpose, to catch
+invented ones. Local `llama3.2:3b` on CPU, no API key.
 
 | Strategy | Precision | Recall | Request fully right | Invented values | p50 |
 |---|---|---|---|---|---|
 | LLM only (v2) | 0.672 | 0.931 | 0.59 | 55 | 2.3 s |
 | Rules only | **1.000** | 0.685 | 0.64 | **0** | **<1 ms** |
-| **Hybrid: rules, then LLM, then grounding (shipped)** | **0.984** | **0.962** | **0.94** | 1 | 1.6 s |
+| **Hybrid: rules → LLM → grounding (shipped)** | **0.984** | **0.962** | **0.94** | 1 | 1.6 s |
 
-The hybrid skips the model entirely on 42 of the 100 requests. The README's own example,
-*"Refund 25 dollars on order 8820…"*, routes and extracts in about 250 ms with no model call.
-A CI test holds the rules to zero invented and zero wrong values on this set.
+The hybrid skips the model on 42% of requests. Methodology, per-tier numbers and caveats:
+[evals/README.md](evals/README.md).
+
+## Quick start
+
+Needs Docker (Compose v2.24+) and about 6 GB of free RAM for the local LLM.
+
+```bash
+git clone https://github.com/Iammilansoni/NLPFT-2.git && cd NLPFT-2
+cp .env.example .env          # set POSTGRES_PASSWORD, REDIS_PASSWORD and SECRET_KEY
+docker compose up -d --build  # first boot pulls ~2.3 GB of Ollama models
+```
+
+Open **http://localhost:3000** → **Try the live demo**. The demo account comes with 20 indexed
+API templates. Try *"change my password from oldpass1 to NewPass#9"*. API docs:
+http://localhost:8000/docs · End-to-end check: `python scripts/smoke_test.py`.
 
 ## Tech stack
 
-| Layer | Technologies |
+| Layer | |
 |---|---|
-| Frontend | Next.js 16 (App Router), React 18, TypeScript, Tailwind CSS (token-based design system), TanStack Query |
-| Backend | FastAPI (async), SQLAlchemy 2, Pydantic v2, Alembic, Celery |
-| AI / ML | Ollama (`nomic-embed-text`, `llama3.2:3b`), fastembed ONNX (`bge-small-en-v1.5`), FlashRank |
-| Data | PostgreSQL 16 + pgvector (HNSW, row-level security), Redis |
-| Infrastructure | Docker Compose, GitHub Actions (lint, tests, Postgres integration, benchmark gate, frontend build) |
+| Backend | FastAPI (async), SQLAlchemy 2, Pydantic v2, Alembic, Celery + Beat |
+| AI / ML | pgvector HNSW, Ollama (`nomic-embed-text`, `llama3.2:3b`), fastembed ONNX, FlashRank, 20+ provider APIs |
+| Data | PostgreSQL 16 + pgvector (row-level security), Redis |
+| Frontend | Next.js 16 (App Router), React, TypeScript, Tailwind, TanStack Query |
+| Tooling | Docker Compose, GitHub Actions (lint, 227 tests, Postgres integration, accuracy gate, frontend build), Playwright |
 
-## Project structure
+<details>
+<summary><b>Architecture and project structure</b></summary>
 
 ```text
-Backend/
-  app/
-    api/v1/            REST endpoints (query, templates, datasets, auth, settings)
-    services/          routing pipeline, pgvector store, extraction, embedding
-    nlp/               ranking, URL detection, BM25/RRF (benchmark arm)
-    llm/               provider registry, live model discovery, embedding clients
-    core/              config, tenancy (RLS), runtime (default embedder), rate limiting
-    demo_catalogue*.py the 20-template catalogue shared by the demo seed and the benchmark
-  alembic/             migrations (pgvector, HNSW, RLS)
-  scripts/             demo seed, migrations runner, Redis→pgvector backfill
-  tests/               unit + Postgres integration tests
-Frontend/              Next.js app (landing, dashboard, templates, datasets, settings)
-evals/                 routing benchmark (180 held-out queries)
-docs/                  architecture, demo GIF, screenshots
-scripts/smoke_test.py  end-to-end check of a running stack
+Next.js ──/api/*──► FastAPI ──► 1 embed (user's model) ─► pgvector  (RLS + tenant filter)
+                                2 rank (max-pool)
+                                3 extract: rules → LLM (user's or local) → grounding → response
+                    Celery ◄── dataset generation · embedding · model-catalogue sync (Beat)
+                    Redis: queue · rate limits · JWT deny-list · circuit breaker
 ```
 
-## Getting started
-
-### Prerequisites
-
-- Docker with Compose **v2.24+**
-- About 6 GB of free RAM for the local LLM
-
-### Run locally
-
-```bash
-git clone https://github.com/Iammilansoni/NLPFT-2.git
-cd NLPFT-2
-cp .env.example .env        # set POSTGRES_PASSWORD, REDIS_PASSWORD and SECRET_KEY
-docker compose up -d --build
+```text
+Backend/app/
+  api/v1/          REST endpoints: query, templates, datasets, embeddings, model catalogue, auth
+  services/        routing pipeline, extraction (rules + grounding), pgvector store, model access
+  llm/             provider registry, live model discovery, embedding clients, chat providers
+  core/            config, tenancy (RLS), runtime default embedder, rate limiting, circuit breaker
+  worker/          Celery tasks: generation, embedding, catalogue sync
+Backend/alembic/   migrations: pgvector, per-dimension HNSW, RLS, model catalogue
+Frontend/          Next.js app: dashboard, templates, datasets, settings
+evals/             routing benchmark (180 requests) and extraction benchmark (100 requests)
+scripts/           demo recording, GIF builder, smoke test
 ```
 
-The first boot downloads about 2.3 GB of Ollama models. When `docker compose ps` shows the
-backend as **healthy**, open **http://localhost:3000** and choose **Try the live demo**. The demo
-tenant is seeded automatically with 20 complete, approved API templates.
+Request flow, data model, tenancy and failure behaviour are in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+</details>
 
-Check the stack end to end:
+<details>
+<summary><b>Engineering decisions</b></summary>
 
-```bash
-pip install httpx && python scripts/smoke_test.py
-```
+- **Rules before the model, grounding after it.** Measured: the 3B model alone invented 55 values
+  per 100 requests. Rules can't invent, and a model value that isn't in the request is shown as
+  *unverified* instead of being used. Result: 98% precision and 1 invented value.
+- **Max-pool over mean.** One exact example match should beat many lukewarm ones. The v1
+  mean-based heuristic scored 23 points lower.
+- **The reranker ships off.** The cross-encoder lowered Hit@1 at every recall depth on this data.
+  It stays in the benchmark, so the decision can be re-checked.
+- **Model identity is (provider, model, dimension).** The same model name from two providers is
+  never assumed compatible. A chosen model is verified with one real call that measures its
+  dimension, rather than trusting a number.
+- **No hard-coded model lists.** Providers are data (one registry entry per provider), models come
+  live from each provider, and a failed listing never retires anything.
+- **Tenancy in two layers.** Superuser roles bypass RLS, so every vector query also filters on the
+  transaction-bound tenant, set with `set_config(..., is_local => true)` so a pooled connection
+  can't leak it.
+</details>
 
-### Environment variables
+<details>
+<summary><b>Configuration</b></summary>
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `POSTGRES_PASSWORD`, `REDIS_PASSWORD` | yes | service credentials |
-| `SECRET_KEY` | yes | JWT signing key (≥ 32 characters) |
-| `SECRET_KEY_ENCRYPTION` | recommended | Fernet key for stored LLM-provider API keys |
-| `GEMINI_API_KEY` | optional | LLM dataset generation with a hosted model |
-| `SMTP_*` | optional | verification and password-reset e-mails |
-| `GOOGLE_CLIENT_ID` | optional | Google sign-in |
+| `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `SECRET_KEY` | yes | service credentials, JWT signing key (≥ 32 chars) |
+| `SECRET_KEY_ENCRYPTION` | recommended | Fernet key for stored provider API keys |
+| `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, … | optional | deployment-wide provider keys; users can add their own in Settings |
+| `EMBEDDING_PROVIDER`, `EMBEDDING_MODEL` | optional | default embedding model for users who haven't chosen one |
+| `MODEL_CATALOG_SYNC_MINUTES`, `MODEL_RETIRE_GRACE_HOURS` | optional | model-catalogue sync interval and retirement grace period |
+| `SMTP_*`, `GOOGLE_CLIENT_ID` | optional | e-mail verification, Google sign-in |
 
-Every other setting has a working default; see [`.env.example`](.env.example). For running the
-services without Docker, see [`docker-compose.dev.yml`](docker-compose.dev.yml) and
-[`Backend/.env.example`](Backend/.env.example).
+Everything else has a working default: see [`.env.example`](.env.example). A cloud deployment
+path (Fly.io + Neon, in-process ONNX embeddings) is described in [DEPLOYMENT.md](DEPLOYMENT.md)
+but hasn't been exercised end to end.
+</details>
 
-### Deployment
+<details>
+<summary><b>Testing</b></summary>
 
-`Backend/Dockerfile.cloud` and `Backend/fly.toml` describe a Fly.io + Neon deployment with
-in-process ONNX embeddings. That path is provided but has not been exercised end to end; see
-[DEPLOYMENT.md](DEPLOYMENT.md).
-
-## Usage
-
-1. **Dashboard:** type a request such as *"change my password from oldpass1 to NewPass#9"*. You
-   get the endpoint, the extracted body and the outcome of each stage.
-2. **Templates:** add your own API with its method, endpoint, JSON Schema and samples, then
-   submit it for review.
-3. **Datasets:** generate example utterances for an approved template, or upload a CSV with a
-   `query` column. Embedding makes them routable, using your model from
-   **Settings → Embedding model**. Each dataset shows the model that embedded it. Generation
-   uses the provider set in **Settings → AI Providers**; without one it falls back to
-   `GEMINI_API_KEY`, then to the local Ollama model.
-4. **API:** `POST /api/v1/query/semantic-search` with `{"query": "..."}`. OpenAPI docs are at
-   http://localhost:8000/docs.
-
-## Engineering decisions
-
-- **Max-pool over mean.** A template with one exact utterance match should beat one with many
-  lukewarm matches. v1's mean-based heuristic scored 23 points lower than plain dense retrieval.
-- **The reranker ships off, and stays in the tree.** The cross-encoder lowered Hit@1 at every
-  recall depth on this data. It remains a benchmark arm, so the decision can be re-checked when
-  the embedder changes.
-- **Constrained decoding plus validation.** The decoder cannot emit invalid JSON. Pydantic
-  enforces types and required fields, and one repair retry feeds the error back. Blank or
-  placeholder values count as missing, so the model cannot pad a required field.
-- **Tenancy in two layers.** Superuser database roles bypass RLS, so every vector query also
-  filters on the transaction-bound tenant. The health endpoint reports whether RLS is actually
-  enforced for the connected role.
-- **Transaction-scoped tenant binding.** `set_config(..., is_local => true)` instead of `SET`, so a
-  pooled connection can never carry one tenant's identity into another request.
-
-## Testing
-
-| Suite | Scope | Runs in CI |
+| Suite | Scope | CI |
 |---|---|---|
-| `Backend/tests/unit` (152 tests) | routing orchestration, extraction and repair, circuit breaker, tenancy SQL, auth, demo catalogue completeness | yes |
-| `Backend/tests/integration/test_rls_isolation.py` | migrations on an empty Postgres + cross-tenant isolation as a non-superuser role | yes |
+| `Backend/tests/unit` (195) | routing, grounded extraction, embedding clients, model discovery, tenancy SQL, auth | yes |
+| `Backend/tests/integration` (32) | real Postgres: migrations on an empty database, model-catalogue lifecycle, cross-tenant isolation as a non-superuser; auth and dataset API flows | catalogue + RLS suites |
 | `evals/run_eval.py` | routing accuracy; merge gate at Hit@1 ≥ 0.78 | yes |
-| `scripts/smoke_test.py` | full user loop against a running stack (login → route → create template → upload → embed → route → delete) | manual |
+| `evals/run_extraction_eval.py` | extraction precision, recall, invented values, latency | manual (needs the local LLM) |
+| `scripts/smoke_test.py` | full user loop against a running stack | manual |
 | Frontend | `tsc --noEmit`, ESLint, production build | yes |
+</details>
 
-## Limitations and next steps
+<details>
+<summary><b>Limitations and next steps</b></summary>
 
-- **Catalogue size.** 20 templates is small, and Hit@1 will fall as the catalogue grows. The
-  dominant errors are sibling endpoints that differ by authentication state (hard-negative Hit@1
-  is 0.625 live).
-- **Reranking.** A cross-encoder fine-tuned on generated utterances is the obvious next
-  experiment, and the harness is ready to measure it.
-- **Cloud extraction without a connection.** Cloud mode has no local model. Rules still
-  extract, but fields that need a model are reported missing until the user connects a
-  provider (Settings → AI Providers).
-- **Inference the grounding check refuses.** A value the request implies but doesn't state is
-  reported as unverified, not used. Examples: "text user 88" → `channel: sms`, or "keep texts on"
-  → `sms_enabled: true`. That is the price of never inventing values.
-- **Local generation is slow.** Dataset generation with the local 3B model on CPU takes minutes
-  per batch, and its utterances are less varied than a hosted model's. Configure a hosted
-  provider for real datasets.
-- **RLS for CRUD.** The CRUD routers rely on explicit tenant filters. Running the API as a
-  non-superuser role would enforce RLS for them too.
+- **Catalogue size.** 20 templates is small; Hit@1 will fall as it grows. The main error is
+  sibling endpoints that differ by authentication state (hard-negative Hit@1 is 0.625 live).
+- **Implied values are refused.** "Text user 88" implies `channel: sms`, but it isn't stated, so it's
+  flagged instead of used. That's the price of never inventing values.
+- **Hosted providers are only partly tested.** Their model-list endpoints are verified and their
+  request formats unit-tested, but live embedding calls are only proven for Ollama and built-in ONNX.
+- **Local generation is slow.** Generating datasets with the 3B model on CPU takes minutes; connect
+  a hosted provider for real datasets.
+</details>
 
 ## Project history
 
 | Version | What it is | Authorship |
 |---|---|---|
 | `v1.0-internship` | Internship prototype: FastAPI, Redis vectors, Celery, eight LLM providers | Team: Milan Soni, Avadhi Singhal, Abhilash Joshi |
-| `v2` (this branch) | pgvector + RLS, measured routing, structured extraction, dual runtime, redesigned UI | Milan Soni |
+| `v2` (this branch) | pgvector + RLS, measured routing, grounded extraction, any-provider models, redesigned UI | Milan Soni |
 
-## Author
-
-**Milan Soni**, [github.com/Iammilansoni](https://github.com/Iammilansoni)
-
-MIT licensed. See [LICENSE](LICENSE).
+**Milan Soni** · [github.com/Iammilansoni](https://github.com/Iammilansoni) · MIT licensed ([LICENSE](LICENSE))
