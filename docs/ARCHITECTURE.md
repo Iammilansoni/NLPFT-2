@@ -36,7 +36,7 @@ Hosted providers           any of ~20 in the registry, with the user's own key o
 | 2. Recall | KNN over `vector_rows` inside a transaction bound to the caller's tenant: `u_id = current_setting('app.tenant_id')`, plus `embedding_provider`, `embedding_model` and `dimension` filters, HNSW cosine, top-25. | `services/pgvector_store.py` |
 | 3. Rank | Row scores are max-pooled per template. The top template is the route. A FlashRank cross-encoder is implemented but off by default (see "Decisions" below). | `nlp/cross_encoder_reranker.py` |
 | 4. Resolve | The winning template (endpoint, method, request schema) is loaded from Postgres. | `multi_model_semantic_service.py` |
-| 5. Extract | The LLM decodes under the template's JSON Schema (Ollama `format`). Pydantic validates the result. On failure, one repair retry feeds the validation error back. Missing required fields are reported, never invented. The call goes through a Redis-backed circuit breaker. | `services/structured_extraction_service.py` |
+| 5. Extract | **Rules** first read values the request states outright, using only the schema: email formats, identifiers after their noun ("order 8820"), secrets after their name, enum words, numbers. Then an **LLM**, only for fields still empty and only if the request has unexplained words: the user's own chat connection, else local Ollama under schema-constrained decoding. Then **grounding**: each model value must appear in the request, or it goes to `unverified` instead of the body. Every field reports its `source` and `confidence`. | `services/extraction_rules.py`, `services/structured_extraction_service.py` |
 | 6. Respond | Returns the route, the extracted body, per-stage outcomes and timings. `degraded: true` only when an enabled stage could not run. | `api/v1/multi_model_query.py` |
 
 ## Where data lives
@@ -148,7 +148,8 @@ after per-user embedding models landed): Hit@1
 | No indexed utterances | `success: false, error: NO_RESULTS` with guidance to embed a dataset |
 | Dataset embedded with another model | `MODEL_MISMATCH` with options to switch model or re-embed; vectors are never compared across models |
 | Provider rate-limits embedding | Retried with backoff on the worker; a persistent limit is recorded on the dataset in plain words |
-| LLM unreachable / circuit open | Route still returned. `extraction.ok=false, degraded=true`, with the reason |
+| LLM unreachable / circuit open | Route still returned. Rule-extracted values are kept; `degraded=true`, with the reason. The user's model falls back to the local one first |
+| Model proposes a value the request doesn't contain | Not used: listed in `extraction.unverified` with the reason (e.g. "the model copied the whole request") |
 | Required field absent from the request | `extraction.ok=false`, partial `values`, `missing_required: [...]` |
 
 ## Known limitations

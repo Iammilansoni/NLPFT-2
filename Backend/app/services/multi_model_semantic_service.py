@@ -63,7 +63,10 @@ from app.services.multi_model_embedding_service import (
     mismatch_options,
 )
 from app.services.pgvector_store import get_pgvector_store
-from app.services.structured_extraction_service import get_structured_extraction_service
+from app.services.structured_extraction_service import (
+    get_structured_extraction_service,
+    user_extraction_llm,
+)
 
 
 def _other_models(groups: List[Dict[str, Any]], active: EmbeddingSelection) -> List[Dict[str, Any]]:
@@ -286,6 +289,7 @@ class MultiModelSemanticRetrievalService:
                 request_schema=template.get("json_schema"),
                 api_name=template["api_name"],
                 endpoint=template["endpoint"],
+                llm=await user_extraction_llm(db, user_id),
             )
             extraction = result.to_dict()
         extracted_body = extraction["values"] if extraction else None

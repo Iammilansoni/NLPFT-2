@@ -288,7 +288,9 @@ export default function DashboardPage() {
                     : extraction?.missing_required?.length
                       ? `missing required: ${extraction.missing_required.join(', ')}`
                       : extraction?.reason || 'not run',
-                  `${extraction?.model ?? '—'} · ${extraction?.attempts ?? 0} attempt(s)`,
+                  extraction?.attempts
+                    ? `${extraction.model ?? 'model'} · ${extraction.attempts} call(s)`
+                    : 'rules only · no model call',
                   `extract ${ms(extraction?.latency_ms)}`,
                 ]}
               />
@@ -301,6 +303,34 @@ export default function DashboardPage() {
                   <FileJson className="w-4 h-4 text-primary" /> Extracted request body
                 </h4>
                 <JsonDisplay data={body} maxHeight="18rem" showCopyButton />
+                {extraction?.fields && Object.keys(extraction.fields).length > 0 && (
+                  <ul className="space-y-1 text-xs" aria-label="Where each value came from">
+                    {Object.entries(extraction.fields).map(([name, f]) => (
+                      <li key={name} className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-foreground">{name}</span>
+                        <span className={cn(
+                          'rounded px-1.5 py-0.5 font-medium',
+                          f.source === 'rule' ? 'bg-success/10 text-success' : 'bg-info/10 text-info'
+                        )}>
+                          {f.source === 'rule' ? 'read from your text' : 'found by the model, checked against your text'}
+                        </span>
+                        <span className="text-muted-foreground">{Math.round(f.confidence * 100)}% sure</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {extraction?.unverified && Object.keys(extraction.unverified).length > 0 && (
+                  <div className="rounded-lg border border-warning/30 bg-warning/5 p-3 text-xs">
+                    <p className="font-medium text-warning">Not used: the model suggested these, but your request doesn&apos;t say them</p>
+                    <ul className="mt-1 space-y-0.5 text-muted-foreground">
+                      {Object.entries(extraction.unverified).map(([name, u]) => (
+                        <li key={name}>
+                          <span className="font-mono">{name}</span> = {JSON.stringify(u.value)} ({u.reason})
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {extraction && !extraction.ok && (
                   <p className="text-xs text-muted-foreground">
                     {extraction.degraded

@@ -426,15 +426,30 @@ export interface SemanticRetrieveFinalOutput {
 }
 
 /** Stage 3 outcome. ok=false + degraded=false means validation failed. */
+export interface ExtractedField {
+  value: unknown;
+  /** "rule": read straight off the request. "llm": the model found it, and it was checked against the request. */
+  source: 'rule' | 'llm';
+  confidence: number;
+}
+
 export interface SemanticRetrieveExtraction {
   ok: boolean;
   values: Record<string, unknown>;
   missing_required: string[];
+  /** Where each value came from and how sure it is. */
+  fields?: Record<string, ExtractedField>;
+  /** Values the model suggested that the request does not support, with the reason. */
+  unverified?: Record<string, { value: unknown; reason: string }>;
+  /** The least certain field's confidence. */
+  confidence?: number | null;
+  strategy?: string;
   degraded: boolean;
   reason?: string | null;
+  /** Model calls made; 0 when rules extracted everything. */
   attempts: number;
   latency_ms: number;
-  model?: string;
+  model?: string | null;
 }
 
 export interface SemanticRetrieveRanking {

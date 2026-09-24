@@ -34,6 +34,24 @@ THREE LAYERS OF GUARANTEE
      to the prompt and the call is retried once. Models correct their own
      mistakes reliably when told exactly what was wrong.
 
+HYBRID STRATEGY (the default)
+-----------------------------
+Measured on evals/extraction_cases.py, the model alone invented 55 values in
+100 requests (an example.com email, "some_token", the request pasted into a
+password field) and took ~2 s per request. So extraction now runs in order:
+
+  1. RULES (app.services.extraction_rules): values readable straight off the
+     request from the schema's own field names, types, formats and enums.
+     Exact, instant, confidence 0.99. Often nothing is left for the model.
+  2. MODEL, only for fields the rules did not fill, and only when the request
+     still has words the rules did not account for.
+  3. GROUNDING: each model value must be supported by the request. Values that
+     aren't are returned as `unverified`, never as extracted fact.
+
+Every extracted field carries its source ("rule" | "llm") and a confidence.
+The model is the user's own chat connection when they have one, else the local
+Ollama model: no API key is ever required.
+
 FAILURE IS REPORTED, NEVER SWALLOWED
 ------------------------------------
 Returns an ExtractionResult carrying `ok`, `degraded` and `reason`. The caller
@@ -43,17 +61,28 @@ v1 could not.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
+import re
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Optional, Protocol, Tuple, Type
 
 import httpx
 from pydantic import BaseModel, ValidationError, create_model
 
 from app.core.circuit_breaker import CircuitOpenError, get_breaker
 from app.core.logger import logger
+from app.services.extraction_rules import (
+    STOPWORDS,
+    FieldValue,
+    command_words,
+    confidence_for,
+    extract_by_rules,
+    grounding_problem,
+    refine_llm_value,
+)
 
 OLLAMA_URL = os.getenv("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 EXTRACTION_MODEL = os.getenv("EXTRACTION_MODEL", "llama3.2:3b")
@@ -79,15 +108,29 @@ class ExtractionResult:
     reason: Optional[str] = None
     attempts: int = 0
     latency_ms: float = 0.0
-    model: str = EXTRACTION_MODEL
+    model: Optional[str] = EXTRACTION_MODEL
     # Required fields the request never mentioned. Reported, never invented.
     missing_required: List[str] = field(default_factory=list)
+    # Per extracted field: its value, source ("rule" | "llm") and confidence.
+    fields: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    # Values the model proposed that the request does not support, with why.
+    unverified: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    strategy: str = "llm"
+
+    @property
+    def confidence(self) -> Optional[float]:
+        """The weakest extracted field's confidence: a body is only as sure as its least sure value."""
+        return min((f["confidence"] for f in self.fields.values()), default=None)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "ok": self.ok,
             "values": self.values,
             "missing_required": self.missing_required,
+            "fields": self.fields,
+            "unverified": self.unverified,
+            "confidence": self.confidence,
+            "strategy": self.strategy,
             "degraded": self.degraded,
             "reason": self.reason,
             "attempts": self.attempts,
@@ -158,6 +201,15 @@ def build_validator(schema: Dict[str, Any], name: str = "ExtractedBody") -> Type
     return create_model(name, **fields)  # type: ignore[call-overload]
 
 
+def _coerce(value: Any, spec: Dict[str, Any]) -> Tuple[Any, Optional[str]]:
+    """Coerce one model value to its schema type; (value, problem)."""
+    try:
+        Single = create_model("Single", v=(_py_type(spec), ...))  # type: ignore[call-overload]
+        return Single(v=value).v, None
+    except ValidationError:
+        return value, f"not a valid {spec.get('type', 'value')}"
+
+
 def _sanitise_schema_for_ollama(schema: Dict[str, Any]) -> Dict[str, Any]:
     """
     Ollama's structured-output grammar accepts a plain JSON Schema object.
@@ -175,6 +227,47 @@ def _sanitise_schema_for_ollama(schema: Dict[str, Any]) -> Dict[str, Any]:
             for k, v in props.items()
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Models
+# ---------------------------------------------------------------------------
+
+class ExtractionLLM(Protocol):
+    """A model that answers an extraction prompt with a JSON object."""
+
+    name: str
+
+    async def generate_json(self, prompt: str, schema: Dict[str, Any]) -> str: ...
+
+
+class ProviderExtractionLLM:
+    """
+    Extraction through a user's own chat connection (Groq, Gemini, OpenRouter, ...).
+
+    Hosted APIs don't share one way of constraining output to a schema, so the
+    reply is parsed and validated instead; grounding then checks every value.
+    """
+
+    def __init__(self, provider: Any, label: str) -> None:
+        self.provider = provider
+        self.name = label
+
+    async def generate_json(self, prompt: str, schema: Dict[str, Any]) -> str:
+        from app.llm.providers.base import LLMConfig
+
+        # Interactive path: a slow hosted call falls back to the local model
+        # instead of holding the request for the provider's full timeout.
+        response = await asyncio.wait_for(
+            self.provider.generate(
+                prompt + "\nAnswer with the JSON object only, no prose, no code fences.",
+                config=LLMConfig(temperature=0.0, max_tokens=512),
+            ),
+            timeout=EXTRACTION_TIMEOUT,
+        )
+        text = (response.content or "").strip()
+        fenced = re.search(r"\{.*\}", text, flags=re.S)
+        return fenced.group(0) if fenced else text
 
 
 # ---------------------------------------------------------------------------
@@ -307,12 +400,131 @@ class StructuredExtractionService:
         api_name: str = "",
         endpoint: str = "",
         max_repair_attempts: int = 1,
+        strategy: str = "hybrid",
+        llm: Optional[ExtractionLLM] = None,
     ) -> ExtractionResult:
-        """Extract slot values, guaranteed schema-valid or explicitly failed."""
-        t0 = time.perf_counter()
+        """
+        Extract slot values.
 
+        strategy "hybrid" (default): rules, then the model for what is left,
+        then grounding. "rules": no model. "llm": the model alone (the v2
+        behaviour, kept so the benchmark can compare against it).
+        """
         if not request_schema or not (request_schema.get("properties")):
-            return ExtractionResult(ok=True, values={}, reason="no schema on template")
+            return ExtractionResult(ok=True, values={}, reason="no schema on template", strategy=strategy, model=None)
+        if strategy in ("hybrid", "rules"):
+            return await self._extract_hybrid(query, request_schema, api_name, endpoint, strategy, llm)
+        return await self._extract_llm_only(query, request_schema, api_name, endpoint, max_repair_attempts)
+
+    # -- hybrid -------------------------------------------------------------
+
+    async def _extract_hybrid(
+        self,
+        query: str,
+        schema: Dict[str, Any],
+        api_name: str,
+        endpoint: str,
+        strategy: str,
+        llm: Optional[ExtractionLLM],
+    ) -> ExtractionResult:
+        t0 = time.perf_counter()
+        props: Dict[str, Dict[str, Any]] = {
+            k: v for k, v in (schema.get("properties") or {}).items() if isinstance(v, dict)
+        }
+        required = [k for k in (schema.get("required") or []) if k in props]
+        found: Dict[str, FieldValue] = extract_by_rules(query, schema)
+        unverified: Dict[str, Dict[str, Any]] = {}
+        remaining = [k for k in props if k not in found]
+        known = {k: fv.value for k, fv in found.items()}
+        command = command_words(api_name, endpoint, schema, known)
+
+        # Words the rules didn't account for. None left means nothing else was
+        # said, so asking a model could only produce invented values.
+        leftover = set(re.findall(r"[a-z0-9]+", query.lower())) - command - STOPWORDS
+        attempts, model_name, degraded, reason = 0, None, False, None
+
+        if strategy == "hybrid" and remaining and leftover:
+            sub_schema = {"type": "object", "properties": {k: props[k] for k in remaining}}
+            prompt = self._build_prompt(query, sub_schema, api_name, endpoint)
+            if known:
+                prompt += "\nAlready extracted (do not repeat): " + json.dumps(known) + "\n"
+            parsed, attempts, model_name, degraded, reason = await self._ask_model(prompt, sub_schema, llm)
+            for key, value in parsed.items():
+                if key not in remaining or _is_absent(value) or value in ([], {}):
+                    continue
+                coerced, problem = _coerce(value, props[key])
+                coerced = refine_llm_value(key, coerced, props[key], query, command)
+                problem = problem or grounding_problem(key, coerced, props[key], query, command)
+                if problem:
+                    unverified[key] = {"value": coerced, "reason": problem}
+                else:
+                    found[key] = FieldValue(coerced, "llm", confidence_for(props[key]))
+
+        missing = [k for k in required if k not in found]
+        return ExtractionResult(
+            ok=not missing and not degraded,
+            values={k: fv.value for k, fv in found.items()},
+            fields={k: fv.to_dict() for k, fv in found.items()},
+            unverified=unverified,
+            missing_required=missing,
+            degraded=degraded,
+            reason=reason or (f"missing required: {', '.join(missing)}" if missing else None),
+            attempts=attempts,
+            latency_ms=(time.perf_counter() - t0) * 1000,
+            model=model_name,
+            strategy=strategy,
+        )
+
+    async def _ask_model(
+        self, prompt: str, schema: Dict[str, Any], llm: Optional[ExtractionLLM]
+    ) -> Tuple[Dict[str, Any], int, Optional[str], bool, Optional[str]]:
+        """
+        One JSON answer from the user's model, else the local one. Returns
+        (parsed, attempts, model, degraded, reason). Retries once on bad JSON.
+        """
+        candidates: List[Tuple[str, Any]] = []
+        if llm is not None:
+            candidates.append((llm.name, llm.generate_json))
+        candidates.append((f"ollama/{self.model}", self._generate))
+        attempts = 0
+        last_problem = None
+        for name, generate in candidates:
+            repair = None
+            for _ in range(2):
+                attempts += 1
+                try:
+                    raw = await generate(prompt + (f"\nYour previous answer was not valid JSON ({repair}). Return only the JSON object.\n" if repair else ""), schema)
+                except CircuitOpenError as exc:
+                    last_problem = f"llm_circuit_open (retry in ~{exc.retry_after:.0f}s)"
+                    break
+                except Exception as exc:  # noqa: BLE001 - try the next model
+                    last_problem = f"llm_unreachable ({name}: {type(exc).__name__})"
+                    logger.warning(f"Extraction with {name} failed: {exc}")
+                    break
+                try:
+                    parsed = json.loads(raw) if raw else {}
+                except json.JSONDecodeError as exc:
+                    repair = str(exc)
+                    continue
+                if isinstance(parsed, dict):
+                    return parsed, attempts, name, False, None
+                repair = "the answer must be a JSON object"
+            if repair and last_problem is None:
+                last_problem = f"invalid_json from {name}"
+        return {}, attempts, None, True, last_problem
+
+    # -- model only (v2 behaviour) -----------------------------------------
+
+    async def _extract_llm_only(
+        self,
+        query: str,
+        request_schema: Dict[str, Any],
+        api_name: str,
+        endpoint: str,
+        max_repair_attempts: int,
+    ) -> ExtractionResult:
+        """The model alone, schema-constrained and validated, without rules or grounding."""
+        t0 = time.perf_counter()
 
         Validator = build_validator(request_schema)
         known_keys = set((request_schema.get("properties") or {}).keys())
@@ -418,6 +630,33 @@ class StructuredExtractionService:
             latency_ms=(time.perf_counter() - t0) * 1000,
             model=self.model,
         )
+
+
+async def user_extraction_llm(db: Any, user_id: Any) -> Optional[ProviderExtractionLLM]:
+    """
+    The user's default chat connection, used for extraction when they have one.
+
+    Optional by design: with no connection (or EXTRACTION_USE_USER_LLM=false)
+    extraction runs on the local model and needs no API key at all.
+    """
+    if os.getenv("EXTRACTION_USE_USER_LLM", "true").lower() not in ("1", "true", "yes"):
+        return None
+    from app.llm.provider_registry import get_provider
+    from app.services.llm_config_service import LLMConfigService
+
+    service = LLMConfigService(db)
+    config = await service.get_default_config(user_id)
+    spec = get_provider(config.provider) if config else None
+    if not config or not spec or not spec.chat:
+        return None
+    if config.provider == "ollama" and config.model_name == EXTRACTION_MODEL and not config.base_url:
+        return None  # identical to the local default, which also gets schema-constrained decoding
+    try:
+        provider = await service.get_provider_for_config(config.config_id)
+    except Exception as exc:  # noqa: BLE001 -- fall back to the local model
+        logger.warning(f"Extraction: user connection {config.config_id} unusable ({exc}); using the local model")
+        return None
+    return ProviderExtractionLLM(provider, f"{config.provider}/{config.model_name}")
 
 
 _service: Optional[StructuredExtractionService] = None

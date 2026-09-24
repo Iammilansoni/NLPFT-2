@@ -12,9 +12,9 @@ Usage:
     
     # Direct creation
     provider = LLMProviderFactory.create(
-        provider_type="openai",
-        model="gpt-4",
-        api_key="sk-...",
+        provider_type="groq",
+        model="<a model id from the model catalogue>",
+        api_key="gsk_...",
     )
 """
 
@@ -176,54 +176,3 @@ class LLMProviderFactory:
     def is_provider_implemented(cls, provider_type: str) -> bool:
         """True for any registry provider a connection can be saved for."""
         return registry.get_provider(provider_type.lower()) is not None
-
-
-# =============================================================================
-# CONVENIENCE FUNCTIONS
-# =============================================================================
-
-async def get_default_provider() -> Optional[BaseLLMProvider]:
-    """
-    Get the default LLM provider from environment/config.
-    
-    Checks for configured providers in order:
-    1. GEMINI_API_KEY -> Google
-    2. OPENAI_API_KEY -> OpenAI
-    3. Ollama available -> Ollama
-    
-    Returns:
-        Configured provider or None
-    """
-    import os
-    
-    # Try Google Gemini
-    gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    if gemini_key:
-        return LLMProviderFactory.create(
-            provider_type="google",
-            model="gemini-2.0-flash",
-            api_key=gemini_key,
-        )
-    
-    # Try OpenAI
-    openai_key = os.getenv("OPENAI_API_KEY")
-    if openai_key:
-        return LLMProviderFactory.create(
-            provider_type="openai",
-            model="gpt-4",
-            api_key=openai_key,
-        )
-    
-    # Try Ollama
-    try:
-        provider = LLMProviderFactory.create(
-            provider_type="ollama",
-            model="llama3.1:8b-instruct-q4_K_M",
-        )
-        if await provider.is_available():
-            return provider
-    except Exception as e:
-        logger.debug(f"Ollama provider not available: {e}")
-    
-    logger.warning("No default LLM provider available")
-    return None

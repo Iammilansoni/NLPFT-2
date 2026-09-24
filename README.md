@@ -48,8 +48,10 @@ one request resolves to one endpoint.
 - **Embedding safety:** every dataset records the provider, model and dimension that embedded
   it. Searching with a different model is refused with two fixes offered (switch model, or
   re-embed), instead of comparing incompatible vectors.
-- **Structured extraction:** JSON-Schema-constrained decoding, Pydantic validation, one repair
-  retry, and missing required fields reported explicitly.
+- **Grounded extraction:** values are read from the request by rules first (instant, exact).
+  An LLM is asked only for what is left, and every value it returns must appear in the request,
+  or it is reported as unverified instead of used. Each field says where it came from and how
+  sure it is. Works without any API key, on the local model; uses your own model if you connect one.
 - **Honest failure signalling:** every response carries per-stage outcomes and `degraded`, so
   "the request had no values" is distinguishable from "the LLM was unreachable".
 - **Template catalogue:** documented APIs with a draft → review → approved workflow. Approval
@@ -67,7 +69,7 @@ one request resolves to one endpoint.
 |---|---|---|
 | **1 · Recall** | Embed the request and retrieve the top-25 most similar utterances for the caller's tenant | `nomic-embed-text` → pgvector HNSW (cosine) |
 | **2 · Rank** | Max-pool utterance scores per template; the best template is the route | `app/nlp/cross_encoder_reranker.py` (cross-encoder available, off by default) |
-| **3 · Extract** | Fill the request body under the template's JSON Schema, validate, repair once | Ollama `llama3.2:3b` + Pydantic, behind a Redis circuit breaker |
+| **3 · Extract** | Rules read what the request states outright. An LLM fills only the rest, and each value it returns must appear in the request | Schema-driven rules, then your model or local `llama3.2:3b`, Pydantic, grounding check |
 
 ```text
 Next.js ──/api/*──► FastAPI ──► Stage 1 embed ─► pgvector (RLS + tenant filter)
@@ -94,8 +96,22 @@ deliberately included as hard negatives. None of the queries appear in the index
 | v1 weighted heuristic | 0.589 | 0.850 | what the first version shipped |
 
 The correct template is always in the top 25 (Recall@25 = 1.000), so all remaining error comes
-from ranking. Routing takes about 100 ms p50 through the API without extraction. Extraction adds
-about 1–5 s on CPU. Methodology and caveats are in **[evals/README.md](evals/README.md)**.
+from ranking. Routing takes about 100 ms p50 through the API. Methodology and caveats are in
+**[evals/README.md](evals/README.md)**.
+
+**Extraction** is measured separately on 100 labelled requests (`evals/extraction_cases.py`).
+A fifth of them omit a required value on purpose, to catch invented ones. The model is the
+local `llama3.2:3b` on CPU, with no API key:
+
+| Strategy | Precision | Recall | Request fully right | Invented values | p50 |
+|---|---|---|---|---|---|
+| LLM only (v2) | 0.672 | 0.931 | 0.59 | 55 | 2.3 s |
+| Rules only | **1.000** | 0.685 | 0.64 | **0** | **<1 ms** |
+| **Hybrid: rules, then LLM, then grounding (shipped)** | **0.984** | **0.962** | **0.94** | 1 | 1.6 s |
+
+The hybrid skips the model entirely on 42 of the 100 requests. The README's own example,
+*"Refund 25 dollars on order 8820…"*, routes and extracts in about 250 ms with no model call.
+A CI test holds the rules to zero invented and zero wrong values on this set.
 
 ## Tech stack
 
@@ -221,8 +237,12 @@ in-process ONNX embeddings. That path is provided but has not been exercised end
   is 0.625 live).
 - **Reranking.** A cross-encoder fine-tuned on generated utterances is the obvious next
   experiment, and the harness is ready to measure it.
-- **Cloud extraction.** Cloud mode has no hosted LLM wired into Stage 3 yet, so extraction
-  reports `degraded` there.
+- **Cloud extraction without a connection.** Cloud mode has no local model. Rules still
+  extract, but fields that need a model are reported missing until the user connects a
+  provider (Settings → AI Providers).
+- **Inference the grounding check refuses.** A value the request implies but doesn't state is
+  reported as unverified, not used. Examples: "text user 88" → `channel: sms`, or "keep texts on"
+  → `sms_enabled: true`. That is the price of never inventing values.
 - **Local generation is slow.** Dataset generation with the local 3B model on CPU takes minutes
   per batch, and its utterances are less varied than a hosted model's. Configure a hosted
   provider for real datasets.

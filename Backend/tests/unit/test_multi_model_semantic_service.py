@@ -76,6 +76,7 @@ def semantic_service(mock_embedder, mock_pgvector_store, mock_extractor, groups)
         stack.enter_context(patch(f"{MODULE}.active_embedding", AsyncMock(return_value=ACTIVE)))
         stack.enter_context(patch(f"{MODULE}.embedder_for", AsyncMock(return_value=mock_embedder)))
         stack.enter_context(patch(f"{MODULE}.embedding_groups", AsyncMock(return_value=groups)))
+        stack.enter_context(patch(f"{MODULE}.user_extraction_llm", AsyncMock(return_value=None)))
         stack.enter_context(
             patch(f"{MODULE}.get_pgvector_store", return_value=mock_pgvector_store)
         )

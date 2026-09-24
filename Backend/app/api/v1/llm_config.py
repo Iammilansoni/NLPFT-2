@@ -10,6 +10,7 @@ Provides REST API for managing LLM provider configurations:
 All endpoints require authentication.
 """
 
+import os
 from typing import List, Optional
 from uuid import UUID
 
@@ -315,9 +316,10 @@ async def list_ollama_models(
     Requires Ollama server to be running.
     """
     try:
+        # Listing needs no particular model; the configured local one is as good as any.
         provider = LLMProviderFactory.create(
             provider_type="ollama",
-            model="llama3.1:8b-instruct-q4_K_M",
+            model=os.getenv("EXTRACTION_MODEL", "llama3.2:3b"),
         )
         
         if not await provider.is_available():

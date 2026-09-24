@@ -65,10 +65,18 @@ class FinalOutput(BaseModel):
 
 
 class ExtractionInfo(BaseModel):
-    """Stage 3 outcome. `ok=False` with `degraded=False` means validation failed."""
+    """
+    Stage 3 outcome. `ok=False` with `degraded=False` means a required value was
+    missing. `fields` says where each value came from ("rule" | "llm") and how
+    sure it is; `unverified` holds model values the request does not support.
+    """
     ok: bool
     values: dict = {}
     missing_required: List[str] = []
+    fields: dict = {}
+    unverified: dict = {}
+    confidence: Optional[float] = None
+    strategy: Optional[str] = None
     degraded: bool = False
     reason: Optional[str] = None
     attempts: int = 0

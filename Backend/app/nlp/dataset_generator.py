@@ -31,7 +31,8 @@ if TYPE_CHECKING:
 # --- Gemini Fallback Configuration (only if explicitly enabled via env) ---
 # This is a FALLBACK only - system prefers user's configured provider
 _gemini_available = False
-_gemini_model = "gemini-2.5-flash"
+# Deployment-level fallback when a user has no LLM connection and GEMINI_API_KEY is set.
+_gemini_model = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-2.5-flash")
 _gemini_client = None
 
 def _init_gemini_fallback():

@@ -296,8 +296,10 @@ async def test_extraction_repairs_invalid_output_on_retry():
 @pytest.mark.asyncio
 async def test_empty_extraction_is_distinguishable_from_failure():
     """THE v1 BUG: a crashed call and an empty result were byte-identical ({})."""
+    # The model path on its own: in the hybrid default, the grounding check would
+    # (rightly) reject these values, since the request "q" doesn't contain them.
     empty = _svc_with_responses([json.dumps({"email": "a@b.com", "password": "pw"})])
-    good = await empty.extract("q", SCHEMA)
+    good = await empty.extract("q", SCHEMA, strategy="llm")
 
     broken = StructuredExtractionService(model="fake")
 
@@ -305,7 +307,7 @@ async def test_empty_extraction_is_distinguishable_from_failure():
         raise RuntimeError("ollama exploded")
 
     broken._generate = _die  # type: ignore[method-assign]
-    bad = await broken.extract("q", SCHEMA)
+    bad = await broken.extract("q", SCHEMA, strategy="llm")
 
     assert good.ok is True and good.degraded is False
     assert bad.ok is False and bad.degraded is True
