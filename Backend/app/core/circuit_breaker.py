@@ -173,11 +173,9 @@ class CircuitBreaker:
     def _client(self) -> Any:
         if self._redis is None:
             try:
-                from app.services.multi_model_redis_service import (
-                    get_multi_model_redis_service,
-                )
+                from app.redis_config import get_redis_client
 
-                self._redis = get_multi_model_redis_service().redis_client
+                self._redis = get_redis_client()
             except Exception as exc:  # noqa: BLE001
                 logger.debug(f"Circuit breaker '{self.name}': no Redis ({exc})")
                 return None

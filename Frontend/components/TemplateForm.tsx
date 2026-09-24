@@ -740,8 +740,8 @@ export function TemplateForm({
 
               {/* Auto-save Status Indicator */}
               {lastSaved && (
-                <div className="mt-3 flex items-center justify-between bg-green-500/10 border border-green-500/30 rounded-lg px-4 py-2">
-                  <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                <div className="mt-3 flex items-center justify-between bg-success/10 border border-success/30 rounded-lg px-4 py-2">
+                  <div className="flex items-center gap-2 text-success dark:text-success">
                     <Save className="w-4 h-4" />
                     <span className="text-sm">
                       {hasDraft ? (
@@ -1216,7 +1216,7 @@ export function TemplateForm({
                 <button
                   onClick={handleApprove}
                   disabled={isLoading}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                  className="px-4 py-2 bg-success text-white rounded-md hover:bg-success disabled:opacity-50"
                 >
                   Approve
                 </button>
@@ -1236,7 +1236,7 @@ export function TemplateForm({
               onClick={e => e.stopPropagation()}
             >
               <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <AlertCircle className="w-6 h-6 text-amber-500" />
+                <AlertCircle className="w-6 h-6 text-warning" />
                 Template Needs Approval
               </h3>
               <p className="text-muted-foreground mb-6">

@@ -6,7 +6,6 @@
  */
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { getColorValue } from '@/lib/utils';
 
 type Theme = 'light' | 'dark';
 type ThemeColor = 'blue' | 'purple' | 'green' | 'orange' | 'pink' | 'red';
@@ -66,24 +65,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme, mounted]);
 
-  // Apply color theme
+  // The brand colour comes from the design tokens in styles/globals.css. It used
+  // to be overwritten here with an inline --primary on <html>, which silently
+  // replaced the palette (and its dark-mode variant) on every page load.
   useEffect(() => {
     if (!mounted) return;
-
     const root = document.documentElement;
-    const colorValues = getColorValue(themeColor);
-    
-    // Set CSS custom properties
-    root.style.setProperty('--primary-h', colorValues.h.toString());
-    root.style.setProperty('--primary-s', `${colorValues.s}%`);
-    root.style.setProperty('--primary-l', `${colorValues.l}%`);
-    
-    // Update primary color in HSL format for compatibility
-    root.style.setProperty('--primary', `${colorValues.h} ${colorValues.s}% ${colorValues.l}%`);
-    
-    // Save to localStorage
-    localStorage.setItem(COLOR_STORAGE_KEY, themeColor);
-  }, [themeColor, mounted]);
+    ['--primary', '--primary-h', '--primary-s', '--primary-l'].forEach((v) => root.style.removeProperty(v));
+    localStorage.removeItem(COLOR_STORAGE_KEY);
+  }, [mounted]);
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);

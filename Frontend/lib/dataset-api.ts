@@ -150,12 +150,13 @@ export class DatasetApiClient {
     const response = await this.client.post<GenerateDatasetResponse>(
       '/api/v1/datasets/generate',
       {
-        user_id: data.user_id,
+        // Field names the backend accepts (api/v1/datasets.py DatasetGenerateRequest).
+        // The LLM is the user's default provider (Settings -> LLM Providers).
         template_id: data.template_id,
-        rows: data.rows || 500,
-        llm_model: data.llm_model || 'gpt-4',
-        custom_prompt: data.custom_prompt,
-        temperature: data.temperature || 0.7,
+        num_examples: Math.max(10, data.rows || 100),
+        user_prompt:
+          data.custom_prompt?.trim() ||
+          'Realistic, varied requests a user would type to call this API, including casual and formal phrasing.',
       }
     );
     return response.data;
@@ -215,16 +216,13 @@ export class DatasetApiClient {
   }
 
   /**
-   * Embed dataset and store in Redis vector DB
+   * Embed a dataset's utterances into pgvector so they become routable.
+   * Uses the deployment's embedding model (EXECUTION_MODE); `embedding_model`
+   * in the request is ignored by the backend.
    */
   async embedDataset(data: EmbedDatasetRequest): Promise<EmbedDatasetResponse> {
     const response = await this.client.post<EmbedDatasetResponse>(
-      '/api/v1/datasets/embed',
-      {
-        dataset_id: data.dataset_id,
-        embedding_model: data.embedding_model || 'sentence-transformers/all-MiniLM-L6-v2',
-        vector_db_collection: data.vector_db_collection || 'api_templates',
-      }
+      `/api/v1/datasets/db/${data.dataset_id}/embed`
     );
     return response.data;
   }
@@ -249,7 +247,7 @@ export class DatasetApiClient {
    * Delete dataset
    */
   async deleteDataset(datasetId: string): Promise<{ message: string }> {
-    const response = await this.client.delete(`/api/v1/datasets/${datasetId}`);
+    const response = await this.client.delete(`/api/v1/datasets/db/${datasetId}`);
     return response.data;
   }
 }

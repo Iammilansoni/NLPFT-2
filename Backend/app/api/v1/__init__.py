@@ -11,15 +11,12 @@ from app.api.v1 import (
     auth,
     datasets,
     email_verification,
-    embedding_validation,
+    embeddings,
     llm_config,
-    model_validation,
-    models,
+    model_catalog,
     multi_model_query,
     telemetry,
     template_builder,
-    user_data,
-    user_settings,
 )
 from app.api.v1.auth import get_current_user
 from app.core.logger import logger
@@ -31,25 +28,22 @@ router = APIRouter(prefix="/v1")
 # Authentication & User Management
 router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 router.include_router(email_verification.router, tags=["Email Verification"])
-router.include_router(user_data.router, prefix="/user-data", tags=["User Data"])
 
 # Template Builder
 router.include_router(template_builder.router, tags=["Template Builder"])
 
 # Datasets
 router.include_router(datasets.router, tags=["Datasets"])
-router.include_router(embedding_validation.router, tags=["Embedding Validation"])
 
 # Configuration
-router.include_router(models.router, tags=["Models"])
-router.include_router(user_settings.router, tags=["User Settings"])
 router.include_router(llm_config.router, tags=["LLM Configuration"])
+router.include_router(model_catalog.router, tags=["Model Catalogue"])
+router.include_router(embeddings.router, tags=["Embeddings"])
 
 # Audit Logs
 router.include_router(audit_logs.router, tags=["Audit Logs"])
 
-# Multi-Model Embedding System
-router.include_router(model_validation.router, tags=["Model Validation"])
+# Routing
 router.include_router(multi_model_query.router, tags=["Multi-Model Query"])
 
 # Performance Telemetry
@@ -69,7 +63,7 @@ async def get_user_dashboard_stats(
     Get user-specific dashboard statistics (Multi-Tenant Secure)
     
     Returns stats ONLY for the authenticated user:
-    - total_embeddings: Count of user's vectors in Redis (across all models)
+    - total_embeddings: Count of user's routable vectors in pgvector
     - total_intents: Unique intent types from PostgreSQL csv_data
     - unique_apis: Unique API names from PostgreSQL csv_data
     - intents: Intent type distribution {intent: count}
@@ -77,25 +71,17 @@ async def get_user_dashboard_stats(
     try:
         from sqlalchemy import distinct, func, select
 
-        from app.core.embedding_model_registry import get_embedding_registry
+        from app.core.tenancy import tenant_session
         from app.models.database_models import CSVData
-        from app.services.multi_model_redis_service import get_multi_model_redis_service
+        from app.services.pgvector_store import get_pgvector_store
 
-        # Count vectors across all registered models
+        # Routable vectors in pgvector for this tenant (all models).
         embedding_count = 0
         try:
-            redis_service = get_multi_model_redis_service()
-            registry = get_embedding_registry()
-            for model_id in registry.list_model_ids():
-                try:
-                    model_count = redis_service.count_vectors(model_id, current_user.u_id)
-                    logger.debug(f"Model {model_id}: {model_count} vectors")
-                    embedding_count += model_count
-                except Exception as model_err:
-                    logger.debug(f"Count failed for model {model_id}: {model_err}")
-                    continue
-        except Exception:
-            embedding_count = 0
+            async with tenant_session(current_user.u_id) as tdb:
+                embedding_count = (await get_pgvector_store().stats(tdb))["total_rows"]
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Vector count unavailable: {exc}")
 
         # Intent distribution and unique API count from PostgreSQL
         intents = {}
@@ -130,26 +116,17 @@ async def get_user_dashboard_stats(
         except Exception as e:
             logger.warning(f"Could not aggregate intents/APIs from DB: {e}")
 
-        # Fetch user's active embedding model name for display
-        active_model = "unknown"
-        try:
-            from app.models.database_models import UserSetting
-            settings_result = await db.execute(
-                select(UserSetting).where(UserSetting.u_id == current_user.u_id)
-            )
-            user_settings = settings_result.scalar_one_or_none()
-            if user_settings and user_settings.default_embedding_model:
-                active_model = user_settings.default_embedding_model
-        except Exception:
-            pass
+        from app.services.model_access import active_embedding
+        active = await active_embedding(db, current_user.u_id)
 
         return {
             "total_embeddings": embedding_count,
             "total_intents": len(intents),
             "unique_apis": unique_api_count,
             "intents": intents,
-            "model": active_model,
-            "index_name": f"idx_vectors_{active_model.replace('-', '_')}"
+            "model": active.model_id,
+            "embedding": active.to_dict(),
+            "vector_store": "pgvector",
         }
     except Exception as e:
         logger.error(f"Error getting global stats: {e}", exc_info=True)
@@ -159,5 +136,5 @@ async def get_user_dashboard_stats(
             "unique_apis": 0,
             "intents": {},
             "model": "unknown",
-            "index_name": "unknown"
+            "vector_store": "pgvector"
         }

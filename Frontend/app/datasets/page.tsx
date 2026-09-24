@@ -52,6 +52,16 @@ import {
 } from "@/components/ui/tooltip"
 import { toast } from '@/hooks/use-toast'
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour'
+import { ModelMismatchPanel, apiErrorMessage } from '@/components/embeddings/ModelMismatchPanel'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { apiClient } from '@/lib/api'
+import type { MismatchOption } from '@/lib/api-types'
 
 interface DatasetRecord {
   api: string
@@ -114,6 +124,12 @@ interface PersistentDataset {
   embedded_rows: number
   embedding_status: string
   embedding_model?: string
+  embedding_progress?: number
+  embedding_error?: string | null
+  /** The model that produced this dataset's vectors (null until embedded). */
+  embedding?: { provider: string; provider_label: string; model_id: string; dimension: number; label: string } | null
+  /** False when the dataset was embedded with a different model than the one you search with. */
+  matches_active_embedding?: boolean | null
   source_type: 'AI_GENERATED' | 'CSV_UPLOAD'
   created_at: string
   updated_at?: string
@@ -149,6 +165,7 @@ export default function DatasetGeneratorPage() {
   const [renamingDataset, setRenamingDataset] = useState<PersistentDataset | null>(null)
   const [newDatasetName, setNewDatasetName] = useState('')
   const [embeddingDatasetId, setEmbeddingDatasetId] = useState<string | null>(null)
+  const [mismatch, setMismatch] = useState<{ message: string; options: MismatchOption[] } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
   const RAW_API_BASE = getApiBase()
@@ -495,44 +512,21 @@ export default function DatasetGeneratorPage() {
     }
   }
 
-  // Handler: Embed dataset to Redis
+  // Handler: embed dataset into pgvector
   const handleEmbedDataset = async (datasetId: string, forceReembed: boolean = false) => {
     setEmbeddingDatasetId(datasetId)
 
-    // Show start notification
-    toast({
-      title: forceReembed ? "Re-embedding Started" : "Embedding Started",
-      description: "Processing vectors with your current embedding model...",
-    })
-
     try {
-      const url = `${API_BASE}/api/v1/datasets/db/${datasetId}/embed${forceReembed ? '?force_reembed=true' : ''}`
-      const response = await fetch(url, withSession({
-        method: 'POST',
-      }))
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || 'Failed to embed dataset')
-      }
-
-      const result = await response.json()
-
-      // Show success notification
-      toast({
-        title: "✓ Embedding Completed",
-        description: `Successfully embedded ${result.embedded_count || 'all'} rows with ${result.model || 'current model'}`,
-      })
-
-      // Refresh datasets to show updated status
+      // Runs on the worker; the list polls while the dataset is in progress.
+      const result = await apiClient.embedDataset(datasetId, forceReembed)
+      toast({ title: forceReembed ? "Re-embedding started" : "Embedding started", description: result.message })
       await fetchAllTasks()
     } catch (err: any) {
-      toast({
-        title: "Embedding Failed",
-        description: err.message || formatError(err),
-        variant: "destructive",
-      })
-      setError(formatError(err))
+      if (err?.detail?.error === 'MODEL_MISMATCH') {
+        setMismatch({ message: err.detail.message, options: err.detail.options ?? [] })
+      } else {
+        toast({ title: "Could not start embedding", description: apiErrorMessage(err), variant: "destructive" })
+      }
     } finally {
       setEmbeddingDatasetId(null)
     }
@@ -631,7 +625,7 @@ export default function DatasetGeneratorPage() {
         {/* Background Decorations */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl" />
-          <div className="absolute top-20 -left-20 w-60 h-60 bg-blue-500/5 rounded-full blur-3xl" />
+          <div className="absolute top-20 -left-20 w-60 h-60 bg-info/5 rounded-full blur-3xl" />
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-px bg-gradient-to-r from-transparent via-border to-transparent" />
         </div>
 
@@ -640,11 +634,11 @@ export default function DatasetGeneratorPage() {
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/10">
+                <div className="grid h-11 w-11 place-items-center rounded-xl bg-brand-gradient text-white shadow-glow [&_svg]:text-white">
                   <Database className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <h1 className="text-3xl lg:text-4xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                  <h1 className="text-3xl lg:text-4xl font-bold tracking-tight font-display text-foreground">
                     Datasets
                   </h1>
                   <p className="text-muted-foreground mt-1">
@@ -660,11 +654,11 @@ export default function DatasetGeneratorPage() {
                 <span className="text-2xl font-bold tabular-nums text-foreground">{persistentDatasets.length}</span>
                 <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total</span>
               </div>
-              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-sm">
-                <span className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-success/10 border border-success/20 backdrop-blur-sm">
+                <span className="text-2xl font-bold tabular-nums text-success dark:text-success">
                   {persistentDatasets.filter(d => d.embedding_status === 'completed').length}
                 </span>
-                <span className="text-xs text-emerald-600/80 dark:text-emerald-400/80 font-medium uppercase tracking-wider">Embedded</span>
+                <span className="text-xs text-success/80 dark:text-success/80 font-medium uppercase tracking-wider">Embedded</span>
               </div>
             </div>
           </div>
@@ -695,22 +689,22 @@ export default function DatasetGeneratorPage() {
           <TabsContent value="generate" className="outline-none animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
             {/* Active Generation Progress Card */}
             {currentTask && (currentTask.status === 'running' || currentTask.status === 'pending') && (
-              <Card className="mb-6 border-blue-200 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 dark:border-blue-900 dark:from-blue-900/20 dark:to-indigo-900/20 shadow-sm animate-in fade-in slide-in-from-top-2">
+              <Card className="mb-6 border-info/25 bg-gradient-to-r from-info/80 to-primary/80 dark:border-info dark:from-info/20 dark:to-primary/20 shadow-sm animate-in fade-in slide-in-from-top-2">
                 <CardContent className="p-5 space-y-4">
                   {/* Header Row */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="relative">
-                        <Loader2 className="w-8 h-8 animate-spin text-blue-600 dark:text-blue-400" />
+                        <Loader2 className="w-8 h-8 animate-spin text-info dark:text-info" />
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="w-3 h-3 rounded-full bg-blue-500/30" />
+                          <div className="w-3 h-3 rounded-full bg-info/30" />
                         </div>
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                        <p className="text-sm font-semibold text-info dark:text-info-foreground">
                           Generating Dataset
                         </p>
-                        <p className="text-xs text-blue-600 dark:text-blue-400 font-mono">
+                        <p className="text-xs text-info dark:text-info font-mono">
                           ID: {currentTask.task_id.slice(0, 8)}...
                         </p>
                       </div>
@@ -720,8 +714,8 @@ export default function DatasetGeneratorPage() {
                       className={cn(
                         "text-xs font-medium px-2.5 py-1",
                         currentTask.status === 'running' 
-                          ? "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-700"
-                          : "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-300 dark:border-amber-700"
+                          ? "bg-info/10 text-info border-info/25 dark:bg-info/50 dark:text-info dark:border-info"
+                          : "bg-warning/10 text-warning border-warning/25 dark:bg-warning/50 dark:text-warning dark:border-warning"
                       )}
                     >
                       {currentTask.status === 'running' ? 'Processing' : 'Queued'}
@@ -731,16 +725,16 @@ export default function DatasetGeneratorPage() {
                   {/* Progress Bar */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-blue-700 dark:text-blue-300 font-medium">
+                      <span className="text-info dark:text-info font-medium">
                         {currentTask.current_step || currentTask.message || 'Initializing...'}
                       </span>
-                      <span className="text-blue-900 dark:text-blue-100 font-bold tabular-nums">
+                      <span className="text-info dark:text-info-foreground font-bold tabular-nums">
                         {currentTask.progress !== undefined ? `${Math.round(currentTask.progress)}%` : '—'}
                       </span>
                     </div>
-                    <div className="h-2.5 bg-blue-200/50 dark:bg-blue-900/50 rounded-full overflow-hidden">
+                    <div className="h-2.5 bg-info/50 dark:bg-info/50 rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-500 ease-out"
+                        className="h-full bg-gradient-to-r from-info to-primary rounded-full transition-all duration-500 ease-out"
                         style={{ width: `${currentTask.progress || 0}%` }}
                       />
                     </div>
@@ -748,15 +742,15 @@ export default function DatasetGeneratorPage() {
 
                   {/* Step Details */}
                   {currentTask.steps && currentTask.steps.length > 0 && (
-                    <div className="pt-2 border-t border-blue-200/50 dark:border-blue-800/50">
+                    <div className="pt-2 border-t border-info/50 dark:border-info/50">
                       <div className="flex flex-wrap gap-2">
                         {currentTask.steps.map((step, idx) => (
                           <div 
                             key={idx}
                             className={cn(
                               "flex items-center gap-1.5 text-xs px-2 py-1 rounded-full",
-                              step.status === 'completed' && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-                              step.status === 'running' && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 animate-pulse",
+                              step.status === 'completed' && "bg-success/10 text-success dark:bg-success/30 dark:text-success",
+                              step.status === 'running' && "bg-info/10 text-info dark:bg-info/30 dark:text-info animate-pulse",
                               step.status === 'pending' && "bg-gray-100 text-gray-500 dark:bg-gray-800/30 dark:text-gray-500"
                             )}
                           >
@@ -772,7 +766,7 @@ export default function DatasetGeneratorPage() {
 
                   {/* Time Estimate */}
                   {currentTask.created_at && (
-                    <p className="text-[10px] text-blue-600/70 dark:text-blue-400/70 text-center">
+                    <p className="text-[10px] text-info/70 dark:text-info/70 text-center">
                       Started {formatDateTime(currentTask.created_at)} • Generation typically takes 30-60 seconds
                     </p>
                   )}
@@ -797,7 +791,7 @@ export default function DatasetGeneratorPage() {
                 <div className="space-y-6">
                   <div className="space-y-3">
                     <Label htmlFor="template-select" className="text-sm font-medium flex items-center gap-1">
-                      Template <span className="text-red-500">*</span>
+                      Template <span className="text-destructive">*</span>
                     </Label>
                     <select
                       id="template-select"
@@ -818,7 +812,7 @@ export default function DatasetGeneratorPage() {
                       )}
                     </select>
                     {templates.length === 0 && (
-                      <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5 mt-2">
+                      <p className="text-xs text-warning dark:text-warning flex items-center gap-1.5 mt-2">
                         <AlertTriangle className="w-3.5 h-3.5" />
                         No approved templates found. Approve a template to continue.
                       </p>
@@ -853,7 +847,7 @@ export default function DatasetGeneratorPage() {
                 <div className="space-y-6 flex flex-col">
                   <div className="space-y-3 flex-1 flex flex-col">
                     <Label htmlFor="user-prompt" className="text-sm font-medium flex items-center gap-1">
-                      Generation Prompt <span className="text-red-500">*</span>
+                      Generation Prompt <span className="text-destructive">*</span>
                     </Label>
                     <textarea
                       id="user-prompt"
@@ -915,15 +909,15 @@ export default function DatasetGeneratorPage() {
                     className={cn(
                       "relative flex flex-col items-center justify-center w-full h-48 rounded-xl border-2 border-dashed transition-all cursor-pointer",
                       uploadedFile
-                        ? "border-emerald-500/50 bg-emerald-50/10"
+                        ? "border-success/50 bg-success/10"
                         : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/20"
                     )}
                   >
                     <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
                       {uploadedFile ? (
                         <>
-                          <div className="h-12 w-12 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mb-3">
-                            <FileSpreadsheet className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                          <div className="h-12 w-12 rounded-full bg-success/10 dark:bg-success/30 flex items-center justify-center mb-3">
+                            <FileSpreadsheet className="h-6 w-6 text-success dark:text-success" />
                           </div>
                           <p className="text-sm font-semibold text-foreground mb-1">
                             {uploadedFile.name}
@@ -1059,13 +1053,31 @@ export default function DatasetGeneratorPage() {
                           {dataset.template_name}
                         </div>
                       )}
+                      {dataset.embedding && (
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                          <span
+                            className="inline-flex max-w-full items-center truncate rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                            title={`Embedded with ${dataset.embedding.label}`}
+                          >
+                            {dataset.embedding.label}
+                          </span>
+                          {dataset.matches_active_embedding === false && (
+                            <span
+                              className="inline-flex items-center rounded-md bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning"
+                              title="Your embedding model is different, so search leaves this dataset out until it is re-embedded."
+                            >
+                              Different model: not searched
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Source */}
                     <div className="col-span-2">
                       <Badge variant="outline" className={cn(
                         "font-medium text-[10px] uppercase tracking-wide border-0 px-2 py-0.5",
-                        dataset.source_type === 'AI_GENERATED' ? "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400" : "bg-sky-100 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400"
+                        dataset.source_type === 'AI_GENERATED' ? "bg-info/10 text-info dark:bg-info/10 dark:text-info" : "bg-info/10 text-info dark:bg-info/10 dark:text-info"
                       )}>
                         {dataset.source_type === 'AI_GENERATED' ? 'AI Generated' : 'Uploaded'}
                       </Badge>
@@ -1074,19 +1086,28 @@ export default function DatasetGeneratorPage() {
                     {/* Status */}
                     <div className="col-span-2">
                       {embeddingDatasetId === dataset.dataset_id ? (
-                        <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 font-medium">
+                        <div className="flex items-center gap-1.5 text-xs text-info dark:text-info font-medium">
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
                           Processing
                         </div>
                       ) : dataset.embedding_status === 'completed' ? (
-                        <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                        <div className="flex items-center gap-1.5 text-xs text-success dark:text-success font-medium">
                           <CheckCircle className="w-3.5 h-3.5" />
                           Embedded
                         </div>
                       ) : dataset.embedding_status === 'in_progress' ? (
-                        <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 font-medium">
+                        <div className="flex items-center gap-1.5 text-xs text-info dark:text-info font-medium">
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          Processing
+                          Embedding {dataset.embedding_progress ? `${dataset.embedding_progress}%` : '…'}
+                        </div>
+                      ) : dataset.embedding_status === 'failed' ? (
+                        <div className="text-xs text-destructive" title={dataset.embedding_error ?? undefined}>
+                          <div className="flex items-center gap-1.5 font-medium">
+                            <AlertTriangle className="w-3.5 h-3.5" /> Failed
+                          </div>
+                          {dataset.embedding_error && (
+                            <p className="mt-0.5 line-clamp-2 text-[11px] text-destructive/80">{dataset.embedding_error}</p>
+                          )}
                         </div>
                       ) : (
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -1124,15 +1145,15 @@ export default function DatasetGeneratorPage() {
                         </Tooltip>
                       </TooltipProvider>
 
-                      {dataset.embedding_status !== 'completed' && dataset.embedding_status !== 'in_progress' && (
+                      {(dataset.embedding_status !== 'completed' || dataset.matches_active_embedding === false) && dataset.embedding_status !== 'in_progress' && (
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-blue-600"
-                                onClick={() => handleEmbedDataset(dataset.dataset_id)}
+                                className="h-8 w-8 text-muted-foreground hover:text-info"
+                                onClick={() => handleEmbedDataset(dataset.dataset_id, dataset.embedding_status === 'failed')}
                                 disabled={embeddingDatasetId === dataset.dataset_id}
                               >
                                 {embeddingDatasetId === dataset.dataset_id ? (
@@ -1142,7 +1163,9 @@ export default function DatasetGeneratorPage() {
                                 )}
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent>Generate Embeddings</TooltipContent>
+                            <TooltipContent>
+                              {dataset.matches_active_embedding === false ? 'Re-embed with your model' : 'Embed for routing'}
+                            </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
                       )}
@@ -1158,7 +1181,7 @@ export default function DatasetGeneratorPage() {
                             <>
                               <DropdownMenuItem
                                 onClick={() => handleEmbedDataset(dataset.dataset_id, true)}
-                                className="text-blue-600 focus:text-blue-600"
+                                className="text-info focus:text-info"
                               >
                                 <Zap className="w-4 h-4 mr-2" /> Re-embed
                               </DropdownMenuItem>
@@ -1304,6 +1327,28 @@ export default function DatasetGeneratorPage() {
             </div>
           </div>
         )}
+
+        {/* Embedding model mismatch: switch model, or re-embed */}
+        <Dialog open={!!mismatch} onOpenChange={(open) => !open && setMismatch(null)}>
+          <DialogContent className="sm:max-w-[560px] rounded-2xl">
+            <DialogHeader>
+              <DialogTitle>Different embedding model</DialogTitle>
+              <DialogDescription>
+                This dataset&apos;s vectors come from another model than the one you search with.
+              </DialogDescription>
+            </DialogHeader>
+            {mismatch && (
+              <ModelMismatchPanel
+                message={mismatch.message}
+                options={mismatch.options}
+                onResolved={() => {
+                  setMismatch(null)
+                  fetchAllTasks()
+                }}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
 
       </main>
     </div>

@@ -8,8 +8,6 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cookie_config import (
@@ -20,6 +18,7 @@ from app.core.cookie_config import (
 )
 from app.core.logger import logger
 from app.core.postgres import get_db
+from app.core.rate_limit import limiter
 from app.core.token_denylist import is_token_revoked, revoke_token
 from app.models.database_models import User
 from app.models.schemas.auth_schemas import (
@@ -39,7 +38,6 @@ from app.services.audit_service import log_audit_event
 from app.services.auth_service import ACCESS_TOKEN_EXPIRE_MINUTES, AuthService, get_auth_service
 
 router = APIRouter()
-limiter = Limiter(key_func=get_remote_address)
 
 
 async def get_current_user(

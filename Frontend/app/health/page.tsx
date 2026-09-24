@@ -73,11 +73,11 @@ export default function HealthPage() {
   const getStatusConfig = (status: string) => {
     switch (status) {
       case 'healthy':
-        return { label: 'Healthy', icon: CheckCircle2, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/30' };
+        return { label: 'Healthy', icon: CheckCircle2, color: 'text-success dark:text-success', bg: 'bg-success/10 dark:bg-success/30' };
       case 'degraded':
-        return { label: 'Degraded', icon: AlertTriangle, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' };
+        return { label: 'Degraded', icon: AlertTriangle, color: 'text-warning dark:text-warning', bg: 'bg-warning/10 dark:bg-warning/30' };
       case 'unhealthy':
-        return { label: 'Unhealthy', icon: XCircle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' };
+        return { label: 'Unhealthy', icon: XCircle, color: 'text-destructive dark:text-destructive', bg: 'bg-destructive/10 dark:bg-destructive/30' };
       default:
         return { label: 'Unknown', icon: AlertTriangle, color: 'text-muted-foreground', bg: 'bg-muted' };
     }
@@ -88,8 +88,8 @@ export default function HealthPage() {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center max-w-md">
-          <div className="mx-auto w-16 h-16 mb-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-            <WifiOff className="h-8 w-8 text-red-600 dark:text-red-400" />
+          <div className="mx-auto w-16 h-16 mb-6 rounded-full bg-destructive/10 dark:bg-destructive/30 flex items-center justify-center">
+            <WifiOff className="h-8 w-8 text-destructive dark:text-destructive" />
           </div>
           <h2 className="text-xl font-semibold mb-2">Service Unavailable</h2>
           <p className="text-muted-foreground mb-6 text-sm">
@@ -305,7 +305,7 @@ export default function HealthPage() {
               <span className="text-muted-foreground">Test Parse Status</span>
               <span className={cn(
                 "font-medium flex items-center gap-1.5",
-                health?.checks?.rule_engine?.test_parse_successful ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                health?.checks?.rule_engine?.test_parse_successful ? 'text-success dark:text-success' : 'text-destructive dark:text-destructive'
               )}>
                 {health?.checks?.rule_engine?.test_parse_successful ? (
                   <>
@@ -349,24 +349,24 @@ function ServiceCard({
       <div className="flex items-start justify-between mb-3">
         <div className={cn(
           "h-10 w-10 rounded-lg flex items-center justify-center",
-          isHealthy ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' :
+          isHealthy ? 'bg-success/10 dark:bg-success/30 text-success dark:text-success' :
             isUnknown ? 'bg-muted text-muted-foreground' :
-              'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+              'bg-destructive/10 dark:bg-destructive/30 text-destructive dark:text-destructive'
         )}>
           {icon}
         </div>
 
         <div className={cn(
           "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium",
-          isHealthy && 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400',
+          isHealthy && 'bg-success/10 dark:bg-success/30 text-success dark:text-success',
           isUnknown && 'bg-muted text-muted-foreground',
-          !isHealthy && !isUnknown && 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+          !isHealthy && !isUnknown && 'bg-destructive/10 dark:bg-destructive/30 text-destructive dark:text-destructive'
         )}>
           <span className={cn(
             "h-1.5 w-1.5 rounded-full",
-            isHealthy && 'bg-green-500',
+            isHealthy && 'bg-success',
             isUnknown && 'bg-muted-foreground',
-            !isHealthy && !isUnknown && 'bg-red-500'
+            !isHealthy && !isUnknown && 'bg-destructive'
           )} />
           {isHealthy ? 'Online' : isUnknown ? 'Checking' : 'Offline'}
         </div>
@@ -400,9 +400,9 @@ function ResourceMeter({
   subtitle?: string;
 }) {
   const getColor = () => {
-    if (value < 50) return 'bg-green-500';
-    if (value < 80) return 'bg-amber-500';
-    return 'bg-red-500';
+    if (value < 50) return 'bg-success';
+    if (value < 80) return 'bg-warning';
+    return 'bg-destructive';
   };
 
   return (

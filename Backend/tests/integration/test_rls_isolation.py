@@ -39,6 +39,17 @@ pytestmark = [
 DIM = 384
 
 
+async def _role_bypasses_rls() -> bool:
+    """Superusers and BYPASSRLS roles skip every policy, even FORCEd ones."""
+    async with AsyncSessionLocal() as session:
+        row = (
+            await session.execute(
+                text("SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = current_user")
+            )
+        ).first()
+    return bool(row and row[0])
+
+
 def _vec(seed: float) -> list[float]:
     return [seed] * DIM
 
@@ -72,6 +83,7 @@ async def test_tenant_cannot_read_another_tenants_vectors():
             [_vec(0.1)],
             embedding_model="test-model",
             dimension=DIM,
+            embedding_provider="test",
         )
 
     async with tenant_session(tenant_b) as db:
@@ -82,12 +94,14 @@ async def test_tenant_cannot_read_another_tenants_vectors():
             [_vec(0.1)],
             embedding_model="test-model",
             dimension=DIM,
+            embedding_provider="test",
         )
 
     # Identical query vector: without RLS, B's row would rank identically to A's.
     async with tenant_session(tenant_a) as db:
         result = await store.search(
-            db, _vec(0.1), embedding_model="test-model", dimension=DIM, top_k=50
+            db, _vec(0.1), embedding_model="test-model", dimension=DIM,
+            embedding_provider="test", top_k=50
         )
         names = {r["api_name"] for r in result.rows}
         assert "A_Api" in names
@@ -99,7 +113,12 @@ async def test_session_without_tenant_sees_nothing():
     """
     Policies use current_setting('app.tenant_id', TRUE) so an unbound session
     yields NULL and matches no rows. Fail closed, never open.
+
+    This is a property of the DATABASE policy, so it only holds for a role RLS
+    applies to. Run the suite as a non-superuser to exercise it (CI does).
     """
+    if await _role_bypasses_rls():
+        pytest.skip("connected role is superuser/BYPASSRLS: PostgreSQL skips RLS for it")
     async with AsyncSessionLocal() as session:
         async with session.begin():
             assert await current_tenant(session) is None
@@ -172,6 +191,7 @@ async def test_hnsw_recall_survives_rls_filtering():
                 [_vec(0.5 + i * 0.001) for i in range(25)],
                 embedding_model="test-model",
                 dimension=DIM,
+                embedding_provider="test",
             )
 
     async with tenant_session(minority) as db:
@@ -182,11 +202,13 @@ async def test_hnsw_recall_survives_rls_filtering():
             [_vec(0.9) for _ in range(5)],
             embedding_model="test-model",
             dimension=DIM,
+            embedding_provider="test",
         )
 
     async with tenant_session(minority) as db:
         result = await store.search(
-            db, _vec(0.5), embedding_model="test-model", dimension=DIM, top_k=50
+            db, _vec(0.5), embedding_model="test-model", dimension=DIM,
+            embedding_provider="test", top_k=50
         )
         assert len(result.rows) == 5, (
             f"expected all 5 owned rows, got {len(result.rows)}. "

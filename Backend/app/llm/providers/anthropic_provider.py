@@ -34,7 +34,6 @@ from app.llm.providers.base import (
     LLMResponse,
     ModelNotFoundError,
     ProviderError,
-    ProviderModel,
     ProviderType,
     RateLimitError,
     TransientError,
@@ -80,56 +79,6 @@ class AnthropicProvider(BaseLLMProvider):
         async for chunk in provider.generate_stream(prompt="Hello"):
             print(chunk.content, end="", flush=True)
     """
-    
-    DEFAULT_MODELS = [
-        # =========================================================================
-        # Claude 4.5 Series (Latest - Recommended)
-        # =========================================================================
-        ProviderModel(
-            id="claude-sonnet-4-5-20250929",
-            name="Claude Sonnet 4.5",
-            description="Best for coding & agentic tasks, 1M context with beta",
-            context_length=200000,
-            supports_vision=True,
-            supports_functions=True,
-        ),
-        ProviderModel(
-            id="claude-opus-4-5-20251101",
-            name="Claude Opus 4.5",
-            description="Most powerful Claude, highest capability",
-            context_length=200000,
-            supports_vision=True,
-            supports_functions=True,
-        ),
-        ProviderModel(
-            id="claude-haiku-4-5-20251001",
-            name="Claude Haiku 4.5",
-            description="Fast and efficient, great for quick tasks",
-            context_length=200000,
-            supports_vision=True,
-            supports_functions=True,
-        ),
-
-        # =========================================================================
-        # Claude 3.5 Series (Previous Gen - Still Supported)
-        # =========================================================================
-        ProviderModel(
-            id="claude-3-5-sonnet-20241022",
-            name="Claude 3.5 Sonnet",
-            description="Previous gen, still excellent ($3/$15 per M tokens)",
-            context_length=200000,
-            supports_vision=True,
-            supports_functions=True,
-        ),
-        ProviderModel(
-            id="claude-3-5-haiku-20241022",
-            name="Claude 3.5 Haiku",
-            description="Fast and cost-effective",
-            context_length=200000,
-            supports_vision=True,
-            supports_functions=True,
-        ),
-    ]
     
     def __init__(
         self,
@@ -469,15 +418,6 @@ class AnthropicProvider(BaseLLMProvider):
                 message=f"Connection failed: {e}",
                 error_code="CONNECTION_ERROR",
             )
-    
-    async def list_models(self) -> List[ProviderModel]:
-        """
-        List available Anthropic models.
-        
-        Note: Anthropic doesn't have a public models endpoint,
-        so we return the predefined list of supported models.
-        """
-        return self.DEFAULT_MODELS.copy()
     
     async def _async_sleep(self, seconds: float):
         """Async sleep helper for retries"""

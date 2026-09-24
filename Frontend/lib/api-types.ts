@@ -393,15 +393,21 @@ export interface SemanticRetrieveStage1Result {
   query: string;
   similarity_score: number;
   t_id: string;
+  api_name?: string;
+  row_id?: string;
 }
 
+/** Stage 2: one template candidate after max-pooling its utterance rows. */
 export interface SemanticRetrieveStage2Result {
   t_id: string;
-  avg_similarity: number;
-  avg_confidence_score: number;
-  final_score: number;
   rank: number;
+  ce_score: number;
+  vector_score: number;
   match_count: number;
+  api_name: string;
+  endpoint: string;
+  method: string;
+  best_utterance: string;
 }
 
 export interface SemanticRetrieveFinalOutput {
@@ -410,46 +416,238 @@ export interface SemanticRetrieveFinalOutput {
   endpoint: string;
   method: string;
   confidence_score: number;
-  request_schema: Record<string, unknown>;
-  response_schema: Record<string, unknown>;
-  extracted_request_body?: Record<string, unknown>;
+  base_url?: string;
+  extracted_base_url?: string | null;
+  effective_base_url?: string;
+  url_source?: 'query' | 'template';
+  request_schema?: Record<string, unknown> | null;
+  response_schema?: Record<string, unknown> | null;
+  extracted_request_body?: Record<string, unknown> | null;
+}
+
+/** Stage 3 outcome. ok=false + degraded=false means validation failed. */
+export interface ExtractedField {
+  value: unknown;
+  /** "rule": read straight off the request. "llm": the model found it, and it was checked against the request. */
+  source: 'rule' | 'llm';
+  confidence: number;
+}
+
+export interface SemanticRetrieveExtraction {
+  ok: boolean;
+  values: Record<string, unknown>;
+  missing_required: string[];
+  /** Where each value came from and how sure it is. */
+  fields?: Record<string, ExtractedField>;
+  /** Values the model suggested that the request does not support, with the reason. */
+  unverified?: Record<string, { value: unknown; reason: string }>;
+  /** The least certain field's confidence. */
+  confidence?: number | null;
+  strategy?: string;
+  degraded: boolean;
+  reason?: string | null;
+  /** Model calls made; 0 when rules extracted everything. */
+  attempts: number;
+  latency_ms: number;
+  model?: string | null;
+}
+
+export interface SemanticRetrieveRanking {
+  strategy: 'vector_maxpool' | 'cross_encoder' | 'vector_maxpool_fallback' | string;
+  degraded: boolean;
+  degraded_reason?: string | null;
+  reranker_model?: string;
+  rows_cross_encoded: number;
 }
 
 export interface SemanticRetrieveMetadata {
   query: string;
-  top_k: number;
-  total_candidates: number;
-  processing_time_ms: number;
-  t_id?: string;
-  match_count?: number;
-  avg_similarity?: number;
-  avg_confidence?: number;
-  intent_alignment?: number;
-  dominant_intent?: string;
-  domain_tags?: string[];
-  matched_queries?: string[];
+  embedding_model?: string;
+  embedding_dimension?: number;
+  stage1_top_k?: number;
+  stage2_top_k?: number;
+  total_candidates?: number;
+  processing_time_ms?: number;
+  best_utterance?: string;
+  vector_score?: number;
+  reranker_enabled?: boolean;
+  timings_ms?: { embed: number; vector_search: number; ranking: number; extraction: number };
+  /** The embedding model this search used. */
+  embedding?: EmbeddingSelection;
+  /** Datasets left out because they were embedded with a different model. */
+  excluded_datasets?: EmbeddingGroup[];
 }
 
 export interface SemanticRetrieveResponse {
   success: boolean;
+  error?: string;
+  message?: string;
   stage1_vector_search: SemanticRetrieveStage1Result[];
   stage2_reranking: SemanticRetrieveStage2Result[];
   final_output: SemanticRetrieveFinalOutput | null;
   metadata: SemanticRetrieveMetadata;
-  extracted_request_body?: Record<string, unknown>;
-  // Legacy fields
+  extracted_request_body?: Record<string, unknown> | null;
+  extraction?: SemanticRetrieveExtraction | null;
+  ranking?: SemanticRetrieveRanking | null;
+  degraded?: boolean;
   api_name?: string;
   endpoint?: string;
   method?: string;
   base_url?: string;
   confidence?: number;
-  alternatives?: Array<{
-    t_id: string;
-    api_name: string;
-    endpoint: string;
-    method: string;
-    avg_similarity: number;
-    match_count: number;
-  }>;
+  alternatives?: SemanticRetrieveStage2Result[];
+  /** How to make datasets from other embedding models searchable. */
+  options?: MismatchOption[] | null;
+}
+
+// ============================================================================
+// Model catalogue
+// ============================================================================
+
+export type CatalogModelStatus = 'active' | 'deprecated' | 'retired';
+
+export interface CatalogModel {
+  provider: string;
+  provider_label?: string;
+  model_id: string;
+  kind: 'llm' | 'embedding';
+  display_name: string;
+  description?: string | null;
+  context_tokens?: number | null;
+  /** Embedding width; null until measured. */
+  dimension?: number | null;
+  is_local: boolean;
+  is_free?: boolean | null;
+  is_new?: boolean;
+  status: CatalogModelStatus;
+  /** Plain-English explanation of a non-active status. */
+  status_reason?: string | null;
+  /** Shutdown date announced by the provider (ISO date). */
+  shutdown_date?: string | null;
+  first_seen_at?: string;
+  last_seen_at?: string;
+  /** Listed for everyone (deployment/public credentials) vs found with your own key. */
+  shared?: boolean;
+}
+
+export interface CatalogSource {
+  provider: string;
+  provider_label: string;
+  scope: 'shared' | 'yours';
+  model_count: number;
+  last_success_at: string | null;
+  last_attempt_at: string | null;
+  last_error: string | null;
+  last_error_code: string | null;
+}
+
+export interface ModelCatalogResponse {
+  models: CatalogModel[];
+  sources: CatalogSource[];
+  counts: { llm: number; embedding: number };
+  policy: {
+    sync_interval_minutes: number;
+    retire_grace_hours: number;
+    retired_retention_days: number;
+    new_badge_days: number;
+  };
+}
+
+export interface ModelCatalogSyncResult {
+  provider: string;
+  provider_label: string;
+  scope: 'shared' | 'yours';
+  ok: boolean;
+  model_count: number;
+  added: number;
+  deprecated: number;
+  retired: number;
+  deleted: number;
+  error: string | null;
+}
+
+export interface ModelDiscoveryResponse {
+  ok: boolean;
   error?: string;
+  error_code?: string;
+  provider_label?: string;
+  models: CatalogModel[];
+}
+
+// ============================================================================
+// Providers and embedding models
+// ============================================================================
+
+/** One entry of the backend provider registry (GET /llm-config/providers). */
+export interface ProviderInfo {
+  id: string;
+  label: string;
+  description: string;
+  api: string;
+  base_url: string;
+  key_url: string;
+  requires_key: boolean;
+  list_requires_key: boolean;
+  chat: boolean;
+  embeddings: boolean;
+  local: boolean;
+  free_tier: boolean;
+  custom_base_url: boolean;
+  embed_batch: number;
+  /** How the current user can reach it: their own connection, a deployment key, no key needed, or not at all. */
+  access: 'connection' | 'deployment' | 'none-needed' | null;
+}
+
+/** The (provider, model, dimension) that search and embedding use. */
+export interface EmbeddingSelection {
+  provider: string;
+  provider_label: string;
+  model_id: string;
+  dimension: number;
+  is_default: boolean;
+  label: string;
+}
+
+/** Datasets whose vectors came from one embedding model. */
+export interface EmbeddingGroup {
+  provider: string;
+  provider_label: string;
+  model_id: string;
+  dimension: number;
+  label: string;
+  matches_active?: boolean;
+  datasets: Array<{ dataset_id: string; name: string; rows: number }>;
+}
+
+export interface EmbeddingSettingsResponse {
+  active: EmbeddingSelection;
+  deployment_default: { provider: string; provider_label: string; model_id: string; dimension: number };
+  providers: Array<ProviderInfo & { connected: boolean; credential_source: string | null }>;
+  models: CatalogModel[];
+  groups: EmbeddingGroup[];
+  needs_reembed: Array<{ dataset_id: string; name: string; rows: number }>;
+  message?: string;
+}
+
+/** A way out of a model mismatch, as offered by the backend. */
+export interface MismatchOption {
+  action: 'switch_model' | 'reembed' | 'reembed_all';
+  label: string;
+  description: string;
+  provider?: string;
+  model_id?: string;
+  dimension?: number;
+  dataset_id?: string;
+  dataset_ids?: string[];
+}
+
+export interface EmbedQueuedResponse {
+  success: boolean;
+  queued?: boolean;
+  dataset_id: string;
+  status: string;
+  provider?: string;
+  model_id?: string;
+  dimension?: number;
+  message: string;
 }

@@ -20,11 +20,11 @@ export function ValidationPanel({
             <h3 className="font-semibold flex items-center gap-2">
                 {validationIssues.length === 0 ? (
                     <>
-                        <CheckCircle2 className="w-5 h-5 text-green-500" /> All Valid
+                        <CheckCircle2 className="w-5 h-5 text-success" /> All Valid
                     </>
                 ) : (
                     <>
-                        <AlertCircle className="w-5 h-5 text-amber-500" /> {validationIssues.length} Issues
+                        <AlertCircle className="w-5 h-5 text-warning" /> {validationIssues.length} Issues
                     </>
                 )}
             </h3>
@@ -39,7 +39,7 @@ export function ValidationPanel({
                     ))}
                 </ul>
             ) : (
-                <p className="text-sm text-green-500">Ready to submit!</p>
+                <p className="text-sm text-success">Ready to submit!</p>
             )}
 
             <div className="pt-4 border-t border-border space-y-2">

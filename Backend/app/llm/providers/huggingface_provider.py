@@ -34,7 +34,6 @@ from app.llm.providers.base import (
     LLMResponse,
     ModelNotFoundError,
     ProviderError,
-    ProviderModel,
     ProviderType,
     RateLimitError,
     TransientError,
@@ -88,112 +87,6 @@ class HuggingFaceProvider(BaseLLMProvider):
         async for chunk in provider.generate_stream(prompt="Hello"):
             print(chunk.content, end="", flush=True)
     """
-    
-    DEFAULT_MODELS = [
-        # ==========================================================================
-        # CPU-Friendly Models (Small, fast, work on serverless inference)
-        # ==========================================================================
-        
-        # Google Gemma (Smaller models, CPU-friendly)
-        ProviderModel(
-            id="google/gemma-2-2b-it",
-            name="Gemma 2 2B Instruct (CPU)",
-            description="Google's smallest Gemma - fast on CPU",
-            context_length=8192,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        
-        # Microsoft Phi (Small, efficient)
-        ProviderModel(
-            id="microsoft/Phi-3-mini-4k-instruct",
-            name="Phi-3 Mini 4K (CPU)",
-            description="3.8B params - excellent for CPU",
-            context_length=4096,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        ProviderModel(
-            id="microsoft/Phi-3.5-mini-instruct",
-            name="Phi-3.5 Mini (CPU)",
-            description="3.8B params - updated version",
-            context_length=128000,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        
-        # Qwen Small Models
-        ProviderModel(
-            id="Qwen/Qwen2.5-1.5B-Instruct",
-            name="Qwen 2.5 1.5B Instruct (CPU)",
-            description="Alibaba's smallest Qwen - fast",
-            context_length=32768,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        ProviderModel(
-            id="Qwen/Qwen2.5-3B-Instruct",
-            name="Qwen 2.5 3B Instruct (CPU)",
-            description="Balanced size and capability",
-            context_length=32768,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        
-        # TinyLlama
-        ProviderModel(
-            id="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-            name="TinyLlama 1.1B Chat (CPU)",
-            description="Ultra-small, very fast",
-            context_length=2048,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        
-        # SmolLM (Hugging Face's own small models)
-        ProviderModel(
-            id="HuggingFaceTB/SmolLM2-1.7B-Instruct",
-            name="SmolLM2 1.7B Instruct (CPU)",
-            description="HuggingFace's efficient small model",
-            context_length=8192,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        
-        # ==========================================================================
-        # GPU Recommended (Larger models, may timeout on CPU)
-        # ==========================================================================
-        
-        # Llama 3 (Medium)
-        ProviderModel(
-            id="meta-llama/Llama-3.2-3B-Instruct",
-            name="Llama 3.2 3B Instruct",
-            description="Meta's compact Llama - GPU recommended",
-            context_length=128000,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        
-        # Mistral (Medium)
-        ProviderModel(
-            id="mistralai/Mistral-7B-Instruct-v0.3",
-            name="Mistral 7B Instruct v0.3",
-            description="Efficient 7B model - GPU recommended",
-            context_length=32768,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        
-        # Qwen (Medium)
-        ProviderModel(
-            id="Qwen/Qwen2.5-7B-Instruct",
-            name="Qwen 2.5 7B Instruct",
-            description="Powerful 7B model - GPU recommended",
-            context_length=32768,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-    ]
     
     def __init__(
         self,
@@ -702,14 +595,6 @@ class HuggingFaceProvider(BaseLLMProvider):
                 message=f"Connection failed: {e}",
                 error_code="CONNECTION_ERROR",
             )
-    
-    async def list_models(self) -> List[ProviderModel]:
-        """
-        List available HuggingFace models.
-        
-        Returns predefined list (HF has too many models to enumerate effectively).
-        """
-        return self.DEFAULT_MODELS
     
     async def _async_sleep(self, seconds: float):
         """Async sleep helper for retries"""

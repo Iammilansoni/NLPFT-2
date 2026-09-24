@@ -12,6 +12,8 @@ import { AlertCircle, Eye, EyeOff, CheckCircle2, XCircle, Loader2 } from 'lucide
 import { useAuth } from '@/contexts/AuthContext';
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
 
+const GOOGLE_ENABLED = Boolean(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
+
 interface PasswordStrength {
   score: number;
   label: string;
@@ -50,9 +52,9 @@ export default function RegisterPage() {
     if (/[^a-zA-Z\d]/.test(password)) score++;
 
     if (score <= 2) return { score, label: 'Weak', color: 'text-destructive' };
-    if (score === 3) return { score, label: 'Fair', color: 'text-amber-500' };
-    if (score === 4) return { score, label: 'Good', color: 'text-green-500' };
-    return { score, label: 'Strong', color: 'text-green-500' };
+    if (score === 3) return { score, label: 'Fair', color: 'text-warning' };
+    if (score === 4) return { score, label: 'Good', color: 'text-success' };
+    return { score, label: 'Strong', color: 'text-success' };
   };
 
   const passwordStrength = formData.password ? getPasswordStrength(formData.password) : null;
@@ -104,13 +106,13 @@ export default function RegisterPage() {
           href="/"
           className="inline-flex items-center text-sm text-primary hover:text-primary/80 transition-colors mb-4"
         >
-          ← Return Home
+          ← Back to home
         </Link>
         <h1 className="text-3xl font-bold text-foreground mb-2">
-          Create Account
+          Create your account
         </h1>
         <p className="text-muted-foreground">
-          Start your journey with AI-powered API testing
+          Describe your APIs once, then route plain-English requests to them.
         </p>
       </div>
 
@@ -209,9 +211,9 @@ export default function RegisterPage() {
                     className={`h-1.5 flex-1 rounded-full transition-colors duration-200 ${
                       i < (passwordStrength?.score || 0)
                         ? passwordStrength?.score && passwordStrength.score >= 4
-                          ? 'bg-green-500'
+                          ? 'bg-success'
                           : passwordStrength?.score === 3
-                            ? 'bg-amber-500'
+                            ? 'bg-warning'
                             : 'bg-destructive'
                         : 'bg-border'
                     }`}
@@ -224,11 +226,11 @@ export default function RegisterPage() {
                 {passwordRequirements.map((req, index) => (
                   <li key={index} className="flex items-center gap-2 text-xs">
                     {req.met ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-success flex-shrink-0" />
                     ) : (
                       <XCircle className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                     )}
-                    <span className={req.met ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}>
+                    <span className={req.met ? 'text-success dark:text-success' : 'text-muted-foreground'}>
                       {req.text}
                     </span>
                   </li>
@@ -311,18 +313,23 @@ export default function RegisterPage() {
         </Link>
       </p>
 
-      {/* Divider */}
-      <div className="relative my-8">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-border" />
+      {/* Google sign-in: only when a client id is configured */}
+      {GOOGLE_ENABLED && (
+        <>
+        {/* Divider */}
+        <div className="relative my-8">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-border" />
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-4 bg-background text-muted-foreground">or</span>
+          </div>
         </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-4 bg-background text-muted-foreground">or</span>
-        </div>
-      </div>
 
-      {/* Google Sign-In */}
-      <GoogleSignInButton onError={setError} />
+        {/* Google Sign-In */}
+        <GoogleSignInButton onError={setError} />
+        </>
+      )}
     </div>
   );
 }

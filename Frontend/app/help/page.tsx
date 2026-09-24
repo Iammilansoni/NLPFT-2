@@ -8,6 +8,7 @@ import {
   ArrowRight, CheckCircle2, AlertCircle, LifeBuoy
 } from 'lucide-react'
 import Link from 'next/link'
+import { LandingNav } from '@/components/landing/LandingNav'
 
 const QUICK_LINKS = [
   { icon: Zap, label: 'Getting Started', href: '/docs#getting-started', desc: 'Set up your first template in 5 minutes' },
@@ -23,7 +24,7 @@ const FAQS = [
   },
   {
     q: 'Why is the semantic search returning no results?',
-    a: 'You need at least one embedded dataset. Go to Datasets > select a dataset > click "Embed to Redis". Make sure the embedding model in Settings matches the model used at search time.',
+    a: 'You need at least one embedded dataset. Go to Datasets > select a dataset > click "Embed". Embedding uses the model configured for this deployment (see Settings → Pipeline), which matches the model used at search time.',
   },
   {
     q: 'What LLM providers are supported for dataset generation?',
@@ -39,7 +40,7 @@ const FAQS = [
   },
   {
     q: 'Can I upload my own CSV dataset instead of generating one?',
-    a: 'Yes. Go to Datasets → Upload tab. Your CSV must have at minimum a "query" column. After upload you can embed it to Redis for semantic search.',
+    a: 'Yes. Go to Datasets → Upload tab. Your CSV must have at minimum a "query" column. Uploaded datasets are embedded automatically and become routable.',
   },
   {
     q: 'What embedding models are available?',
@@ -94,12 +95,13 @@ export default function HelpPage() {
   )
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20 pt-16">
+      <LandingNav />
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-border/40">
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute -top-40 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-          <div className="absolute top-10 left-1/4 w-64 h-64 bg-violet-500/5 rounded-full blur-3xl" />
+          <div className="absolute top-10 left-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
         </div>
         <div className="relative max-w-4xl mx-auto px-6 py-16 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-muted/50 text-sm text-muted-foreground mb-5">

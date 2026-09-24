@@ -1,607 +1,390 @@
-# Backend\app\services\multi_model_embedding_service.py
+# Backend/app/services/multi_model_embedding_service.py
 
 """
-Multi-Model Dataset Embedding Service - Safe Dataset Embedding Pipeline
+Dataset Embedding Service
+=========================
 
-Purpose:
-This service handles dataset embedding with strict model governance.
-It ensures that datasets are embedded using the model from Settings
-and properly tracked for compatibility checks.
+Turns a generated or uploaded dataset into routable vectors.
 
-Non-Negotiable Rules:
-1. Dataset embedding uses ONLY the model from user's Settings
-2. Each dataset records which model was used
-3. Re-embedding clears previous vectors before creating new ones
-4. Embedding status is tracked for progress reporting
-5. No mixing of vectors from different models
+Every row's utterance (`query` column) is embedded with the user's active
+embedding model (Settings -> Embedding model, else the deployment default) and
+written to PostgreSQL `vector_rows` through `PgVectorStore`, inside a
+tenant-bound transaction. Search reads with the same selection, so a freshly
+embedded dataset is immediately queryable.
 
-Embedding Flow:
-1. Fetch user's active embedding model from Settings
-2. Validate model is available in Ollama
-3. Ensure model-specific Redis index exists
-4. Delete any existing vectors for this dataset (if re-embedding)
-5. Generate embeddings in batches using Ollama
-6. Store vectors in model-specific Redis namespace
-7. Update dataset metadata with embedding info
+Rules:
+  1. A dataset is tagged with the (provider, model, dimension) that embedded
+     it. Embedding over a different model needs an explicit re-embed; routing
+     never compares vectors across models (MODEL_MISMATCH instead).
+  2. Embedding is idempotent: the dataset's previous vectors are deleted first,
+     so re-running never duplicates rows.
+  3. Only the utterance is embedded -- the same text the benchmark and the demo
+     seed index -- so retrieval quality measured in evals/ applies here.
+  4. Long jobs run on the Celery worker (`queue_embedding`); the dataset row
+     carries progress and a plain-English error for the UI to poll.
 """
 
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-import numpy as np
 import pandas as pd
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.embedding_model_registry import get_embedding_registry
 from app.core.logger import logger
-from app.models.database_models import Dataset
-from app.models.schemas.embedding_schemas import (
-    EmbeddingStatus,
-    ErrorCode,
-)
-from app.services.multi_model_redis_service import get_multi_model_redis_service
-from app.services.ollama_embedding_service import get_ollama_service
-from app.services.user_embedding_settings_service import get_user_embedding_settings_service
+from app.core.tenancy import tenant_session
+from app.llm.embeddings import EmbeddingError
+from app.llm.provider_registry import provider_label
+from app.models.database_models import CSVData, Dataset, Template, UserSettings
+from app.models.schemas.embedding_schemas import EmbeddingStatus, ErrorCode
+from app.services.model_access import EmbeddingSelection, active_embedding, embedder_for
+from app.services.pgvector_store import get_pgvector_store
+
+PROGRESS_CHUNK = 64  # rows per progress update
+
+
+def _clean(value: Any, default: str = "") -> str:
+    """pandas yields NaN for empty cells; never embed or store the string 'nan'."""
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return default
+    return str(value).strip()
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def dataset_embedding(dataset: Dataset) -> Optional[Dict[str, Any]]:
+    """The model a dataset's vectors came from, or None if it was never embedded."""
+    if not dataset.embedding_model:
+        return None
+    provider = dataset.embedding_provider or "ollama"
+    return {
+        "provider": provider,
+        "provider_label": provider_label(provider),
+        "model_id": dataset.embedding_model,
+        "dimension": dataset.embedding_dimension,
+        "label": f"{provider_label(provider)} · {dataset.embedding_model} · {dataset.embedding_dimension}-dim",
+    }
+
+
+def mismatch_options(dataset: Dataset, active: EmbeddingSelection) -> List[Dict[str, Any]]:
+    """The two ways out of a model mismatch, described for the UI."""
+    embedded = dataset_embedding(dataset)
+    return [
+        {
+            "action": "switch_model",
+            "label": f"Search with {embedded['model_id']}",
+            "description": f"Switch your embedding model back to {embedded['label']}. No re-embedding needed.",
+            "provider": embedded["provider"],
+            "model_id": embedded["model_id"],
+            "dimension": embedded["dimension"],
+        },
+        {
+            "action": "reembed",
+            "label": f"Re-embed with {active.model_id}",
+            "description": f"Replace this dataset's vectors using {active.label}.",
+            "dataset_id": str(dataset.dataset_id),
+        },
+    ]
 
 
 class MultiModelDatasetEmbeddingService:
-    """
-    Dataset embedding service with multi-model support.
-    
-    This service:
-    - Fetches embedding model from user's Settings (source of truth)
-    - Generates embeddings using Ollama
-    - Stores vectors in model-specific Redis namespace/index
-    - Tracks embedding status and metadata
-    - Enforces one-model-per-dataset rule
-    
-    CRITICAL: Never embed a dataset with a model different from Settings
-    without explicit re-embedding action.
-    """
-    
+    """Embeds datasets into pgvector with the user's embedding model."""
+
     def __init__(self):
-        self.registry = get_embedding_registry()
-        self.settings_service = get_user_embedding_settings_service()
-        self.redis_service = get_multi_model_redis_service()
-        self.ollama_service = get_ollama_service()
-    
-    # --- Main Embedding Methods ---
-    
+        self.store = get_pgvector_store()
+
+    async def _dataset(self, db: AsyncSession, user_id: uuid.UUID, dataset_id: uuid.UUID) -> Optional[Dataset]:
+        return (await db.execute(
+            select(Dataset).where(Dataset.dataset_id == dataset_id, Dataset.u_id == user_id)
+        )).scalar_one_or_none()
+
+    async def check_before_embedding(
+        self, db: AsyncSession, user_id: uuid.UUID, dataset_id: uuid.UUID, force_reembed: bool
+    ) -> Optional[Dict[str, Any]]:
+        """An error dict if embedding should not start, else None."""
+        dataset = await self._dataset(db, user_id, dataset_id)
+        if not dataset:
+            return {"success": False, "error": ErrorCode.DATASET_NOT_FOUND, "message": f"Dataset {dataset_id} not found"}
+        if dataset.embedding_status == EmbeddingStatus.IN_PROGRESS and not force_reembed:
+            return {
+                "success": False, "error": ErrorCode.EMBEDDING_IN_PROGRESS,
+                "message": f"This dataset is already being embedded ({dataset.embedding_progress or 0}% done).",
+            }
+        active = await active_embedding(db, user_id)
+        if dataset.embedding_model and not force_reembed and not active.matches(
+            dataset.embedding_provider or "ollama", dataset.embedding_model, dataset.embedding_dimension
+        ):
+            embedded = dataset_embedding(dataset)
+            return {
+                "success": False,
+                "error": ErrorCode.MODEL_MISMATCH,
+                "message": (
+                    f"This dataset was embedded with {embedded['label']}, but your embedding model is "
+                    f"{active.label}. Re-embed it, or switch your model back."
+                ),
+                "dataset_id": str(dataset_id),
+                "dataset_model": embedded,
+                "active_model": active.to_dict(),
+                "options": mismatch_options(dataset, active),
+            }
+        return None
+
+    async def mark_queued(self, db: AsyncSession, user_id: uuid.UUID, dataset_id: uuid.UUID) -> None:
+        """Show the dataset as in progress the moment the job is queued, so the UI starts polling."""
+        dataset = await self._dataset(db, user_id, dataset_id)
+        if dataset:
+            dataset.embedding_status = EmbeddingStatus.IN_PROGRESS
+            dataset.embedding_progress = 0
+            dataset.embedding_error = None
+            await db.commit()
+
     async def embed_dataset(
         self,
         db: AsyncSession,
         user_id: uuid.UUID,
         dataset_id: uuid.UUID,
-        batch_size: int = 32,
-        force_reembed: bool = False
+        force_reembed: bool = False,
+        selection: Optional[EmbeddingSelection] = None,
     ) -> Dict[str, Any]:
         """
-        Embed a dataset using the user's active embedding model.
-        
-        Critical Flow:
-        1. Get user's active model from Settings (SOURCE OF TRUTH)
-        2. Check if dataset already embedded with different model
-        3. If different model and not force_reembed: return error
-        4. If force_reembed: delete existing vectors first
-        5. Generate embeddings using Ollama
-        6. Store in model-specific Redis index
-        7. Update dataset metadata
-        
-        Args:
-            db: AsyncSession
-            user_id: User UUID
-            dataset_id: Dataset UUID
-            batch_size: Batch size for embedding
-            force_reembed: If True, re-embed even if already embedded
-            
-        Returns:
-            Embedding result with status and metadata
+        Embed every utterance of a dataset and index it for routing.
+
+        Returns a status dict. Failures are reported and also recorded on the
+        dataset row, so the UI's status polling shows them.
         """
         task_id = str(uuid.uuid4())
-        
+        if not force_reembed:
+            blocked = await self.check_before_embedding(db, user_id, dataset_id, force_reembed=False)
+            if blocked:
+                return blocked
+        dataset = await self._dataset(db, user_id, dataset_id)
+        if not dataset:
+            return {"success": False, "error": ErrorCode.DATASET_NOT_FOUND, "message": f"Dataset {dataset_id} not found"}
+        selection = selection or await active_embedding(db, user_id)
+
+        async def _fail(error: str, message: str) -> Dict[str, Any]:
+            dataset.embedding_status = EmbeddingStatus.FAILED
+            dataset.embedding_error = message
+            await db.commit()
+            logger.warning(f"Embedding dataset {str(dataset_id)[:8]} failed: {message}")
+            return {"success": False, "error": error, "message": message, "task_id": task_id}
+
         try:
-            logger.info(
-                f" Starting dataset embedding (dataset={str(dataset_id)[:8]}, "
-                f"user={str(user_id)[:8]}, force={force_reembed})"
-            )
-            
-            # 1. Get dataset
-            result = await db.execute(
-                select(Dataset).where(
-                    Dataset.dataset_id == dataset_id,
-                    Dataset.u_id == user_id
-                )
-            )
-            dataset = result.scalar_one_or_none()
-            
-            if not dataset:
-                return {
-                    "success": False,
-                    "error": ErrorCode.DATASET_NOT_FOUND,
-                    "message": f"Dataset {dataset_id} not found"
-                }
-            
-            # 2. Get user's active embedding model from Settings
-            model_id, dimension, model_spec = await self.settings_service.get_active_embedding_model_async(
-                db, user_id
-            )
-            
-            logger.info(f"User's active model: {model_id} (dim={dimension})")
-            
-            # 3. Check for existing embedding with different model
-            if dataset.embedding_model and dataset.embedding_model != model_id:
-                if not force_reembed:
-                    logger.warning(
-                        f" Dataset already embedded with {dataset.embedding_model}, "
-                        f"but user wants {model_id}"
-                    )
-                    return {
-                        "success": False,
-                        "error": ErrorCode.MODEL_MISMATCH,
-                        "message": (
-                            f"Dataset was previously embedded with '{dataset.embedding_model}'. "
-                            f"Set force_reembed=True to re-embed with '{model_id}'."
-                        ),
-                        "dataset_id": str(dataset_id),
-                        "existing_model": dataset.embedding_model,
-                        "requested_model": model_id,
-                        "options": [
-                            {
-                                "action": "force_reembed",
-                                "label": f"Re-embed with {model_id}",
-                                "description": "This will delete existing vectors and create new ones"
-                            },
-                            {
-                                "action": "use_existing",
-                                "label": f"Keep using {dataset.embedding_model}",
-                                "description": "Change your Settings to use the existing model"
-                            }
-                        ]
+            embedder = await embedder_for(db, user_id, selection)
+        except EmbeddingError as exc:
+            return await _fail(exc.code, exc.message)
+
+        try:
+            csv_path = dataset.csv_path
+            if not csv_path or not Path(csv_path).exists():
+                return await _fail("CSV_NOT_FOUND", "The dataset's CSV file is missing on the server. Generate or upload it again.")
+
+            df = pd.read_csv(csv_path)
+            if "query" not in df.columns:
+                return await _fail("INVALID_DATASET", "The dataset has no 'query' column, so there is nothing to embed.")
+
+            # Rows need a template id to be routable. Generated datasets carry
+            # one on the dataset; uploaded CSVs may instead name the API per row.
+            template_ids = await self._template_ids_by_name(db, user_id)
+
+            rows: List[Dict[str, Any]] = []
+            for _, row in df.iterrows():
+                utterance = _clean(row.get("query"))
+                if not utterance:
+                    continue
+                api_name = _clean(row.get("api_name", row.get("api")))
+                t_id = dataset.t_id or template_ids.get(api_name)
+                rows.append(
+                    {
+                        "t_id": t_id,
+                        "dataset_id": dataset.dataset_id,
+                        "query": utterance,
+                        "api_name": api_name or None,
+                        "endpoint": _clean(row.get("endpoint")) or None,
+                        "method": _clean(row.get("method"), "POST"),
+                        "scenario_type": _clean(row.get("scenario_type"), "valid"),
+                        "test_category": _clean(row.get("test_category")) or None,
+                        "intent_type": _clean(row.get("intent_type")) or None,
+                        "notes": _clean(row.get("notes")) or None,
                     }
-                else:
-                    # Force re-embed: delete existing vectors
-                    old_model = dataset.embedding_model
-                    logger.info(f" Deleting existing vectors (model={old_model})")
-                    try:
-                        deleted = self.redis_service.delete_dataset_vectors(
-                            model_id=old_model,
-                            user_id=user_id,
-                            dataset_id=dataset_id
-                        )
-                        logger.info(f" Deleted {deleted} existing vectors")
-                    except ValueError:
-                        # Old model no longer in registry (e.g. removed invalid model)
-                        # Construct namespace directly and clean up orphaned keys
-                        logger.warning(
-                            f" Old model '{old_model}' not in registry, "
-                            f"attempting direct key cleanup"
-                        )
-                        safe_id = old_model.replace("-", "_").replace(".", "_").replace("/", "_").lower()
-                        namespace = f"vector:{safe_id}"
-                        pattern = f"{namespace}:{user_id}:{dataset_id}:*"
-                        keys = []
-                        cursor = 0
-                        while True:
-                            cursor, batch = self.redis_service.redis_client.scan(
-                                cursor=cursor, match=pattern.encode(), count=100
-                            )
-                            keys.extend(batch)
-                            if cursor == 0:
-                                break
-                        if keys:
-                            self.redis_service.redis_client.delete(*keys)
-                            logger.info(f" Cleaned up {len(keys)} orphaned vectors for old model '{old_model}'")
-                        else:
-                            logger.info(f" No orphaned vectors found for old model '{old_model}'")
-            
-            # 4. Check Ollama availability
-            if not await self.ollama_service.check_ollama_available():
-                return {
-                    "success": False,
-                    "error": "OLLAMA_UNAVAILABLE",
-                    "message": "Ollama service not available at http://localhost:11434"
-                }
-            
-            # 5. Update dataset status to in_progress
+                )
+
+            total_rows = len(rows)
             dataset.embedding_status = EmbeddingStatus.IN_PROGRESS
             dataset.embedding_progress = 0
-            dataset.embedding_model = model_id
-            dataset.embedding_dimension = dimension
-            dataset.embedding_started_at = datetime.now(timezone.utc).replace(tzinfo=None)
-            dataset.embedding_error = None
-            await db.commit()
-            
-            # 6. Ensure Redis index exists
-            self.redis_service.ensure_model_index_exists(model_id)
-            
-            # 7. Read CSV and prepare for embedding
-            csv_path = dataset.csv_path
-            if not Path(csv_path).exists():
-                dataset.embedding_status = EmbeddingStatus.FAILED
-                dataset.embedding_error = f"CSV file not found: {csv_path}"
-                await db.commit()
-                return {
-                    "success": False,
-                    "error": "CSV_NOT_FOUND",
-                    "message": f"CSV file not found: {csv_path}"
-                }
-            
-            df = pd.read_csv(csv_path)
-            total_rows = len(df)
-            
-            if total_rows == 0:
-                dataset.embedding_status = EmbeddingStatus.COMPLETED
-                dataset.embedding_progress = 100
-                dataset.total_rows = 0
-                dataset.embedded_rows = 0
-                await db.commit()
-                return {
-                    "success": True,
-                    "message": "Dataset is empty",
-                    "embedded_count": 0
-                }
-            
+            dataset.embedding_provider = selection.provider
+            dataset.embedding_model = selection.model_id
+            dataset.embedding_dimension = selection.dimension
             dataset.total_rows = total_rows
+            dataset.embedded_rows = 0
+            dataset.embedding_error = None
+            dataset.embedding_started_at = _now()
             await db.commit()
-            
-            logger.info(f" Embedding {total_rows} rows")
-            
-            # 8. Check for already-embedded rows (resumable embedding)
-            already_embedded_rows = set()
-            if not force_reembed:
-                try:
-                    namespace = self.redis_service._get_namespace(model_id)
-                    pattern = f"{namespace}:{user_id}:{dataset_id}:*"
-                    for key in self.redis_service.redis_client.scan_iter(
-                        match=pattern.encode(), count=500
-                    ):
-                        # Extract row_id from key: vector:model:user:dataset:ROW_ID
-                        try:
-                            key_str = key.decode() if isinstance(key, bytes) else key
-                            row_id = int(key_str.rsplit(':', 1)[-1])
-                            already_embedded_rows.add(row_id)
-                        except (ValueError, IndexError):
-                            continue
-                    
-                    if already_embedded_rows:
-                        logger.info(
-                            f"⏭️ Resumable: found {len(already_embedded_rows)} already-embedded rows, "
-                            f"will skip them"
-                        )
-                except Exception as e:
-                    logger.warning(f"Could not check for existing embeddings: {e}")
-            
-            # 9. Process in batches
-            embedded_count = len(already_embedded_rows)
-            failed_count = 0
-            template_id = dataset.t_id
-            
-            for batch_start in range(0, total_rows, batch_size):
-                batch_end = min(batch_start + batch_size, total_rows)
-                batch = df.iloc[batch_start:batch_end]
-                
-                # Prepare texts for embedding
-                texts = []
-                row_metadata = []
-                
-                for idx, row in batch.iterrows():
-                    # Skip already-embedded rows (resumable embedding)
-                    if int(idx) in already_embedded_rows:
-                        continue
-                    
-                    # Combine fields for rich context
-                    query = row.get('query', '')
-                    api = row.get('api', row.get('api_name', ''))
-                    notes = row.get('notes', '')
-                    endpoint = row.get('endpoint', '')
-                    method = row.get('method', 'POST')
-                    
-                    text = f"{query} {api} {endpoint} {notes}".strip()
-                    if not text:
-                        text = f"API test case row {idx}"
-                    
-                    texts.append(text)
-                    row_metadata.append({
-                        "row_id": int(idx),
-                        "query": str(query),
-                        "api_name": str(api),
-                        "endpoint": str(endpoint),
-                        "method": str(method),
-                        "scenario_type": str(row.get('scenario_type', 'valid')),
-                        "test_category": str(row.get('test_category', 'valid_flow')),
-                        "notes": str(notes),
-                    })
-                
-                # Skip batch if all rows already embedded
-                if not texts:
-                    continue
-                
-                # Generate embeddings using Ollama
-                try:
-                    embeddings = await self.ollama_service.generate_embeddings_batch(
-                        model_name=model_id,
-                        texts=texts,
-                        batch_size=batch_size
+
+            await self.store.ensure_index(db, selection.dimension)
+
+            # Idempotent: drop this dataset's previous vectors first.
+            async with tenant_session(user_id) as tdb:
+                deleted = await self.store.delete_by_dataset(tdb, dataset.dataset_id)
+            if deleted:
+                logger.info(f"Removed {deleted} previous vectors for dataset {str(dataset_id)[:8]}")
+
+            unroutable = sum(1 for r in rows if not r["t_id"])
+            embedded = 0
+            for start in range(0, total_rows, PROGRESS_CHUNK):
+                batch = rows[start : start + PROGRESS_CHUNK]
+                vectors = await embedder.embed([r["query"] for r in batch])
+                if embedder.dimension != selection.dimension:
+                    # The model's real width differs from what was recorded
+                    # (e.g. the provider changed it). Index under the real one
+                    # and correct the user's setting so search matches.
+                    selection = await self._correct_dimension(db, user_id, selection, embedder.dimension)
+                    dataset.embedding_dimension = selection.dimension
+                    await self.store.ensure_index(db, selection.dimension)
+                async with tenant_session(user_id) as tdb:
+                    embedded += await self.store.upsert_rows(
+                        tdb, batch, vectors,
+                        embedding_model=selection.model_id,
+                        dimension=selection.dimension,
+                        embedding_provider=selection.provider,
                     )
-                except Exception as e:
-                    logger.error(f"Batch embedding failed: {e}")
-                    failed_count += len(texts)
-                    continue
-                
-                # Prepare vectors for batch storage
-                vectors_data = []
-                for i, (embedding, metadata) in enumerate(zip(embeddings, row_metadata)):
-                    if embedding is None:
-                        failed_count += 1
-                        continue
-                    
-                    vectors_data.append({
-                        "row_id": metadata["row_id"],
-                        "vector": np.array(embedding, dtype=np.float32),
-                        "metadata": metadata
-                    })
-                
-                # Store in Redis
-                if vectors_data:
-                    success, failures = self.redis_service.store_vectors_batch(
-                        model_id=model_id,
-                        user_id=user_id,
-                        dataset_id=dataset_id,
-                        template_id=template_id,
-                        vectors_data=vectors_data
-                    )
-                    embedded_count += success
-                    failed_count += failures
-                
-                # Update progress
-                progress = int((batch_end / total_rows) * 100)
-                dataset.embedding_progress = progress
-                dataset.embedded_rows = embedded_count
+                dataset.embedded_rows = embedded
+                dataset.embedding_progress = int(embedded * 100 / max(total_rows, 1))
                 await db.commit()
-                
-                logger.info(
-                    f" Progress: {progress}% ({embedded_count}/{total_rows})"
-                )
-            
-            # 10. Finalize
+
             dataset.embedding_status = EmbeddingStatus.COMPLETED
             dataset.embedding_progress = 100
-            dataset.embedded_rows = embedded_count
-            dataset.embedding_completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
-            
-            if failed_count > 0:
-                dataset.embedding_error = f"{failed_count} rows failed to embed"
-            
-            # Bulk-update is_embedded flag for all dataset rows
-            if embedded_count > 0:
-                try:
-                    from app.models.database_models import CSVData
-                    stmt = (
-                        update(CSVData)
-                        .where(
-                            CSVData.dataset_id == dataset_id,
-                            CSVData.u_id == user_id
-                        )
-                        .values(is_embedded=1)
-                    )
-                    await db.execute(stmt)
-                except Exception as e:
-                    logger.warning(f"Could not update is_embedded flag: {e}")
-            
-            await db.commit()
-            
-            # Verify actual Redis vector count matches what we think we stored
-            verify_count = self.redis_service.count_vectors(model_id, user_id, dataset_id)
-            if verify_count != embedded_count:
-                logger.warning(
-                    f"⚠️ Embedding count mismatch after storage! "
-                    f"Expected {embedded_count} vectors in Redis, "
-                    f"but count_vectors reports {verify_count}. "
-                    f"(dataset={str(dataset_id)[:8]}, model={model_id})"
-                )
-                # Trust the actual Redis count
-                embedded_count = verify_count
-                dataset.embedded_rows = embedded_count
-                await db.commit()
-            
-            logger.info(
-                f"✅ Embedding completed: {embedded_count}/{total_rows} rows "
-                f"(model={model_id}, failed={failed_count}, "
-                f"verified_redis_count={verify_count})"
+            dataset.embedding_completed_at = _now()
+            if unroutable:
+                dataset.embedding_error = f"{unroutable} rows have no template and cannot be routed to"
+            await db.execute(
+                update(CSVData)
+                .where(CSVData.dataset_id == dataset_id, CSVData.u_id == user_id)
+                .values(is_embedded=1)
             )
-            
+            await db.commit()
+
+            logger.info(
+                f"Embedded dataset {str(dataset_id)[:8]}: {embedded}/{total_rows} rows with {selection.label}"
+            )
             return {
                 "success": True,
                 "task_id": task_id,
                 "dataset_id": str(dataset_id),
-                "model_id": model_id,
-                "dimension": dimension,
-                "redis_index": model_spec.redis_index_name,
-                "redis_namespace": model_spec.redis_namespace,
+                "provider": selection.provider,
+                "model_id": selection.model_id,
+                "dimension": selection.dimension,
+                "vector_store": "pgvector",
                 "total_rows": total_rows,
-                "embedded_count": embedded_count,
-                "failed_count": failed_count,
-                "verified_redis_count": verify_count,
-                "status": EmbeddingStatus.COMPLETED
+                "embedded_count": embedded,
+                "failed_count": total_rows - embedded,
+                "unroutable_rows": unroutable,
+                "status": EmbeddingStatus.COMPLETED,
             }
-            
-        except Exception as e:
-            logger.error(f" Embedding failed: {e}", exc_info=True)
-            
-            # Update dataset with error
-            try:
-                result = await db.execute(
-                    select(Dataset).where(Dataset.dataset_id == dataset_id)
-                )
-                dataset = result.scalar_one_or_none()
-                if dataset:
-                    dataset.embedding_status = EmbeddingStatus.FAILED
-                    dataset.embedding_error = str(e)
-                    await db.commit()
-            except Exception:
-                pass
-            
-            return {
-                "success": False,
-                "error": "EMBEDDING_FAILED",
-                "message": str(e),
-                "task_id": task_id
-            }
-    
-    async def reembed_dataset(
-        self,
-        db: AsyncSession,
-        user_id: uuid.UUID,
-        dataset_id: uuid.UUID,
-        new_model_id: Optional[str] = None,
-        batch_size: int = 32
-    ) -> Dict[str, Any]:
-        """
-        Re-embed a dataset with a new model (or current settings model).
-        
-        This is called when user explicitly wants to change the embedding model.
-        It will:
-        1. Update user's Settings if new_model_id provided
-        2. Delete all existing vectors
-        3. Re-embed with new model
-        
-        Args:
-            db: AsyncSession
-            user_id: User UUID
-            dataset_id: Dataset UUID
-            new_model_id: Optional new model to use (updates Settings)
-            batch_size: Batch size for embedding
-            
-        Returns:
-            Re-embedding result
-        """
-        # If new model specified, update Settings first
-        if new_model_id:
-            await self.settings_service.set_active_embedding_model_async(
-                db, user_id, new_model_id
-            )
-            logger.info(f" Updated Settings to use model: {new_model_id}")
-        
-        # Now embed with force_reembed=True
-        return await self.embed_dataset(
-            db=db,
-            user_id=user_id,
-            dataset_id=dataset_id,
-            batch_size=batch_size,
-            force_reembed=True
-        )
-    
-    # --- Status Methods ---
-    
-    async def get_embedding_status(
-        self,
-        db: AsyncSession,
-        user_id: uuid.UUID,
-        dataset_id: uuid.UUID
-    ) -> Dict[str, Any]:
-        """
-        Get embedding status for a dataset.
-        
-        Args:
-            db: AsyncSession
-            user_id: User UUID
-            dataset_id: Dataset UUID
-            
-        Returns:
-            Embedding status info
-        """
-        result = await db.execute(
-            select(Dataset).where(
-                Dataset.dataset_id == dataset_id,
-                Dataset.u_id == user_id
-            )
-        )
-        dataset = result.scalar_one_or_none()
-        
+
+        except EmbeddingError as exc:
+            await db.rollback()
+            return await _fail(exc.code, exc.message)
+        except Exception as e:  # noqa: BLE001 - recorded on the dataset and returned
+            logger.error(f"Embedding failed for dataset {dataset_id}: {e}", exc_info=True)
+            await db.rollback()
+            return await _fail("EMBEDDING_FAILED", f"Embedding stopped unexpectedly: {e}")
+
+    async def _correct_dimension(
+        self, db: AsyncSession, user_id: uuid.UUID, selection: EmbeddingSelection, measured: int
+    ) -> EmbeddingSelection:
+        logger.warning(f"{selection.label} now produces {measured}-dim vectors; recording the measured width")
+        if not selection.is_default:
+            settings = (await db.execute(select(UserSettings).where(UserSettings.u_id == user_id))).scalar_one_or_none()
+            if settings:
+                settings.embedding_dimension = measured
+        return EmbeddingSelection(selection.provider, selection.model_id, measured, selection.is_default)
+
+    async def _template_ids_by_name(self, db: AsyncSession, user_id: uuid.UUID) -> Dict[str, uuid.UUID]:
+        result = await db.execute(select(Template.api_name, Template.t_id).where(Template.u_id == user_id))
+        return {name: t_id for name, t_id in result.all() if name}
+
+    async def get_embedding_status(self, db: AsyncSession, user_id: uuid.UUID, dataset_id: uuid.UUID) -> Dict[str, Any]:
+        dataset = await self._dataset(db, user_id, dataset_id)
         if not dataset:
-            return {
-                "error": ErrorCode.DATASET_NOT_FOUND,
-                "message": f"Dataset {dataset_id} not found"
-            }
-        
+            return {"error": ErrorCode.DATASET_NOT_FOUND, "message": f"Dataset {dataset_id} not found"}
+        active = await active_embedding(db, user_id)
+        embedded = dataset_embedding(dataset)
         return {
             "dataset_id": str(dataset.dataset_id),
             "status": dataset.embedding_status,
             "progress": dataset.embedding_progress,
+            "embedding": embedded,
+            "embedding_provider": dataset.embedding_provider,
             "embedding_model": dataset.embedding_model,
             "embedding_dimension": dataset.embedding_dimension,
+            "matches_active_model": bool(embedded) and active.matches(
+                embedded["provider"], embedded["model_id"], embedded["dimension"]
+            ),
             "total_rows": dataset.total_rows,
             "embedded_rows": dataset.embedded_rows,
             "error": dataset.embedding_error,
             "started_at": dataset.embedding_started_at.isoformat() if dataset.embedding_started_at else None,
             "completed_at": dataset.embedding_completed_at.isoformat() if dataset.embedding_completed_at else None,
         }
-    
-    async def check_model_compatibility(
-        self,
-        db: AsyncSession,
-        user_id: uuid.UUID,
-        dataset_id: uuid.UUID
-    ) -> Dict[str, Any]:
-        """
-        Check if user's current model is compatible with dataset's embedded model.
-        
-        This should be called before any vector search.
-        
-        Args:
-            db: AsyncSession
-            user_id: User UUID
-            dataset_id: Dataset UUID
-            
-        Returns:
-            Compatibility info with actions if mismatched
-        """
-        # Get dataset
-        result = await db.execute(
-            select(Dataset).where(
-                Dataset.dataset_id == dataset_id,
-                Dataset.u_id == user_id
-            )
-        )
-        dataset = result.scalar_one_or_none()
-        
-        if not dataset:
-            return {
-                "error": ErrorCode.DATASET_NOT_FOUND,
-                "message": f"Dataset {dataset_id} not found"
-            }
-        
-        # Check if dataset is embedded
-        if not dataset.embedding_model:
-            return {
-                "compatible": False,
-                "error": ErrorCode.NOT_EMBEDDED,
-                "message": "Dataset has not been embedded yet",
-                "action_required": "embed_dataset",
-                "endpoint": f"/api/v1/datasets/{dataset_id}/embed"
-            }
-        
-        if dataset.embedding_status == EmbeddingStatus.IN_PROGRESS:
-            return {
-                "compatible": False,
-                "error": ErrorCode.EMBEDDING_IN_PROGRESS,
-                "message": f"Embedding in progress ({dataset.embedding_progress}%)",
-                "progress": dataset.embedding_progress
-            }
-        
-        # Get user's active model
-        user_model_id, _, _ = await self.settings_service.get_active_embedding_model_async(
-            db, user_id
-        )
-        
-        # Check compatibility
-        return self.settings_service.validate_model_for_search(
-            user_model_id=user_model_id,
-            dataset_model_id=dataset.embedding_model
-        )
+
+
+async def embedding_groups(db: AsyncSession, user_id: uuid.UUID) -> List[Dict[str, Any]]:
+    """The user's embedded datasets, grouped by the model that produced their vectors."""
+    datasets = (await db.execute(
+        select(Dataset).where(
+            Dataset.u_id == user_id,
+            Dataset.embedding_status == EmbeddingStatus.COMPLETED,
+            Dataset.embedding_model.isnot(None),
+        ).order_by(Dataset.created_at.desc())
+    )).scalars().all()
+    groups: Dict[tuple, Dict[str, Any]] = {}
+    for dataset in datasets:
+        embedded = dataset_embedding(dataset)
+        key = (embedded["provider"], embedded["model_id"], embedded["dimension"])
+        group = groups.setdefault(key, {**embedded, "datasets": []})
+        group["datasets"].append({
+            "dataset_id": str(dataset.dataset_id),
+            "name": dataset.name or "Untitled dataset",
+            "rows": dataset.embedded_rows or 0,
+        })
+    return list(groups.values())
+
+
+async def queue_embedding(db: AsyncSession, user_id: uuid.UUID, dataset_id: uuid.UUID, force_reembed: bool) -> Dict[str, Any]:
+    """
+    Start embedding a dataset on the Celery worker.
+
+    Checks run here, synchronously, so a model mismatch or a missing dataset is
+    answered immediately instead of failing later in the background.
+    """
+    service = get_multi_model_embedding_service()
+    blocked = await service.check_before_embedding(db, user_id, dataset_id, force_reembed)
+    if blocked:
+        return blocked
+    active = await active_embedding(db, user_id)
+    await service.mark_queued(db, user_id, dataset_id)
+    try:
+        from app.worker.tasks import embed_dataset_task
+
+        embed_dataset_task.delay(str(user_id), str(dataset_id))
+    except Exception as exc:  # noqa: BLE001 - no broker: embed in this request instead
+        logger.warning(f"Could not queue embedding ({exc}); embedding inline")
+        return await service.embed_dataset(db, user_id, dataset_id, force_reembed=True)
+    return {
+        "success": True,
+        "queued": True,
+        "dataset_id": str(dataset_id),
+        "status": EmbeddingStatus.IN_PROGRESS,
+        "provider": active.provider,
+        "model_id": active.model_id,
+        "dimension": active.dimension,
+        "message": f"Embedding with {active.label}. Progress updates as it runs.",
+    }
 
 
 # --- Singleton Accessor ---
@@ -610,7 +393,7 @@ _service_instance: Optional[MultiModelDatasetEmbeddingService] = None
 
 
 def get_multi_model_embedding_service() -> MultiModelDatasetEmbeddingService:
-    """Get the singleton multi-model dataset embedding service."""
+    """Get the singleton dataset embedding service."""
     global _service_instance
     if _service_instance is None:
         _service_instance = MultiModelDatasetEmbeddingService()

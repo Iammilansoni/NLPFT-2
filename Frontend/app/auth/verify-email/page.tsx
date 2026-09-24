@@ -108,7 +108,7 @@ function VerifyEmailContent() {
           <CardContent className="pt-6">
             <div className="text-center space-y-4">
               <div>
-                <CheckCircle2 className="h-16 w-16 text-green-600 mx-auto" />
+                <CheckCircle2 className="h-16 w-16 text-success mx-auto" />
               </div>
               <h2 className="text-2xl font-bold">Email Verified!</h2>
               <p className="text-muted-foreground">

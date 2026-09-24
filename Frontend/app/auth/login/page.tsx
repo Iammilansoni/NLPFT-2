@@ -10,6 +10,8 @@ import Link from 'next/link';
 import { AlertCircle, Eye, EyeOff, Loader2, Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
+
+const GOOGLE_ENABLED = Boolean(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
 import { DEMO_MODE, DEMO_CREDENTIALS } from '@/lib/constants';
 
 export default function LoginPage() {
@@ -91,13 +93,13 @@ export default function LoginPage() {
           href="/"
           className="inline-flex items-center text-sm text-primary hover:text-primary/80 transition-colors mb-4"
         >
-          ← Return Home
+          ← Back to home
         </Link>
         <h1 className="text-3xl font-bold text-foreground mb-2">
-          Login
+          Sign in
         </h1>
         <p className="text-muted-foreground">
-          Welcome back! Please enter your details.
+          Welcome back. Sign in to route requests against your API catalogue.
         </p>
       </div>
 
@@ -121,7 +123,7 @@ export default function LoginPage() {
           className="mb-6 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-6 py-3 font-semibold text-primary transition-all duration-200 hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
-          Try the live demo — no signup needed
+          Explore the live demo — no sign-up
         </button>
       )}
 
@@ -155,7 +157,7 @@ export default function LoginPage() {
               href="/auth/forgot-password"
               className="text-sm text-primary hover:text-primary/80 transition-colors"
             >
-              Reset Password
+              Forgot password?
             </Link>
           </div>
           <div className="relative">
@@ -208,7 +210,7 @@ export default function LoginPage() {
               Signing in...
             </>
           ) : (
-            'Login'
+            'Sign in'
           )}
         </button>
       </form>
@@ -224,18 +226,23 @@ export default function LoginPage() {
         </Link>
       </p>
 
-      {/* Divider */}
-      <div className="relative my-8">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-border" />
+      {/* Google sign-in: only when a client id is configured */}
+      {GOOGLE_ENABLED && (
+        <>
+        {/* Divider */}
+        <div className="relative my-8">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-border" />
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-4 bg-background text-muted-foreground">or</span>
+          </div>
         </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-4 bg-background text-muted-foreground">or</span>
-        </div>
-      </div>
 
-      {/* Google Sign-In */}
-      <GoogleSignInButton onError={setError} />
+        {/* Google Sign-In */}
+        <GoogleSignInButton onError={setError} />
+        </>
+      )}
     </div>
   );
 }

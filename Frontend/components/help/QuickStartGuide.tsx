@@ -60,7 +60,7 @@ const GUIDE_STEPS: GuideStep[] = [
     id: 'complete',
     title: "You're All Set!",
     description: "You now know the basics of NLPForge. Explore the dashboard, create templates, and start building smarter API integrations.",
-    icon: <CheckCircle2 className="h-8 w-8 text-green-500" />,
+    icon: <CheckCircle2 className="h-8 w-8 text-success" />,
     tip: 'Press ? at any time to view keyboard shortcuts. Need help? Click the help button in the sidebar.',
   },
 ]

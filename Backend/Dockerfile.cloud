@@ -13,7 +13,7 @@
 # is not a cold start, it is an outage. Baking them in trades image size (which
 # is cached) for first-request latency (which is user-visible).
 #
-# Build:
+# Build (from Backend/):
 #   docker build -f Dockerfile.cloud -t nlpforge-backend:cloud .
 #
 # Run:
@@ -113,6 +113,7 @@ COPY --chown=appuser:appuser app/ ./app/
 COPY --chown=appuser:appuser alembic.ini ./
 COPY --chown=appuser:appuser alembic/ ./alembic/
 COPY --chown=appuser:appuser scripts/ ./scripts/
+COPY --chown=appuser:appuser *.py ./
 
 USER appuser
 
@@ -121,8 +122,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
-# Migrations run on boot (alembic upgrade is idempotent); the seed is opt-in via
-# SEED_DEMO so a redeploy never rewrites a live demo tenant.
-CMD ["sh", "-c", "alembic upgrade head && \
-     { [ \"$SEED_DEMO\" = \"true\" ] && python scripts/seed_demo.py || true; } && \
-     exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WEB_CONCURRENCY:-2}"]
+# Same idempotent boot sequence as the local image (see Dockerfile). The seed is
+# opt-in via SEED_DEMO; a seed failure never blocks the API.
+CMD ["sh", "-c", "python init_db_direct.py && python scripts/run_migrations.py && python seed_admin.py && { [ \"$SEED_DEMO\" != \"true\" ] || python scripts/seed_demo.py || echo 'demo seed failed'; } && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-1}"]

@@ -135,30 +135,3 @@ export function useSubmitTemplate() {
   });
 }
 
-/**
- * Sync templates from source
- */
-export function useSyncTemplates() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: () => apiClient.syncTemplates(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['templates'] });
-    },
-  });
-}
-
-/**
- * Reload templates cache
- */
-export function useReloadTemplates() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: () => apiClient.reloadTemplates(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['templates'] });
-    },
-  });
-}

@@ -10,7 +10,10 @@ import { useId } from "react"
 import { cn } from "@/lib/utils"
 
 interface ProviderIconProps {
-  provider: 'openai' | 'google' | 'grok' | 'claude' | 'ollama' | 'deepseek' | 'huggingface' | 'custom'
+  /** Provider id from the backend registry; unknown ids get a monogram. */
+  provider: string
+  /** Provider label, used for the monogram when there is no bundled mark. */
+  label?: string
   className?: string
   size?: number
 }
@@ -216,21 +219,53 @@ const CustomIcon = ({ className, size = 24 }: { className?: string; size?: numbe
   </svg>
 )
 
-export const ProviderIcon = ({ provider, className, size = 24 }: ProviderIconProps) => {
+// Monogram for providers without a bundled mark
+const MonogramIcon = ({ letters, className, size = 24 }: { letters: string; className?: string; size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+    aria-hidden="true"
+  >
+    <rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" strokeWidth="1.5" />
+    <text x="12" y="15.5" textAnchor="middle" fontSize={letters.length > 1 ? 8.5 : 10} fontWeight="700" fill="currentColor" fontFamily="ui-sans-serif, system-ui">
+      {letters}
+    </text>
+  </svg>
+)
+
+const GroqIcon = (props: { className?: string; size?: number }) => <MonogramIcon letters="Gq" {...props} />
+const OpenRouterIcon = (props: { className?: string; size?: number }) => <MonogramIcon letters="OR" {...props} />
+
+export const ProviderIcon = ({ provider, label, className, size = 24 }: ProviderIconProps) => {
   const icons = {
     openai: OpenAIIcon,
     google: GoogleIcon,
+    groq: GroqIcon,
+    openrouter: OpenRouterIcon,
     grok: GrokIcon,
     claude: ClaudeIcon,
+    anthropic: ClaudeIcon,
     ollama: OllamaIcon,
     deepseek: DeepSeekIcon,
     huggingface: HuggingFaceIcon,
     custom: CustomIcon,
+    builtin: CustomIcon,
   }
 
-  const IconComponent = icons[provider] || CustomIcon
+  const IconComponent = icons[provider as keyof typeof icons]
+  if (IconComponent) return <IconComponent className={cn(className)} size={size} />
 
-  return <IconComponent className={cn(className)} size={size} />
+  const letters = (label || provider)
+    .split(/[\s-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(word => word[0]!.toUpperCase())
+    .join('')
+  return <MonogramIcon letters={letters || '?'} className={cn(className)} size={size} />
 }
 
 export default ProviderIcon

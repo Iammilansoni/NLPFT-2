@@ -35,6 +35,8 @@ class ProviderType(str, Enum):
     HUGGINGFACE = "huggingface"
     DEEPSEEK = "deepseek"
     GROK = "grok"  # xAI's Grok models
+    GROQ = "groq"  # Groq LPU inference (OpenAI-compatible)
+    OPENROUTER = "openrouter"  # OpenRouter model router (OpenAI-compatible)
     CUSTOM = "custom"
 
 
@@ -307,15 +309,34 @@ class BaseLLMProvider(ABC):
         """
         ...
     
-    @abstractmethod
+    @property
+    def catalog_provider(self) -> str:
+        """
+        Provider id used for model listing. Differs from `provider_type` for
+        OpenAI-compatible providers (Groq, OpenRouter, DeepSeek), which share
+        OpenAIProvider; the factory records the real one.
+        """
+        return getattr(self, "_catalog_provider", None) or self.provider_type.value
+
     async def list_models(self) -> List[ProviderModel]:
         """
-        List available models from the provider.
-        
-        Returns:
-            List of ProviderModel objects
+        Chat models this provider serves right now, listed live.
+
+        Raises app.llm.model_discovery.DiscoveryError when the listing fails.
         """
-        ...
+        from app.llm.model_discovery import discover_models
+
+        models = await discover_models(self.catalog_provider, self.api_key, self.base_url)
+        return [
+            ProviderModel(
+                id=m.model_id,
+                name=m.display_name,
+                description=m.description,
+                context_length=m.context_tokens or 0,
+            )
+            for m in models
+            if m.kind == "llm"
+        ]
     
     # =========================================================================
     # COMMON METHODS

@@ -10,6 +10,7 @@ Provides REST API for managing LLM provider configurations:
 All endpoints require authentication.
 """
 
+import os
 from typing import List, Optional
 from uuid import UUID
 
@@ -20,7 +21,6 @@ from app.api.v1.auth import get_current_user
 from app.core.logger import logger
 from app.core.postgres import get_db
 from app.llm.provider_factory import LLMProviderFactory
-from app.llm.providers.base import ProviderType
 from app.models.database_models import User
 from app.services.llm_config_service import (
     LLMConfigService,
@@ -41,27 +41,42 @@ def get_service(db: AsyncSession = Depends(get_db)) -> LLMConfigService:
     return LLMConfigService(db)
 
 
+def refresh_model_catalog(user_id: UUID) -> None:
+    """Re-list this user's providers in the background after a connection changes."""
+    try:
+        from app.worker.tasks import sync_model_catalog_task
+
+        sync_model_catalog_task.delay(str(user_id))
+    except Exception as e:  # noqa: BLE001 -- the next scheduled sync catches up
+        logger.warning(f"Could not queue a model catalogue refresh: {e}")
+
+
 # =============================================================================
 # PROVIDER INFO
 # =============================================================================
 
-@router.get("/providers", summary="List available LLM providers")
+@router.get("/providers", summary="List every supported provider")
 async def list_providers(
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
-    Get information about all supported LLM providers.
-    
-    Returns provider name, description, requirements, and default models.
-    Requires authentication.
+    Every provider NLPForge can use (app.llm.provider_registry), whether or not
+    anyone has a key for it, plus how this user can currently reach each one:
+    their own connection, a deployment-wide key, or no key needed.
     """
-    return {
-        "providers": LLMProviderFactory.get_supported_providers(),
-        "implemented": [
-            p.value for p in ProviderType 
-            if LLMProviderFactory.is_provider_implemented(p.value)
-        ],
-    }
+    from app.llm.embeddings import EmbeddingError
+    from app.services.model_access import ResolvedCredential, resolve_credential
+
+    providers = []
+    for info in LLMProviderFactory.get_supported_providers():
+        try:
+            credential: ResolvedCredential = await resolve_credential(db, current_user.u_id, info["id"])
+            access = credential.source
+        except EmbeddingError:
+            access = None
+        providers.append({**info, "access": access})
+    return {"providers": providers}
 
 
 # =============================================================================
@@ -133,16 +148,15 @@ async def create_config(
     
     The API key will be encrypted before storage.
     """
-    # Validate provider
     if not LLMProviderFactory.is_provider_implemented(data.provider):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Provider '{data.provider}' is not implemented. "
-                   f"Available: {[p.value for p in ProviderType if LLMProviderFactory.is_provider_implemented(p.value)]}",
+            detail=f"Unknown provider '{data.provider}'.",
         )
     
     try:
         config = await service.create_config(current_user.u_id, data)
+        refresh_model_catalog(current_user.u_id)
         return service.to_response(config)
     except ValueError as e:
         raise HTTPException(
@@ -186,6 +200,7 @@ async def update_config(
     
     try:
         config = await service.update_config(config_id, data)
+        refresh_model_catalog(current_user.u_id)
         return service.to_response(config)
     except ValueError as e:
         raise HTTPException(
@@ -216,6 +231,7 @@ async def delete_config(
         )
     
     await service.delete_config(config_id)
+    refresh_model_catalog(current_user.u_id)
     return {"message": "Configuration deleted successfully"}
 
 
@@ -300,9 +316,10 @@ async def list_ollama_models(
     Requires Ollama server to be running.
     """
     try:
+        # Listing needs no particular model; the configured local one is as good as any.
         provider = LLMProviderFactory.create(
             provider_type="ollama",
-            model="llama3.1:8b-instruct-q4_K_M",
+            model=os.getenv("EXTRACTION_MODEL", "llama3.2:3b"),
         )
         
         if not await provider.is_available():

@@ -157,6 +157,11 @@ class RerankOutcome:
     model: str = RERANKER_MODEL
     latency_ms: float = 0.0
     rows_scored: int = 0
+    # What actually produced the ranking: "cross_encoder" when the model scored
+    # the rows, "vector_maxpool" when it is switched off by configuration (the
+    # measured default -- not a failure), "vector_maxpool_fallback" when it was
+    # enabled but could not run (that case, and only that case, is degraded).
+    strategy: str = "vector_maxpool"
 
     @property
     def best(self) -> Optional[RerankedTemplate]:
@@ -269,7 +274,9 @@ class CrossEncoderReranker:
             return [], None
 
         if not RERANKER_ENABLED:
-            return self._fallback(rows), "reranker disabled"
+            # Disabled by configuration is the shipped default, chosen on
+            # measurement (see RERANKER_ENABLED above). It is not degradation.
+            return self._fallback(rows), None
 
         ranker = await self._ensure_loaded()
         if ranker is None:
@@ -387,11 +394,18 @@ class CrossEncoderReranker:
         t0 = time.perf_counter()
         scored, degraded_reason = await self.rerank_rows(query, stage1_rows)
         templates = self.aggregate_to_templates(scored, strategy=strategy, top_k=top_k)
+        if degraded_reason is not None:
+            ranking = "vector_maxpool_fallback"
+        elif RERANKER_ENABLED:
+            ranking = "cross_encoder"
+        else:
+            ranking = "vector_maxpool"
         return RerankOutcome(
             templates=templates,
             degraded=degraded_reason is not None,
             degraded_reason=degraded_reason,
-            model=self.model_name,
+            strategy=ranking,
+            model=self.model_name if RERANKER_ENABLED else "none",
             latency_ms=round((time.perf_counter() - t0) * 1000, 2),
             rows_scored=sum(1 for r in scored if r.get("ce_scored")),
         )

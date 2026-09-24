@@ -20,9 +20,7 @@ from fastapi import APIRouter, FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
 from app.core.config import REDIS_HOST, REDIS_PASSWORD, REDIS_PORT, settings
 from app.core.context_vars import request_id_ctx, trace_id_ctx
@@ -173,18 +171,6 @@ async def lifespan(app: FastAPI):
     app.state.redis_connected    = redis_connected
     app.state.redis_error        = redis_error
 
-    # Auto-register Ollama embedding models
-    try:
-        from app.services.embedding_model_service import auto_register_local_embedding_models
-        result = await auto_register_local_embedding_models()
-        if result.get("registered"):
-            logger.info(
-                f"Auto-registered {len(result['registered'])} embedding model(s)",
-                extra={"extra": {"event_name": "embedding_auto_register", "models": result["registered"]}},
-            )
-    except Exception as exc:
-        logger.warning(f"Could not auto-register embedding models: {type(exc).__name__}: {exc}")
-
     # Recover stale embedding tasks
     if postgres_connected:
         try:
@@ -197,6 +183,43 @@ async def lifespan(app: FastAPI):
                 )
         except Exception as exc:
             logger.warning(f"Stale task recovery failed: {type(exc).__name__}: {exc}")
+
+    # Tenancy check: report, loudly, whether the database will actually enforce
+    # RLS for this connection. A superuser (the default role the official
+    # postgres image creates) bypasses every policy -- isolation then rests on
+    # the explicit tenant predicates in the query path alone.
+    app.state.rls_enforced = None
+    if postgres_connected:
+        try:
+            from app.core.tenancy import rls_status
+            status_ = await rls_status()
+            app.state.rls_enforced = status_["enforced"]
+            log = logger.info if status_["enforced"] else logger.warning
+            log(f"Tenancy: {status_['detail']}")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"RLS status check failed: {exc}")
+
+    # Warm models in the background so the first query does not pay load time,
+    # without delaying startup (a CPU-only LLM load takes tens of seconds).
+    import asyncio
+
+    async def _warm_models() -> None:
+        try:
+            from app.core.runtime import EXECUTION_MODE, get_embedder
+            emb = get_embedder()
+            if hasattr(emb, "warm"):
+                await emb.warm()
+            else:
+                await emb.embed_one("warm-up")
+            if EXECUTION_MODE == "local":
+                from app.services.structured_extraction_service import (
+                    get_structured_extraction_service,
+                )
+                await get_structured_extraction_service().warm()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Model warm-up skipped: {exc}")
+
+    app.state.warmup_task = asyncio.create_task(_warm_models())
 
     log_event(
         "application_startup_complete",
@@ -293,23 +316,8 @@ def create_app() -> FastAPI:
 
     app.add_middleware(SecurityHeadersMiddleware)
 
-    # ── Rate limiter ──────────────────────────────────────────────────────
-    if REDIS_PASSWORD:
-        storage_uri = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/1"
-    else:
-        storage_uri = f"redis://{REDIS_HOST}:{REDIS_PORT}/1"
-
-    try:
-        limiter = Limiter(
-            key_func=get_remote_address,
-            storage_uri=storage_uri,
-            default_limits=["1000/hour"],
-            headers_enabled=True,
-        )
-        logger.info("Rate limiter: using Redis storage")
-    except Exception as exc:
-        logger.warning(f"Rate limiter Redis unavailable ({exc}), falling back to memory storage")
-        limiter = Limiter(key_func=get_remote_address, default_limits=["1000/hour"], headers_enabled=True)
+    # ── Rate limiter (shared, Redis-backed, see app/core/rate_limit.py) ────
+    from app.core.rate_limit import limiter
 
     app.state.limiter = limiter
 
@@ -418,6 +426,28 @@ def create_app() -> FastAPI:
             cors_origins=cors_origins,
         )
 
+    # ── Trailing-slash normalisation (no redirects) ───────────────────────
+    # Collection routes are declared as "/templates/". A request for
+    # "/templates" would get Starlette's 307 redirect to an ABSOLUTE URL built
+    # from the Host header -- which, behind the Next.js proxy, is the internal
+    # "http://backend:8000/...", unreachable from the browser. Match the slash
+    # form internally instead of redirecting.
+    slash_routes: set[str] = set()
+
+    @app.middleware("http")
+    async def normalize_trailing_slash(request: Request, call_next):
+        if not slash_routes:
+            # From the OpenAPI schema: recent FastAPI nests included routers, so
+            # app.routes no longer lists every path.
+            slash_routes.update(
+                p.rstrip("/") for p in app.openapi().get("paths", {})
+                if p.endswith("/") and p != "/" and "{" not in p
+            )
+        path = request.scope["path"]
+        if path in slash_routes:
+            request.scope["path"] = path + "/"
+        return await call_next(request)
+
     # ── Request counter middleware (lightweight) ──────────────────────────
     @app.middleware("http")
     async def count_requests(request: Request, call_next):
@@ -435,11 +465,18 @@ def create_app() -> FastAPI:
         rd_ok  = app.state.redis_connected
 
         overall = "healthy" if db_ok and rd_ok else ("degraded" if db_ok else "unhealthy")
+        from app.core.runtime import runtime_info
+        try:
+            runtime = runtime_info()
+        except Exception as exc:  # noqa: BLE001
+            runtime = {"error": str(exc)}
+        runtime["rls_enforced"] = getattr(app.state, "rls_enforced", None)
         return {
             "status": overall,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "version": settings.app_version,
             "environment": settings.environment,
+            "runtime": runtime,
             "checks": {
                 "database": {
                     "status": "healthy" if db_ok else "unhealthy",

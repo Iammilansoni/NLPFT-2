@@ -24,11 +24,13 @@ import { useTemplatesList } from '@/hooks/useTemplateManagement';
 import {
   useGenerateDataset,
   useDatasetStatus,
-  useEmbedDataset,
   useDownloadDataset,
 } from '@/hooks/useDatasetManagement';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
+import Link from 'next/link';
+import { toast } from '@/hooks/use-toast';
+import { apiErrorMessage } from '@/components/embeddings/ModelMismatchPanel';
 
 const LLM_MODELS = [
   { value: 'llama3.2:3b-instruct-q4_K_M', label: 'Llama 3.2 3B (Recommended)', description: 'Fast & good quality' },
@@ -44,57 +46,19 @@ export default function DatasetGenerationPage() {
   const [llmModel, setLlmModel] = useState('llama3.2:3b-instruct-q4_K_M');
   const [customPrompt, setCustomPrompt] = useState('');
   const [temperature, setTemperature] = useState(0.7);
-  const [embeddingModel, setEmbeddingModel] = useState('');
 
   // Generation state
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // Fetch user settings for default embedding model
-  const { data: userSettings } = useQuery({
-    queryKey: ['userSettings'],
-    queryFn: () => apiClient.getUserSettings(),
+  // The model new vectors are made with: the user's choice in Settings, else the deployment default.
+  const { data: embeddingSettings } = useQuery({
+    queryKey: ['embedding-settings'],
+    queryFn: () => apiClient.getEmbeddingSettings(),
+    staleTime: 30000,
   });
-
-  // Fetch registered embedding models
-  const { data: embeddingModelsData } = useQuery({
-    queryKey: ['embedding-models-available'],
-    queryFn: () => apiClient.listEmbeddingModels(),
-    staleTime: 60000,
-  });
-
-  // Get only registered models
-  const registeredModels = (embeddingModelsData?.models || []).filter(m => m.is_registered);
-
-  // Set default embedding model from user settings (validate against registered models)
-  useEffect(() => {
-    // Wait until userSettings has resolved (not undefined) and registeredModels are loaded
-    if (userSettings === undefined || registeredModels.length === 0) {
-      return;
-    }
-    
-    // If embeddingModel is already set, don't override
-    if (embeddingModel) {
-      return;
-    }
-    
-    if (userSettings?.default_embedding_model) {
-      // Validate that the user's default model is actually registered
-      const isModelRegistered = registeredModels.some(
-        (m) => m.name === userSettings.default_embedding_model
-      );
-      if (isModelRegistered) {
-        setEmbeddingModel(userSettings.default_embedding_model);
-      } else {
-        // Fall back to first registered model if user's default is not available
-        setEmbeddingModel(registeredModels[0].name);
-      }
-    } else {
-      // No user default, use first registered model
-      setEmbeddingModel(registeredModels[0].name);
-    }
-  }, [userSettings, registeredModels, embeddingModel]);
+  const activeEmbedding = embeddingSettings?.active;
 
   // Queries and mutations
   const { data: templatesData } = useTemplatesList({ status: 'approved' });
@@ -103,7 +67,7 @@ export default function DatasetGenerationPage() {
     currentTaskId || '',
     isPolling
   );
-  const embedMutation = useEmbedDataset();
+  const [embedding, setEmbedding] = useState(false);
   const downloadMutation = useDownloadDataset();
 
   const approvedTemplates = templatesData || [];
@@ -153,17 +117,21 @@ export default function DatasetGenerationPage() {
   };
 
   const handleEmbed = async () => {
-    if (!currentTaskId) return;
-
+    setEmbedding(true);
+    // Embedding targets the stored dataset, not the Celery task that produced it.
+    const datasetId = (statusData as any)?.dataset_id || (statusData as any)?.result?.dataset_id;
+    if (!datasetId) {
+      toast({ title: 'Nothing to embed', description: 'The generated dataset was not stored.', variant: 'destructive' });
+      setEmbedding(false);
+      return;
+    }
     try {
-      await embedMutation.mutateAsync({
-        dataset_id: currentTaskId,
-        embedding_model: embeddingModel,
-        vector_db_collection: 'api_templates',
-      });
-      alert('Dataset embedded successfully to Redis!');
+      const res = await apiClient.embedDataset(datasetId);
+      toast({ title: 'Embedding started', description: `${res.message} Follow progress on the Datasets page.` });
     } catch (error: any) {
-      alert(error.message || 'Failed to embed dataset');
+      toast({ title: 'Could not start embedding', description: apiErrorMessage(error), variant: 'destructive' });
+    } finally {
+      setEmbedding(false);
     }
   };
 
@@ -369,55 +337,43 @@ export default function DatasetGenerationPage() {
                   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white font-bold">
                     3
                   </div>
-                  <h2 className="text-xl font-semibold">Embed to Redis Vector Database</h2>
+                  <h2 className="text-xl font-semibold">Embed for routing</h2>
                 </div>
 
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Embedding Model</label>
-                    <select
-                      value={embeddingModel}
-                      onChange={e => setEmbeddingModel(e.target.value)}
-                      disabled={embedMutation.isPending || registeredModels.length === 0}
-                      className="w-full px-4 py-3 bg-background border border-border rounded-lg"
-                    >
-                      {registeredModels.length === 0 ? (
-                        <option value="">No registered models - configure in Settings</option>
-                      ) : (
-                        registeredModels.map(model => (
-                          <option key={model.name} value={model.name}>
-                            {model.display_name || model.name} - {model.dimension}D vectors
-                          </option>
-                        ))
-                      )}
-                    </select>
-                    {registeredModels.length === 0 && (
-                      <p className="text-xs text-amber-600 mt-2">
-                        Go to Settings → Embeddings to pull and register Ollama models
-                      </p>
-                    )}
+                  <div className="rounded-lg border border-border p-4">
+                    <p className="text-sm font-medium">Embedding model</p>
+                    <p className="mt-1 font-mono text-sm text-muted-foreground">
+                      {activeEmbedding ? activeEmbedding.label : 'Loading…'}
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Search compares vectors from one model only.{' '}
+                      <Link href="/settings?tab=embeddings" className="text-primary hover:underline">
+                        Change the embedding model
+                      </Link>
+                    </p>
                   </div>
 
                   <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
                     <p className="text-xs text-muted-foreground">
-                      <strong>Redis Stack</strong> - Fast, scalable vector search with persistent storage
+                      <strong>pgvector</strong> - HNSW vector search inside PostgreSQL, scoped to your account
                     </p>
                   </div>
 
                   <button
                     onClick={handleEmbed}
-                    disabled={embedMutation.isPending}
+                    disabled={embedding}
                     className="w-full px-6 py-3 bg-success text-white rounded-lg hover:bg-success/90 disabled:opacity-50 flex items-center justify-center gap-2"
                   >
-                    {embedMutation.isPending ? (
+                    {embedding ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Embedding to Redis...
+                        Embedding...
                       </>
                     ) : (
                       <>
                         <Database className="w-4 h-4" />
-                        Embed to Redis
+                        Embed dataset
                       </>
                     )}
                   </button>
@@ -557,10 +513,10 @@ export default function DatasetGenerationPage() {
                           {canEmbed && (
                             <button
                               onClick={handleEmbed}
-                              disabled={embedMutation.isPending}
+                              disabled={embedding}
                               className="w-full px-4 py-3 bg-secondary text-secondary-foreground border rounded-lg hover:bg-secondary/80 disabled:opacity-50 flex items-center justify-center gap-2"
                             >
-                              {embedMutation.isPending ? (
+                              {embedding ? (
                                 <>
                                   <Loader2 className="w-4 h-4 animate-spin" />
                                   Embedding...
@@ -568,7 +524,7 @@ export default function DatasetGenerationPage() {
                               ) : (
                                 <>
                                   <Database className="w-4 h-4" />
-                                  Embed to Redis (Create Vectors)
+                                  Embed (create vectors)
                                 </>
                               )}
                             </button>
@@ -606,7 +562,7 @@ export default function DatasetGenerationPage() {
                   </div>
                   <div className="flex items-start gap-2">
                     <ChevronRight className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <span><strong>Click &quot;Embed to Redis&quot;</strong> to create vectors for search</span>
+                    <span><strong>Click &quot;Embed dataset&quot;</strong> to create vectors for search</span>
                   </div>
                 </div>
               </div>
@@ -617,7 +573,7 @@ export default function DatasetGenerationPage() {
 
       {/* Success Toast */}
       {showSuccess && (
-        <div className="fixed bottom-8 right-8 bg-green-600 text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 z-50">
+        <div className="fixed bottom-8 right-8 bg-success text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 z-50">
           <CheckCircle2 className="w-5 h-5" />
           <div>
             <p className="font-medium">Dataset Generated!</p>

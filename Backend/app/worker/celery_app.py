@@ -16,6 +16,7 @@ Usage from FastAPI (triggering):
 import os
 
 from celery import Celery
+from celery.signals import worker_ready
 
 # ---------------------------------------------------------------------------
 # Redis connection — uses the same Redis instance already in docker-compose.
@@ -77,3 +78,22 @@ celery_app.conf.update(
     # Allow tasks to call self.update_state() to push progress to the backend
     task_track_started=True,
 )
+
+# ---------------------------------------------------------------------------
+# Scheduled jobs (run by `celery worker -B` in docker-compose)
+# ---------------------------------------------------------------------------
+# Same variable model_catalog_service.policy() reports to the UI.
+MODEL_CATALOG_SYNC_MINUTES = float(os.getenv("MODEL_CATALOG_SYNC_MINUTES", "360"))
+
+celery_app.conf.beat_schedule = {
+    "sync-model-catalog": {
+        "task": "nlpforge.sync_model_catalog",
+        "schedule": MODEL_CATALOG_SYNC_MINUTES * 60,
+    },
+}
+
+
+@worker_ready.connect
+def _sync_catalog_on_start(sender, **_kwargs):
+    """Beat's first run is one interval away; a fresh install should not show an empty catalogue until then."""
+    sender.app.send_task("nlpforge.sync_model_catalog", queue="nlpforge")

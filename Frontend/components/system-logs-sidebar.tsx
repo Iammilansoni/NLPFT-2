@@ -23,13 +23,13 @@ import {
 
 // Activity type configuration with icons
 const ACTIVITY_CONFIG: Record<ActivityType, { icon: typeof Bot; color: string; label: string }> = {
-  llm: { icon: Bot, color: 'text-purple-500', label: 'LLM' },
-  dataset: { icon: Database, color: 'text-blue-500', label: 'Dataset' },
-  template: { icon: FileText, color: 'text-emerald-500', label: 'Template' },
-  embedding: { icon: Layers, color: 'text-cyan-500', label: 'Embedding' },
-  auth: { icon: KeyRound, color: 'text-amber-500', label: 'Auth' },
+  llm: { icon: Bot, color: 'text-primary', label: 'LLM' },
+  dataset: { icon: Database, color: 'text-info', label: 'Dataset' },
+  template: { icon: FileText, color: 'text-success', label: 'Template' },
+  embedding: { icon: Layers, color: 'text-info', label: 'Embedding' },
+  auth: { icon: KeyRound, color: 'text-warning', label: 'Auth' },
   system: { icon: Settings2, color: 'text-gray-500', label: 'System' },
-  api: { icon: Globe, color: 'text-indigo-500', label: 'API' },
+  api: { icon: Globe, color: 'text-primary', label: 'API' },
 }
 
 // Command Center Category configuration
@@ -38,17 +38,17 @@ const CATEGORY_CONFIG = {
     label: 'I',
     fullLabel: 'Info',
     icon: Info,
-    color: 'text-blue-500',
-    bgColor: 'bg-blue-500/10',
-    borderColor: 'border-blue-500/20',
+    color: 'text-info',
+    bgColor: 'bg-info/10',
+    borderColor: 'border-info/20',
   },
   warning: {
     label: 'W',
     fullLabel: 'Warning',
     icon: AlertTriangle,
-    color: 'text-amber-500',
-    bgColor: 'bg-amber-500/10',
-    borderColor: 'border-amber-500/20',
+    color: 'text-warning',
+    bgColor: 'bg-warning/10',
+    borderColor: 'border-warning/20',
   },
   error: {
     label: 'E',
@@ -117,7 +117,7 @@ function LogItem({
       className={cn(
         "rounded-sm border transition-colors cursor-pointer",
         config.borderColor,
-        isCritical && "border-amber-500/50",
+        isCritical && "border-warning/50",
         "hover:bg-accent/50"
       )}
       onClick={() => onToggle(index)}
@@ -146,7 +146,7 @@ function LogItem({
         <div className="flex-1 min-w-0">
           <p className={cn(
             "text-sm leading-tight break-words",
-            isCritical && "text-amber-500 font-medium"
+            isCritical && "text-warning font-medium"
           )}>
             {displayMessage}
           </p>
@@ -171,8 +171,8 @@ function LogItem({
               <span className={cn(
                 "font-mono font-medium",
                 log.level === 'ERROR' && "text-error",
-                log.level === 'WARNING' && "text-amber-500",
-                log.level === 'INFO' && "text-blue-500"
+                log.level === 'WARNING' && "text-warning",
+                log.level === 'INFO' && "text-info"
               )}>
                 {log.level}
               </span>
@@ -441,7 +441,7 @@ export function SystemLogsSidebar() {
                 </span>
               )}
               {counts.warning > 0 && (
-                <span className="flex items-center gap-1 text-[9px] text-amber-500 font-mono">
+                <span className="flex items-center gap-1 text-[9px] text-warning font-mono">
                   <span className="font-bold">W</span>
                   {counts.warning}
                 </span>

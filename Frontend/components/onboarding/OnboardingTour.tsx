@@ -96,7 +96,7 @@ const DATASETS_TOUR_STEPS: Step[] = [
   {
     target: '[data-tour="embed-dataset"]',
     title: 'Embed to Vector DB',
-    content: 'Embed datasets to Redis vector database for semantic search. This creates searchable embeddings from your data.',
+    content: 'Embed datasets into pgvector so their utterances become routable. This creates searchable embeddings from your data.',
     placement: 'left',
   },
   {
@@ -219,7 +219,9 @@ export function OnboardingTour({ tourId, run: runProp, onComplete }: OnboardingT
       completed = {}
     }
     
-    if (!completed[tourId] && user) {
+    // Only the dashboard tour starts on its own; a tour on every page the first
+    // time you open it is an interruption, not onboarding.
+    if (tourId === 'dashboard' && !completed[tourId] && user) {
       // Small delay to ensure DOM elements are rendered
       const timer = setTimeout(() => setRun(true), 1500)
       return () => clearTimeout(timer)

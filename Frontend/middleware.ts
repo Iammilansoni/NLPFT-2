@@ -5,7 +5,10 @@ import type { NextRequest } from 'next/server'
 const publicRoutes = [
   '/', // Landing page
   '/about', // About us page
-  '/product', // Product page
+  '/docs', // Documentation
+  '/help', // Help centre
+  '/getting-started', // Setup guide
+  '/contact', // Contact
   '/status', // Status page
   '/privacy', // Privacy policy
   '/terms', // Terms of service

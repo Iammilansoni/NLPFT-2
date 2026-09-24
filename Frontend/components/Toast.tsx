@@ -26,24 +26,24 @@ export const Toast: React.FC<ToastProps> = ({ type, message, onClose }) => {
       <div
         className={`flex items-start gap-3 min-w-[300px] max-w-md px-4 py-3 rounded-lg shadow-lg ${
           type === 'success'
-            ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
-            : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+            ? 'bg-success/10 dark:bg-success/20 border border-success/25 dark:border-success'
+            : 'bg-destructive/10 dark:bg-destructive/20 border border-destructive/25 dark:border-destructive'
         }`}
         role="alert"
         aria-live="polite"
       >
         {type === 'success' ? (
-          <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+          <CheckCircle className="w-5 h-5 text-success dark:text-success flex-shrink-0 mt-0.5" />
         ) : (
-          <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+          <XCircle className="w-5 h-5 text-destructive dark:text-destructive flex-shrink-0 mt-0.5" />
         )}
 
         <div className="flex-1">
           <p
             className={`text-sm font-medium ${
               type === 'success'
-                ? 'text-green-900 dark:text-green-100'
-                : 'text-red-900 dark:text-red-100'
+                ? 'text-success dark:text-success-foreground'
+                : 'text-destructive dark:text-destructive-foreground'
             }`}
           >
             {message}
@@ -54,16 +54,16 @@ export const Toast: React.FC<ToastProps> = ({ type, message, onClose }) => {
           onClick={onClose}
           className={`flex-shrink-0 rounded-md p-1 hover:bg-opacity-20 transition-colors ${
             type === 'success'
-              ? 'hover:bg-green-200 dark:hover:bg-green-700'
-              : 'hover:bg-red-200 dark:hover:bg-red-700'
+              ? 'hover:bg-success/25 dark:hover:bg-success'
+              : 'hover:bg-destructive/25 dark:hover:bg-destructive'
           }`}
           aria-label="Dismiss notification"
         >
           <X
             className={`w-4 h-4 ${
               type === 'success'
-                ? 'text-green-600 dark:text-green-400'
-                : 'text-red-600 dark:text-red-400'
+                ? 'text-success dark:text-success'
+                : 'text-destructive dark:text-destructive'
             }`}
           />
         </button>

@@ -15,8 +15,8 @@ before they reach the thing worth showing.
 
 WHERE THE DATA COMES FROM
 -------------------------
-The 20 templates are imported from `evals/api_surface.py` — the same catalogue
-the routing benchmark runs against. That is deliberate: the demo tenant IS the
+The 20 templates are imported from `app/demo_catalogue.py` — the same catalogue
+the routing benchmark (evals/) runs against. That is deliberate: the demo tenant IS the
 benchmark surface, so the numbers quoted in the README are reproducible against
 what a reviewer is clicking. Two fixtures that could drift apart would be worse
 than one.
@@ -44,9 +44,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
-REPO_ROOT = BACKEND_ROOT.parent
 sys.path.insert(0, str(BACKEND_ROOT))
-sys.path.insert(0, str(REPO_ROOT / "evals"))
 
 from sqlalchemy import text  # noqa: E402
 
@@ -61,20 +59,17 @@ from app.services.pgvector_store import get_pgvector_store  # noqa: E402
 DEMO_USER_ID = uuid.UUID("00000000-0000-4000-8000-000000000d30")
 DEMO_EMAIL = os.getenv("SEED_DEMO_EMAIL", "demo@nlpforge.dev")
 DEMO_PASSWORD = os.getenv("SEED_DEMO_PASSWORD", "DemoForge!2026")
+# The demo utterances are one ordinary dataset, so the demo user can re-embed
+# them with any model and see the model-mismatch flow like any other user.
+DEMO_DATASET_ID = uuid.UUID("00000000-0000-4000-8000-00000000da7a")
+DEMO_DATASET_NAME = "Demo catalogue utterances"
 
 
 def load_api_surface() -> List[Dict[str, Any]]:
-    """Import the benchmark catalogue. Fails loudly rather than seeding nothing."""
-    try:
-        from api_surface import API_TEMPLATES  # type: ignore[import-not-found]
+    """The benchmark catalogue (shared with evals/run_eval.py)."""
+    from app.demo_catalogue import API_TEMPLATES
 
-        return list(API_TEMPLATES)
-    except ImportError as exc:
-        raise SystemExit(
-            f"Could not import evals/api_surface.py ({exc}).\n"
-            f"The demo seed and the routing benchmark share one catalogue by "
-            f"design; run this from a checkout that includes evals/."
-        )
+    return list(API_TEMPLATES)
 
 
 # ---------------------------------------------------------------------------
@@ -131,56 +126,131 @@ async def reset_demo_tenant() -> None:
 
 async def seed_templates(templates: List[Dict[str, Any]]) -> Dict[str, uuid.UUID]:
     """
-    Insert the API catalogue. Returns api_name -> t_id.
+    Insert the API catalogue as COMPLETE templates. Returns api_name -> t_id.
+
+    Every field the Template Builder treats as mandatory is filled from
+    app/demo_catalogue_details.py: 500+ word documentation, parameter table,
+    valid / edge / error sample requests with expected responses, sample
+    responses, response schema, headers, auth, rate limit and assertions.
 
     t_id is derived deterministically from the api_name via uuid5, so re-running
     updates the same rows instead of creating duplicates, and the ids are stable
-    across environments — which makes benchmark labels portable.
+    across environments, which keeps benchmark labels portable.
     """
+    from app.demo_catalogue_details import build_template_details
+
     ids: Dict[str, uuid.UUID] = {}
     async with tenant_session(DEMO_USER_ID) as db:
         for tpl in templates:
             t_id = uuid.uuid5(uuid.NAMESPACE_DNS, f"nlpforge-demo:{tpl['api_name']}")
             ids[tpl["api_name"]] = t_id
-
-            # A real description is required for the template to look credible in
-            # the UI; the benchmark itself never reads it.
-            description = (
-                f"{tpl['description']} "
-                f"Sample utterances: {'; '.join(tpl['utterances'][:3])}."
-            )
+            d = build_template_details(tpl)
 
             await db.execute(
                 text(
                     """
                     INSERT INTO templates
-                        (t_id, u_id, api_name, description, base_url, endpoint,
-                         method, json_schema, domain_tags, created_at)
+                        (t_id, u_id, api_name, description, base_url, endpoint, "Field",
+                         method, json_schema, response_schema, sample_requests,
+                         sample_responses, domain_tags, auth_config, headers,
+                         rate_limit, assertions, created_at, updated_at)
                     VALUES
-                        (CAST(:t_id AS uuid),
-                         current_setting('app.tenant_id')::uuid,
-                         :api_name, :description, :base_url, :endpoint, :method,
-                         CAST(:json_schema AS jsonb), CAST(:tags AS jsonb), now())
+                        (CAST(:t_id AS uuid), current_setting('app.tenant_id')::uuid,
+                         :api_name, :description, :base_url, :endpoint, :endpoint,
+                         :method, CAST(:json_schema AS jsonb), CAST(:response_schema AS jsonb),
+                         CAST(:sample_requests AS jsonb), CAST(:sample_responses AS jsonb),
+                         CAST(:tags AS jsonb), CAST(:auth_config AS jsonb),
+                         CAST(:headers AS jsonb), CAST(:rate_limit AS jsonb),
+                         CAST(:assertions AS jsonb), now(), now())
                     ON CONFLICT (t_id) DO UPDATE SET
-                        api_name    = EXCLUDED.api_name,
-                        description = EXCLUDED.description,
-                        endpoint    = EXCLUDED.endpoint,
-                        method      = EXCLUDED.method,
-                        json_schema = EXCLUDED.json_schema
+                        api_name         = EXCLUDED.api_name,
+                        description      = EXCLUDED.description,
+                        base_url         = EXCLUDED.base_url,
+                        endpoint         = EXCLUDED.endpoint,
+                        "Field"          = EXCLUDED."Field",
+                        method           = EXCLUDED.method,
+                        json_schema      = EXCLUDED.json_schema,
+                        response_schema  = EXCLUDED.response_schema,
+                        sample_requests  = EXCLUDED.sample_requests,
+                        sample_responses = EXCLUDED.sample_responses,
+                        domain_tags      = EXCLUDED.domain_tags,
+                        auth_config      = EXCLUDED.auth_config,
+                        headers          = EXCLUDED.headers,
+                        rate_limit       = EXCLUDED.rate_limit,
+                        assertions       = EXCLUDED.assertions,
+                        updated_at       = now()
                     """
                 ),
                 {
                     "t_id": str(t_id),
                     "api_name": tpl["api_name"],
-                    "description": description,
+                    "description": d["description"],
                     "base_url": "https://api.nlpforge.dev",
                     "endpoint": tpl["endpoint"],
                     "method": tpl["method"],
                     "json_schema": _json(tpl["json_schema"]),
-                    "tags": _json([tpl["cluster"]]),
+                    "response_schema": _json(d["response_schema"]),
+                    "sample_requests": _json(d["sample_requests"]),
+                    "sample_responses": _json(d["sample_responses"]),
+                    "tags": _json(d["domain_tags"]),
+                    "auth_config": _json(d["auth_config"]),
+                    "headers": _json(d["headers"]),
+                    "rate_limit": _json(d["rate_limit"]),
+                    "assertions": _json(d["assertions"]),
                 },
             )
-    logger.info(f"Seeded {len(ids)} templates")
+
+            # Parameter table and expected responses: replace wholesale so a
+            # re-seed always matches the catalogue exactly.
+            await db.execute(text("DELETE FROM parameters WHERE t_id = CAST(:t AS uuid)"), {"t": str(t_id)})
+            await db.execute(text("DELETE FROM expected_responses WHERE t_id = CAST(:t AS uuid)"), {"t": str(t_id)})
+            for p in d["parameters"]:
+                await db.execute(
+                    text(
+                        """
+                        INSERT INTO parameters (p_id, u_id, t_id, name, type, description, required, example)
+                        VALUES (gen_random_uuid(), current_setting('app.tenant_id')::uuid,
+                                CAST(:t AS uuid), :name, :type, :description, :required, :example)
+                        """
+                    ),
+                    {
+                        "t": str(t_id),
+                        "name": p["name"],
+                        "type": p["type"],
+                        "description": p["description"],
+                        "required": 1 if p["required"] else 0,
+                        "example": p["example"] if isinstance(p["example"], str) else _json(p["example"]),
+                    },
+                )
+            for r in d["sample_responses"]:
+                await db.execute(
+                    text(
+                        """
+                        INSERT INTO expected_responses (r_id, u_id, t_id, status, fields)
+                        VALUES (gen_random_uuid(), current_setting('app.tenant_id')::uuid,
+                                CAST(:t AS uuid), :status, CAST(:fields AS jsonb))
+                        """
+                    ),
+                    {"t": str(t_id), "status": r["status_code"], "fields": _json(r["response_body"])},
+                )
+
+            # Status lives in the `metadata` table. Demo templates are approved,
+            # so they appear as active and can drive dataset generation.
+            await db.execute(
+                text(
+                    """
+                    INSERT INTO metadata (m_id, u_id, t_id, status, approved_by,
+                                          approved_at, confidence, remarks, created_at)
+                    VALUES (CAST(:m_id AS uuid), current_setting('app.tenant_id')::uuid,
+                            CAST(:t_id AS uuid), 'approved',
+                            current_setting('app.tenant_id')::uuid, now(), 100,
+                            'Seeded demo template: reviewed catalogue entry', now())
+                    ON CONFLICT (m_id) DO UPDATE SET status = 'approved'
+                    """
+                ),
+                {"m_id": str(uuid.uuid5(t_id, "metadata")), "t_id": str(t_id)},
+            )
+    logger.info(f"Seeded {len(ids)} complete templates (approved)")
     return ids
 
 
@@ -190,9 +260,10 @@ async def seed_vectors(
     """
     Embed every utterance and write it to vector_rows.
 
-    Embedding happens through the runtime adapter, so the vectors match whichever
-    EXECUTION_MODE this deployment runs — 768-dim in local mode, 384-dim in
-    cloud. Storing model+dimension per row is what makes that safe.
+    Embeds with the deployment default model (app.core.runtime), which is also
+    what a user who never picks a model searches with. Every row records the
+    provider, model and measured dimension, so a user who switches models is
+    told to re-embed instead of silently comparing incompatible vectors.
     """
     embedder = get_embedder()
 
@@ -203,7 +274,7 @@ async def seed_vectors(
             rows.append(
                 {
                     "t_id": ids[tpl["api_name"]],
-                    "dataset_id": None,
+                    "dataset_id": DEMO_DATASET_ID,
                     "query": utt,
                     "api_name": tpl["api_name"],
                     "endpoint": tpl["endpoint"],
@@ -215,7 +286,7 @@ async def seed_vectors(
             )
             texts.append(utt)
 
-    logger.info(f"Embedding {len(texts)} utterances with {embedder.model_id}...")
+    logger.info(f"Embedding {len(texts)} utterances with {embedder.provider}/{embedder.model_id}...")
     vectors = await embedder.embed(texts)
     if len(vectors) != len(texts):
         raise SystemExit(
@@ -224,18 +295,86 @@ async def seed_vectors(
         )
 
     store = get_pgvector_store()
+    async with AsyncSessionLocal() as plain:
+        await store.ensure_index(plain, embedder.dimension)
+    csv_path = write_demo_csv(rows)
     async with tenant_session(DEMO_USER_ID) as db:
         # Clear first so a re-run refreshes rather than duplicating.
-        await db.execute(text("DELETE FROM vector_rows WHERE test_category = 'demo_seed'"))
+        await db.execute(
+            text("DELETE FROM vector_rows WHERE test_category = 'demo_seed' OR dataset_id = CAST(:d AS uuid)"),
+            {"d": str(DEMO_DATASET_ID)},
+        )
+        await upsert_demo_dataset(db, rows, csv_path, embedder)
         written = await store.upsert_rows(
             db,
             rows,
             vectors,
             embedding_model=embedder.model_id,
             dimension=embedder.dimension,
+            embedding_provider=embedder.provider,
         )
     logger.info(f"Indexed {written} vectors")
     return written
+
+
+def write_demo_csv(rows: List[Dict[str, Any]]) -> str:
+    """The utterances as a dataset CSV, so re-embedding reads them like any upload."""
+    import csv
+
+    from app.core.config import DATASETS_DIR
+
+    path = DATASETS_DIR / "demo_catalogue_utterances.csv"
+    columns = ["query", "api_name", "endpoint", "method", "scenario_type", "test_category", "intent_type"]
+    with open(path, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=columns, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+    return str(path)
+
+
+async def upsert_demo_dataset(db, rows: List[Dict[str, Any]], csv_path: str, embedder) -> None:
+    """The dataset record (tagged with the model that embedded it) and its viewable rows."""
+    from sqlalchemy import delete
+
+    from app.models.database_models import CSVData, Dataset, utc_now
+
+    now = utc_now()
+    await db.merge(Dataset(
+        dataset_id=DEMO_DATASET_ID,
+        u_id=DEMO_USER_ID,
+        name=DEMO_DATASET_NAME,
+        description="Hand-written example requests for the 20 demo API templates (also the routing benchmark's index).",
+        csv_path=csv_path,
+        embedding_provider=embedder.provider,
+        embedding_model=embedder.model_id,
+        embedding_dimension=embedder.dimension,
+        embedding_status="completed",
+        embedding_progress=100,
+        embedding_error=None,
+        total_rows=len(rows),
+        embedded_rows=len(rows),
+        created_at=now,
+        embedding_started_at=now,
+        embedding_completed_at=now,
+    ))
+    await db.execute(delete(CSVData).where(CSVData.dataset_id == DEMO_DATASET_ID))
+    db.add_all([
+        CSVData(
+            u_id=DEMO_USER_ID,
+            t_id=row["t_id"],
+            dataset_id=DEMO_DATASET_ID,
+            query=row["query"],
+            api_name=row["api_name"],
+            endpoint=row["endpoint"],
+            data_category="valid",
+            embedded_with_model=embedder.model_id,
+            is_embedded=1,
+            intent_type=row["intent_type"],
+            created_at=now,
+        )
+        for row in rows
+    ])
+    await db.flush()
 
 
 async def verify(templates: List[Dict[str, Any]]) -> bool:
@@ -263,6 +402,7 @@ async def verify(templates: List[Dict[str, Any]]) -> bool:
             qv,
             embedding_model=embedder.model_id,
             dimension=embedder.dimension,
+            embedding_provider=embedder.provider,
             top_k=25,
         )
 

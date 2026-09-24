@@ -59,7 +59,9 @@ async def main():
                 "        fly secrets set SEED_ADMIN_PASSWORD=\"$(openssl rand -base64 24)\"",
                 file=sys.stderr,
             )
-            sys.exit(1)
+            # Skipping the seed is the safe outcome; it must not stop the API
+            # from booting (this runs in the container's startup chain).
+            return
         admin_password = "Admin@12345"
         print(
             "SEED: using the default local development password. "

@@ -81,6 +81,9 @@ export default function TemplateDetailPage() {
   })
 
   const isApproved = template?.status === "approved"
+  const fullUrl = `${(template?.base_url || "").replace(/\/$/, "")}${template?.endpoint || ""}`
+  const authType = template?.auth_config?.type
+  const authLabel = !authType || authType === "none" ? "Public (no session)" : authType === "bearer" ? "Bearer token" : String(authType)
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -185,15 +188,15 @@ export default function TemplateDetailPage() {
             <div className="bg-card border rounded-xl p-6">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <Globe className="h-5 w-5" />
-                API Base URL
+                Endpoint
               </h2>
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="font-mono">{template.method}</Badge>
                   <code className="flex-1 bg-muted px-3 py-2 rounded text-sm font-mono truncate">
-                    {template.base_url || template.endpoint || "No URL defined"}
+                    {fullUrl || "No URL defined"}
                   </code>
-                  <Button variant="ghost" size="icon" onClick={() => copyToClipboard(template.base_url || template.endpoint || "")}>
+                  <Button variant="ghost" size="icon" aria-label="Copy endpoint URL" onClick={() => copyToClipboard(fullUrl)}>
                     <Copy className="h-4 w-4" />
                   </Button>
                 </div>
@@ -265,6 +268,20 @@ export default function TemplateDetailPage() {
                 </div>
               </div>
             )}
+
+            {/* Schemas */}
+            {(template.json_schema || template.response_schema) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {[["Request schema", template.json_schema], ["Response schema", template.response_schema]].map(([label, schema]: any) => (
+                  schema ? (
+                    <div key={label} className="bg-card border rounded-xl p-6">
+                      <h2 className="text-lg font-semibold mb-4">{label}</h2>
+                      <pre className="bg-muted p-3 rounded text-xs overflow-x-auto">{JSON.stringify(schema, null, 2)}</pre>
+                    </div>
+                  ) : null
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Sidebar */}
@@ -307,14 +324,28 @@ export default function TemplateDetailPage() {
                 <Shield className="h-4 w-4" />
                 Security
               </h3>
-              <div className="space-y-3">
-                {template.requires_auth !== undefined && (
-                  <div>
-                    <span className="text-xs text-muted-foreground">Authentication</span>
-                    <p className="font-medium">{template.requires_auth ? "Required" : "Not Required"}</p>
+              <dl className="space-y-3 text-sm">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">Authentication</dt>
+                  <dd className="font-medium text-right">{authLabel}</dd>
+                </div>
+                {template.rate_limit?.requests_per_minute && (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground">Rate limit</dt>
+                    <dd className="font-medium">{template.rate_limit.requests_per_minute} req/min</dd>
                   </div>
                 )}
-              </div>
+                {template.headers && Object.keys(template.headers).length > 0 && (
+                  <div>
+                    <dt className="text-muted-foreground mb-1.5">Headers</dt>
+                    <dd className="space-y-1">
+                      {Object.entries(template.headers).map(([k, v]) => (
+                        <code key={k} className="block rounded bg-muted px-2 py-1 text-xs font-mono truncate">{k}: {String(v)}</code>
+                      ))}
+                    </dd>
+                  </div>
+                )}
+              </dl>
             </div>
 
             {/* Keywords */}

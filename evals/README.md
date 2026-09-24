@@ -20,7 +20,7 @@ in-memory index, so it runs in CI on every push.
 
 | File | Purpose |
 |---|---|
-| `api_surface.py` | 20 API templates + 100 indexed utterances, grouped into confusion clusters |
+| `api_surface.py` | re-exports the 20-template catalogue (100 indexed utterances, grouped into confusion clusters) from `Backend/app/demo_catalogue.py`, which also seeds the demo tenant |
 | `benchmark_queries.py` | 180 held-out labeled queries across 4 difficulty tiers |
 | `run_eval.py` | Index, three ranking strategies, metrics, reporting |
 
@@ -156,6 +156,30 @@ faster and surrenders the entire hard-negative gain.
   production lexical arm would be PostgreSQL `tsvector`/`ts_rank_cd`, which is a
   different ranking function — so the hybrid numbers predict direction, not exact
   magnitude.
+
+## Extraction benchmark
+
+Routing picks the endpoint; extraction fills in its body. `extraction_cases.py` holds 100
+requests over the same 20 APIs, each with the exact values a careful human would extract.
+About a fifth omit a required value on purpose ("log me in"), so a system that invents values
+is caught. Scoring is field-level. Identifiers and secrets must match exactly; free text such as
+a cancellation reason is compared loosely.
+
+```bash
+docker cp evals nlpft-2-backend-1:/tmp/evals
+docker exec -w /app nlpft-2-backend-1 python /tmp/evals/run_extraction_eval.py --strategy hybrid --show-errors
+```
+
+| Strategy | Precision | Recall | Exact | Invented | p50 | Model calls |
+|---|---|---|---|---|---|---|
+| `llm` (v2) | 0.672 | 0.931 | 0.59 | 55 | 2257 ms | 100/100 |
+| `rules` | 1.000 | 0.685 | 0.64 | 0 | 0 ms | 0/100 |
+| `hybrid` | 0.984 | 0.962 | 0.94 | 1 | 1638 ms | 58/100 |
+
+Local `llama3.2:3b` on CPU, no API key. What the model alone invented: `user@example.com` for a
+missing email, `"some_token"`, `123456` as an OTP, `page: 1, limit: 10` defaults, and the whole
+request pasted into a password field. The rules can't do any of that, and the grounding check
+rejects it when the model does.
 
 ## Reproducing
 

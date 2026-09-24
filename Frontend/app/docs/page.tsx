@@ -1,5 +1,6 @@
 'use client'
 
+import { useProviders } from '@/hooks/useProviders'
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import {
@@ -8,6 +9,7 @@ import {
   Layers, ExternalLink, Code2, Cpu
 } from 'lucide-react'
 import Link from 'next/link'
+import { LandingNav } from '@/components/landing/LandingNav'
 
 // Backend Swagger UI URL, derived from the public API base so it works in all environments.
 const SWAGGER_URL = `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:19000').replace(/\/$/, '')}/docs`
@@ -22,24 +24,27 @@ const SECTIONS = [
 ]
 
 const API_ENDPOINTS = [
-  { method: 'GET', path: '/api/v1/templates', desc: 'List all API templates' },
-  { method: 'POST', path: '/api/v1/templates', desc: 'Create a new template' },
-  { method: 'GET', path: '/api/v1/templates/{id}', desc: 'Get template by ID' },
-  { method: 'PATCH', path: '/api/v1/templates/{id}/toggle', desc: 'Toggle template status' },
-  { method: 'DELETE', path: '/api/v1/templates/{id}', desc: 'Delete a template' },
-  { method: 'POST', path: '/api/v1/datasets/generate', desc: 'Generate NLP dataset from template' },
-  { method: 'GET', path: '/api/v1/datasets', desc: 'List all datasets' },
-  { method: 'POST', path: '/api/v1/datasets/db/{id}/embed', desc: 'Embed dataset to Redis vector store' },
-  { method: 'POST', path: '/api/v1/query/retrieve', desc: 'Semantic search across embeddings' },
-  { method: 'GET', path: '/api/v1/settings', desc: 'Get user settings' },
-  { method: 'PATCH', path: '/api/v1/settings', desc: 'Update user settings (model, dimension)' },
+  { method: 'POST', path: '/api/v1/query/semantic-search', desc: 'Route a natural-language request: template + extracted body' },
+  { method: 'GET', path: '/api/v1/query/health', desc: 'Routing readiness: your embedding model reachable, vectors indexed for it' },
+  { method: 'GET', path: '/api/v1/embeddings/settings', desc: 'Your embedding model, embedding providers, datasets grouped by model' },
+  { method: 'PUT', path: '/api/v1/embeddings/settings', desc: "Choose any provider's embedding model (verified and measured)" },
+  { method: 'GET', path: '/api/v1/model-catalog', desc: 'Every model your providers serve, with lifecycle status' },
+  { method: 'GET', path: '/api/v1/templates/', desc: 'List your API templates' },
+  { method: 'POST', path: '/api/v1/templates/', desc: 'Create a template' },
+  { method: 'GET', path: '/api/v1/templates/{id}', desc: 'Get a template' },
+  { method: 'DELETE', path: '/api/v1/templates/{id}', desc: 'Delete a template (and its vectors)' },
+  { method: 'POST', path: '/api/v1/datasets/generate', desc: 'Generate an utterance dataset with an LLM (Celery)' },
+  { method: 'POST', path: '/api/v1/datasets/upload', desc: 'Upload a CSV dataset (auto-embedded)' },
+  { method: 'GET', path: '/api/v1/datasets/db/list', desc: 'List stored datasets' },
+  { method: 'POST', path: '/api/v1/datasets/db/{id}/embed', desc: 'Embed a dataset into pgvector' },
+  { method: 'GET', path: '/api/v1/health', desc: 'Service health + runtime (embedder, RLS status)' },
 ]
 
 const METHOD_COLORS: Record<string, string> = {
-  GET:    'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-  POST:   'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-  PATCH:  'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-  DELETE: 'bg-red-500/10 text-red-600 dark:text-red-400',
+  GET:    'bg-info/10 text-info dark:text-info',
+  POST:   'bg-success/10 text-success dark:text-success',
+  PATCH:  'bg-warning/10 text-warning dark:text-warning',
+  DELETE: 'bg-destructive/10 text-destructive dark:text-destructive',
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -50,7 +55,7 @@ function CopyButton({ text }: { text: string }) {
       className="p-1.5 rounded-md hover:bg-muted/60 transition-colors text-muted-foreground hover:text-foreground"
       aria-label="Copy"
     >
-      {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+      {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
     </button>
   )
 }
@@ -60,9 +65,9 @@ function CodeBlock({ code }: { code: string }) {
     <div className="relative group rounded-xl bg-muted/40 border border-border/60 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2 border-b border-border/40 bg-muted/30">
         <div className="flex gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-red-400/60" />
-          <div className="w-2.5 h-2.5 rounded-full bg-amber-400/60" />
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-400/60" />
+          <div className="w-2.5 h-2.5 rounded-full bg-destructive/60" />
+          <div className="w-2.5 h-2.5 rounded-full bg-warning/60" />
+          <div className="w-2.5 h-2.5 rounded-full bg-success/60" />
         </div>
         <CopyButton text={code} />
       </div>
@@ -73,9 +78,11 @@ function CodeBlock({ code }: { code: string }) {
 
 export default function DocsPage() {
   const [active, setActive] = useState('getting-started')
+  const { providers } = useProviders()
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pt-16">
+      <LandingNav />
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-border/40 bg-gradient-to-b from-muted/30 to-background">
         <div className="absolute -top-40 right-1/3 w-96 h-96 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
@@ -90,7 +97,7 @@ export default function DocsPage() {
             NLPForge Docs
           </h1>
           <p className="text-muted-foreground text-lg max-w-xl">
-            Complete reference for the NLPForge API Testing & NLP Dataset Platform.
+            How NLPForge routes natural language to API calls, and how to use it.
           </p>
         </div>
       </section>
@@ -142,29 +149,29 @@ export default function DocsPage() {
               <div className="space-y-8">
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Getting Started</h2>
-                  <p className="text-muted-foreground">Get NLPForge running and generate your first API test dataset in under 10 minutes.</p>
+                  <p className="text-muted-foreground">From zero to a routed, schema-valid API call. The demo tenant already has steps 2 to 4 done.</p>
                 </div>
 
                 {[
                   {
-                    step: '1', title: 'Register & Verify', icon: Zap,
-                    body: 'Create an account at /auth/register. Check your email for the OTP and verify your account.',
+                    step: '1', title: 'Sign in', icon: Zap,
+                    body: 'Use the one-click demo login, Google, or register with email (verification code by e-mail).',
                   },
                   {
-                    step: '2', title: 'Configure AI Providers', icon: Cpu,
-                    body: 'Go to Settings → AI Providers. Add your Gemini, OpenAI or Anthropic API key. Or leave it as-is to use local Ollama.',
+                    step: '2', title: 'Describe your APIs as templates', icon: FileCode,
+                    body: 'Templates → New Template: method, endpoint, description and a JSON Schema for the request body.',
                   },
                   {
-                    step: '3', title: 'Create an API Template', icon: FileCode,
-                    body: 'Go to Templates → New Template. Define your API endpoint: method, URL, description, and intent keywords.',
+                    step: '3', title: 'Generate example utterances', icon: Database,
+                    body: 'Datasets → Generate: an LLM writes realistic requests for an approved template (or upload a CSV with a query column).',
                   },
                   {
-                    step: '4', title: 'Generate a Dataset', icon: Database,
-                    body: 'Go to Datasets → Generate. Select your template, choose an LLM provider, set row count, and click Generate.',
+                    step: '4', title: 'Embed them', icon: Cpu,
+                    body: 'Embedding writes each utterance to pgvector with the deployment’s embedding model. Uploads are embedded automatically.',
                   },
                   {
-                    step: '5', title: 'Search in Plain English', icon: SearchIcon,
-                    body: 'Embed your dataset, then go to Dashboard. Type a natural language query and get the matching API back instantly.',
+                    step: '5', title: 'Route a request', icon: SearchIcon,
+                    body: 'Dashboard: type a request in plain English and get the endpoint plus a schema-validated request body.',
                   },
                 ].map((item) => (
                   <div key={item.step} className="flex gap-5">
@@ -212,7 +219,7 @@ export default function DocsPage() {
                         <tr key={field} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
                           <td className="px-4 py-3 font-mono text-xs text-primary">{field}</td>
                           <td className="px-4 py-3">
-                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${req === 'Yes' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-muted text-muted-foreground'}`}>{req}</span>
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${req === 'Yes' ? 'bg-success/10 text-success dark:text-success' : 'bg-muted text-muted-foreground'}`}>{req}</span>
                           </td>
                           <td className="px-4 py-3 text-muted-foreground text-xs">{desc}</td>
                         </tr>
@@ -253,26 +260,26 @@ Authorization: Bearer <token>`} />
               <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Semantic Search</h2>
-                  <p className="text-muted-foreground">Two-stage retrieval: Redis vector search (Stage 1) → cross-encoder re-ranking (Stage 2). Returns a structured match with confidence score.</p>
+                  <p className="text-muted-foreground">Three stages: pgvector recall over indexed utterances → max-pool ranking per template → schema-constrained extraction validated with Pydantic. Every response reports whether any stage degraded.</p>
                 </div>
-                <CodeBlock code={`POST /api/v1/query/retrieve
+                <CodeBlock code={`POST /api/v1/query/semantic-search
 Content-Type: application/json
-Authorization: Bearer <token>
 
-{
-  "query": "I want to reset my password",
-  "embedding_model": "nomic-embed-text",
-  "top_k": 5
-}
+{ "query": "refund 25 dollars on order 8820, it arrived broken" }
 
-// Response
+// Response (abridged)
 {
+  "success": true,
   "final_output": {
-    "api_name": "Reset Password",
+    "api_name": "Refund_Order",
     "method": "POST",
-    "endpoint": "/auth/reset-password",
-    "confidence_score": 0.94
+    "endpoint": "/orders/{order_id}/refund",
+    "confidence_score": 0.6931
   },
+  "extracted_request_body": { "order_id": "8820", "amount": 25.0 },
+  "extraction": { "ok": true, "missing_required": [], "degraded": false },
+  "ranking": { "strategy": "vector_maxpool", "degraded": false },
+  "degraded": false,
   "stage1_vector_search": [...],
   "stage2_reranking": [...]
 }`} />
@@ -283,23 +290,26 @@ Authorization: Bearer <token>
               <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">LLM Providers</h2>
-                  <p className="text-muted-foreground">Configure API keys in Settings → AI Providers. Each provider is used during dataset generation.</p>
+                  <p className="text-muted-foreground">
+                    Connect providers in Settings → AI Providers. Model lists are not written into the app:
+                    each provider is asked which models it serves, and Settings → Model catalogue shows the
+                    result, including models that are new or being phased out.
+                  </p>
                 </div>
                 <div className="grid gap-4">
-                  {[
-                    { name: 'Gemini (Google AI)', key: 'GEMINI_API_KEY', models: 'gemini-2.0-flash, gemini-1.5-pro', status: 'Recommended' },
-                    { name: 'OpenAI', key: 'OPENAI_API_KEY', models: 'gpt-4o, gpt-4-turbo, gpt-3.5-turbo', status: 'Supported' },
-                    { name: 'Anthropic Claude', key: 'ANTHROPIC_API_KEY', models: 'claude-3-5-sonnet, claude-3-haiku', status: 'Supported' },
-                    { name: 'Ollama (local)', key: 'None required', models: 'llama3, mistral, phi3', status: 'Local only' },
-                  ].map(p => (
-                    <div key={p.name} className="flex items-start gap-4 p-4 rounded-xl border border-border/60 bg-card">
+                  {providers.map(p => (
+                    <div key={p.id} className="flex items-start gap-4 p-4 rounded-xl border border-border/60 bg-card">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-foreground text-sm">{p.name}</span>
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">{p.status}</span>
+                          <span className="font-semibold text-foreground text-sm">{p.label}</span>
+                          {p.local && <span className="text-xs px-2 py-0.5 rounded-full bg-info/10 text-info font-medium">Runs locally</span>}
+                          {p.free_tier && !p.local && <span className="text-xs px-2 py-0.5 rounded-full bg-success/10 text-success font-medium">Free tier</span>}
                         </div>
-                        <p className="text-xs text-muted-foreground">Models: {p.models}</p>
-                        <code className="text-xs font-mono text-muted-foreground mt-1 block">Env: {p.key}</code>
+                        <p className="text-xs text-muted-foreground">{p.description}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {[p.chat && 'Chat models', p.embeddings && 'Embedding models'].filter(Boolean).join(' · ')}
+                          {' · '}{p.requires_key ? 'Needs an API key' : 'No API key needed'}
+                        </p>
                       </div>
                     </div>
                   ))}

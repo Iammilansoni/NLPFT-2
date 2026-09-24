@@ -1,143 +1,83 @@
 /**
- * Auth Layout - Premium SaaS Split-Screen Design
- * Left: Gradient blue panel with product preview
- * Right: Clean white form area
+ * Auth layout: brand panel (left) + form (right).
+ * The panel shows what the product actually does: one real request and the
+ * validated API call it resolves to.
  */
 
 import React from 'react';
-import { Zap, LayoutGrid, FileJson, MessageSquare, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
+import { CheckCircle2, Network } from 'lucide-react';
 
-export default function AuthLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+const POINTS = [
+  'Routes plain-English requests to the right endpoint in your API catalogue',
+  'Extracts request bodies that validate against each endpoint’s JSON Schema',
+  'Routing accuracy measured on a 180-query held-out benchmark',
+];
+
+export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen flex">
-      {/* Left Panel - Gradient Blue with Product Preview */}
-      <div className="hidden lg:flex lg:w-1/2 xl:w-[45%] relative overflow-hidden">
-        {/* Gradient Background */}
-        <div 
-          className="absolute inset-0"
+    <div className="min-h-screen flex bg-background">
+      <aside className="hidden lg:flex lg:w-[46%] relative overflow-hidden bg-[hsl(240_32%_9%)] text-white">
+        {/* Ambient brand light */}
+        <div className="absolute -top-40 -left-40 h-[520px] w-[520px] rounded-full bg-primary/40 blur-[120px]" />
+        <div className="absolute bottom-[-200px] right-[-120px] h-[460px] w-[460px] rounded-full bg-brand-2/30 blur-[120px]" />
+        <div
+          className="absolute inset-0 opacity-[0.07]"
           style={{
-            background: 'linear-gradient(135deg, #4F46E5 0%, #3B82F6 30%, #6366F1 60%, #4338CA 100%)',
+            backgroundImage:
+              'linear-gradient(rgba(255,255,255,.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.6) 1px, transparent 1px)',
+            backgroundSize: '44px 44px',
+            maskImage: 'radial-gradient(ellipse at 30% 40%, black 30%, transparent 75%)',
           }}
         />
-        
-        {/* Geometric shapes */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div 
-            className="absolute top-0 left-0 w-full h-full opacity-20"
-            style={{
-              backgroundImage: `
-                linear-gradient(45deg, rgba(255,255,255,0.1) 25%, transparent 25%),
-                linear-gradient(-45deg, rgba(255,255,255,0.1) 25%, transparent 25%),
-                linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.05) 75%),
-                linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.05) 75%)
-              `,
-              backgroundSize: '60px 60px',
-            }}
-          />
-          {/* Large geometric triangle shapes */}
-          <div className="absolute -top-20 -right-20 w-96 h-96 bg-white/5 rotate-45 transform" />
-          <div className="absolute top-1/4 -left-10 w-64 h-64 bg-white/5 rotate-12 transform" />
-          <div className="absolute bottom-1/3 right-1/4 w-48 h-48 bg-white/5 -rotate-12 transform" />
-        </div>
-        
-        {/* Content */}
-        <div className="relative z-10 flex flex-col justify-between p-8 lg:p-12 w-full">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 w-fit">
-            <div className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center">
-              <Zap className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-bold text-xl text-white">NLPForge</span>
+
+        <div className="relative z-10 flex flex-col justify-between w-full p-12 xl:p-14">
+          <Link href="/" className="flex items-center gap-2.5 w-fit">
+            <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand-gradient shadow-glow">
+              <Network className="h-5 w-5 text-white" />
+            </span>
+            <span className="font-display text-lg font-bold tracking-tight">NLPForge</span>
           </Link>
-          
-          {/* Middle content - Tagline and Preview */}
-          <div className="flex-1 flex flex-col justify-center py-12">
-            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4 leading-tight">
-              Designed for<br />
-              <span className="text-blue-200">AI-Powered Testing</span>
+
+          <div className="space-y-8 max-w-lg">
+            <h2 className="font-display text-4xl font-bold leading-[1.1] tracking-tight">
+              From a sentence to a <span className="bg-gradient-to-r from-[hsl(245_90%_78%)] to-[hsl(265_90%_80%)] bg-clip-text text-transparent">validated API call</span>.
             </h2>
-            <p className="text-white/70 text-lg mb-8 max-w-md">
-              Generate intelligent test datasets and validate APIs remotely, from anywhere.
-            </p>
-            
-            {/* Pagination indicator */}
-            <div className="flex gap-2 mb-8">
-              <div className="w-8 h-1.5 rounded-full bg-white" />
-              <div className="w-2 h-1.5 rounded-full bg-white/30" />
-              <div className="w-2 h-1.5 rounded-full bg-white/30" />
-            </div>
-            
-            {/* Floating preview card */}
-            <div className="relative max-w-lg">
-              {/* App preview window */}
-              <div className="bg-white rounded-xl shadow-2xl overflow-hidden transform hover:scale-[1.02] transition-transform duration-300">
-                {/* Window header */}
-                <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center">
-                      <LayoutGrid className="w-3.5 h-3.5 text-primary" />
-                    </div>
-                    <span className="text-sm font-medium text-slate-700">API Test Templates</span>
-                  </div>
-                </div>
-                
-                {/* Preview content */}
-                <div className="p-4 space-y-3">
-                  {/* Sample rows */}
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <FileJson className="w-5 h-5 text-blue-500" />
-                    <div className="flex-1">
-                      <div className="text-sm font-medium text-slate-700">NLP Intent Classification</div>
-                      <div className="text-xs text-slate-400">Semantic matching • 95%+ accuracy</div>
-                    </div>
-                    <div className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">Active</div>
-                  </div>
-                  
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <MessageSquare className="w-5 h-5 text-purple-500" />
-                    <div className="flex-1">
-                      <div className="text-sm font-medium text-slate-700">Query-to-API Matching</div>
-                      <div className="text-xs text-slate-400">Vector search • Re-ranking</div>
-                    </div>
-                    <div className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">Ready</div>
-                  </div>
-                  
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <BarChart3 className="w-5 h-5 text-amber-500" />
-                    <div className="flex-1">
-                      <div className="text-sm font-medium text-slate-700">AI Dataset Generation</div>
-                      <div className="text-xs text-slate-400">LLM-powered • Multi-provider</div>
-                    </div>
-                    <div className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">Active</div>
-                  </div>
-                </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-sm shadow-2xl overflow-hidden">
+              <div className="flex items-center gap-1.5 border-b border-white/10 px-4 py-3">
+                <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+                <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+                <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+                <span className="ml-3 font-mono text-[11px] text-white/45">semantic-search</span>
               </div>
-              
-              {/* Floating avatar */}
-              <div className="absolute -top-4 -right-4 w-12 h-12 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 border-4 border-white shadow-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">JD</span>
+              <div className="p-5 space-y-4 text-sm">
+                <p className="text-white/75">“Refund 25 dollars on order 8820, it arrived broken”</p>
+                <pre className="font-mono text-[12.5px] leading-relaxed text-white/85">{`POST /orders/{order_id}/refund
+{
+  "order_id": "8820",
+  "amount": 25.0
+}`}</pre>
               </div>
             </div>
+
+            <ul className="space-y-3">
+              {POINTS.map((p) => (
+                <li key={p} className="flex items-start gap-3 text-white/70">
+                  <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0 text-[hsl(156_60%_55%)]" />
+                  <span>{p}</span>
+                </li>
+              ))}
+            </ul>
           </div>
-          
-          {/* Bottom - Trust indicators */}
-          <div className="text-white/50 text-sm">
-            <p>Trusted by 1,000+ developers worldwide</p>
-          </div>
+
+          <p className="text-xs text-white/35">FastAPI · PostgreSQL + pgvector · Ollama · Next.js</p>
         </div>
-      </div>
-      
-      {/* Right Panel - Form Area */}
-      <div className="w-full lg:w-1/2 xl:w-[55%] flex items-center justify-center bg-background">
-        <div className="w-full max-w-md px-6 py-8 lg:px-12">
-          {children}
-        </div>
-      </div>
+      </aside>
+
+      <main id="main-content" className="flex w-full lg:w-[54%] items-center justify-center">
+        <div className="w-full max-w-md px-6 py-10 lg:px-10">{children}</div>
+      </main>
     </div>
   );
 }

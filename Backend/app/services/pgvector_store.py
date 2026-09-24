@@ -21,8 +21,6 @@ Secondary wins: one less service to run and pay for, vectors transactionally
 consistent with the templates they reference (no more orphaned index entries),
 and joins against relational data without a round trip.
 
-The Redis path is retained behind VECTOR_BACKEND=redis so the two can be
-benchmarked on the same eval harness rather than argued about.
 
 INTERACTION WITH RLS -- THE IMPORTANT PART
 ------------------------------------------
@@ -33,12 +31,11 @@ ZERO surviving rows -- silently, with no error.
 Every query here therefore runs on a session prepared by `app.core.tenancy`,
 which sets `hnsw.iterative_scan = relaxed_order` on the same transaction. Callers
 MUST use `tenant_session()` or the `get_tenant_db` dependency; a bare session
-will both bypass tuning and (correctly) see no rows at all.
+binds no tenant, so every query here (correctly) matches no rows.
 """
 
 from __future__ import annotations
 
-import os
 import time
 import uuid
 from dataclasses import dataclass
@@ -50,7 +47,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logger import logger
 
-VECTOR_BACKEND = os.getenv("VECTOR_BACKEND", "pgvector").lower()
+# pgvector's HNSW index caps: 2000 dimensions for `vector`, 4000 for `halfvec`
+# (16-bit floats, half the memory, negligible recall loss for cosine search).
+HNSW_VECTOR_MAX_DIM = 2000
+HNSW_HALFVEC_MAX_DIM = 4000
+
+
+def vector_expression(dimension: int) -> tuple[str, str]:
+    """
+    The column expression and query cast for vectors of this width.
+
+    Search must use exactly the expression its partial index was built on, or
+    the planner cannot use the index. Wider than 4000 has no HNSW support in
+    pgvector, so those models are searched exactly (fine at this scale).
+    """
+    if dimension <= HNSW_VECTOR_MAX_DIM:
+        return f"embedding::vector({dimension})", "vector"
+    if dimension <= HNSW_HALFVEC_MAX_DIM:
+        return f"embedding::halfvec({dimension})", "halfvec"
+    return "embedding", "vector"
 
 
 def to_pgvector(vec: Sequence[float]) -> str:
@@ -96,6 +111,7 @@ class PgVectorStore:
         embeddings: Sequence[Sequence[float]],
         embedding_model: str,
         dimension: int,
+        embedding_provider: str,
     ) -> int:
         """
         Insert indexed utterances with their vectors.
@@ -131,6 +147,7 @@ class PgVectorStore:
                     "test_category": row.get("test_category"),
                     "intent_type": row.get("intent_type"),
                     "notes": row.get("notes"),
+                    "embedding_provider": embedding_provider,
                     "embedding_model": embedding_model,
                     "dimension": dimension,
                     "embedding": to_pgvector(arr),
@@ -143,22 +160,47 @@ class PgVectorStore:
                 INSERT INTO {self.TABLE}
                     (u_id, t_id, dataset_id, query, api_name, endpoint, method,
                      scenario_type, test_category, intent_type, notes,
-                     embedding_model, dimension, embedding)
+                     embedding_provider, embedding_model, dimension, embedding)
                 VALUES
                     (current_setting('app.tenant_id')::uuid,
                      CAST(:t_id AS uuid), CAST(:dataset_id AS uuid), :query,
                      :api_name, :endpoint, :method, :scenario_type,
                      :test_category, :intent_type, :notes,
-                     :embedding_model, :dimension, CAST(:embedding AS vector))
+                     :embedding_provider, :embedding_model, :dimension, CAST(:embedding AS vector))
                 """
             ),
             payload,
         )
         logger.info(
             f"pgvector: inserted {len(payload)} rows "
-            f"(model={embedding_model}, dim={dimension})"
+            f"(provider={embedding_provider}, model={embedding_model}, dim={dimension})"
         )
         return len(payload)
+
+    async def ensure_index(self, db: AsyncSession, dimension: int) -> bool:
+        """
+        Make sure a partial HNSW index exists for this dimension.
+
+        Called before a model of a new width is first indexed. Creating an index
+        needs the table owner; when the app runs as a restricted role the index
+        must come from a migration instead, and search stays correct (exact) in
+        the meantime -- so a failure is logged, never raised.
+        """
+        if dimension > HNSW_HALFVEC_MAX_DIM:
+            logger.info(f"pgvector: {dimension}-dim vectors exceed HNSW limits; searched exactly")
+            return False
+        expr, cast = vector_expression(dimension)
+        try:
+            await db.execute(text(
+                f"CREATE INDEX IF NOT EXISTS idx_vector_rows_hnsw_{int(dimension)} ON {self.TABLE} "
+                f"USING hnsw (({expr}) {cast}_cosine_ops) WHERE dimension = {int(dimension)}"
+            ))
+            await db.commit()
+            return True
+        except Exception as exc:  # noqa: BLE001 - see docstring
+            await db.rollback()
+            logger.warning(f"pgvector: could not create an index for {dimension}-dim vectors: {exc}")
+            return False
 
     # ------------------------------------------------------------------
     # Read path
@@ -170,6 +212,7 @@ class PgVectorStore:
         query_vector: Sequence[float],
         embedding_model: str,
         dimension: int,
+        embedding_provider: str,
         top_k: int = 25,
         dataset_id: Optional[uuid.UUID] = None,
         template_id: Optional[uuid.UUID] = None,
@@ -183,9 +226,9 @@ class PgVectorStore:
           * The `dimension = :dim` predicate is not merely a filter -- it is what
             makes the partial HNSW index for that dimension eligible. Drop it and
             the planner falls back to a sequential scan.
-          * No `u_id` predicate appears anywhere. RLS supplies it. If this query
-            returns another tenant's row, RLS is misconfigured -- which is
-            exactly the failure `verify_rls_enforced()` checks for at startup.
+          * Tenant scoping comes from the transaction's bound tenant (set by
+            `tenant_session()`), applied here explicitly AND by RLS when the
+            connecting role does not bypass it -- two independent layers.
         """
         arr = np.asarray(query_vector, dtype=np.float32).ravel()
         if arr.shape[0] != dimension:
@@ -193,9 +236,20 @@ class PgVectorStore:
                 f"query vector dimension {arr.shape[0]} != expected {dimension}"
             )
 
-        filters = ["dimension = :dim", "embedding_model = :model"]
+        # The tenant predicate is explicit, not left to RLS alone: RLS is skipped
+        # entirely for superuser / BYPASSRLS roles (the default docker-compose
+        # role is one), and a retrieval path that leaks across tenants under a
+        # common deployment is not isolated. `current_setting(..., true)` yields
+        # NULL when no tenant is bound, which matches nothing -- fail closed.
+        filters = [
+            "u_id = current_setting('app.tenant_id', true)::uuid",
+            "dimension = :dim",
+            "embedding_provider = :provider",
+            "embedding_model = :model",
+        ]
         params: Dict[str, Any] = {
             "dim": dimension,
+            "provider": embedding_provider,
             "model": embedding_model,
             "qvec": to_pgvector(arr),
             "k": top_k,
@@ -207,14 +261,15 @@ class PgVectorStore:
             filters.append("t_id = CAST(:template_id AS uuid)")
             params["template_id"] = str(template_id)
 
+        expr, cast = vector_expression(dimension)
         sql = f"""
             SELECT row_uid, t_id, dataset_id, query, api_name, endpoint, method,
                    scenario_type, test_category, intent_type, notes,
                    embedding_model,
-                   (embedding::vector({dimension}) <=> CAST(:qvec AS vector)) AS distance
+                   ({expr} <=> CAST(:qvec AS {cast})) AS distance
             FROM {self.TABLE}
             WHERE {' AND '.join(filters)}
-            ORDER BY embedding::vector({dimension}) <=> CAST(:qvec AS vector)
+            ORDER BY {expr} <=> CAST(:qvec AS {cast})
             LIMIT :k
         """
 
@@ -267,14 +322,20 @@ class PgVectorStore:
 
     async def delete_by_dataset(self, db: AsyncSession, dataset_id: uuid.UUID) -> int:
         res = await db.execute(
-            text(f"DELETE FROM {self.TABLE} WHERE dataset_id = CAST(:d AS uuid)"),
+            text(
+                f"DELETE FROM {self.TABLE} WHERE dataset_id = CAST(:d AS uuid) "
+                f"AND u_id = current_setting('app.tenant_id', true)::uuid"
+            ),
             {"d": str(dataset_id)},
         )
         return int(res.rowcount or 0)
 
     async def delete_by_template(self, db: AsyncSession, template_id: uuid.UUID) -> int:
         res = await db.execute(
-            text(f"DELETE FROM {self.TABLE} WHERE t_id = CAST(:t AS uuid)"),
+            text(
+                f"DELETE FROM {self.TABLE} WHERE t_id = CAST(:t AS uuid) "
+                f"AND u_id = current_setting('app.tenant_id', true)::uuid"
+            ),
             {"t": str(template_id)},
         )
         return int(res.rowcount or 0)
@@ -284,15 +345,17 @@ class PgVectorStore:
         result = await db.execute(
             text(
                 f"""
-                SELECT embedding_model, dimension, COUNT(*) AS n
+                SELECT embedding_provider, embedding_model, dimension, COUNT(*) AS n
                 FROM {self.TABLE}
-                GROUP BY embedding_model, dimension
+                WHERE u_id = current_setting('app.tenant_id', true)::uuid
+                GROUP BY embedding_provider, embedding_model, dimension
                 ORDER BY n DESC
                 """
             )
         )
         by_model = [
-            {"model": r["embedding_model"], "dimension": r["dimension"], "rows": int(r["n"])}
+            {"provider": r["embedding_provider"], "model": r["embedding_model"],
+             "dimension": r["dimension"], "rows": int(r["n"])}
             for r in result.mappings()
         ]
         return {"backend": "pgvector", "total_rows": sum(m["rows"] for m in by_model),

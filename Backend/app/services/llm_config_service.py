@@ -558,21 +558,6 @@ class LLMConfigService:
             max_retries=config_params.get("max_retries", 3),
         )
     
-    async def get_default_provider(self, user_id: UUID):
-        """
-        Get user's default LLM provider instance.
-        
-        Falls back to environment-based provider if no config.
-        """
-        config = await self.get_default_config(user_id)
-        
-        if config:
-            return await self.get_provider_for_config(config.config_id)
-        
-        # Fallback to environment-based provider
-        from app.llm.provider_factory import get_default_provider
-        return await get_default_provider()
-    
     # =========================================================================
     # RESPONSE FORMATTING
     # =========================================================================

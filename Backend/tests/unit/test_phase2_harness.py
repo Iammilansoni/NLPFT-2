@@ -296,8 +296,10 @@ async def test_extraction_repairs_invalid_output_on_retry():
 @pytest.mark.asyncio
 async def test_empty_extraction_is_distinguishable_from_failure():
     """THE v1 BUG: a crashed call and an empty result were byte-identical ({})."""
+    # The model path on its own: in the hybrid default, the grounding check would
+    # (rightly) reject these values, since the request "q" doesn't contain them.
     empty = _svc_with_responses([json.dumps({"email": "a@b.com", "password": "pw"})])
-    good = await empty.extract("q", SCHEMA)
+    good = await empty.extract("q", SCHEMA, strategy="llm")
 
     broken = StructuredExtractionService(model="fake")
 
@@ -305,7 +307,7 @@ async def test_empty_extraction_is_distinguishable_from_failure():
         raise RuntimeError("ollama exploded")
 
     broken._generate = _die  # type: ignore[method-assign]
-    bad = await broken.extract("q", SCHEMA)
+    bad = await broken.extract("q", SCHEMA, strategy="llm")
 
     assert good.ok is True and good.degraded is False
     assert bad.ok is False and bad.degraded is True
@@ -409,3 +411,31 @@ def test_dedup_disabled_passes_everything_through():
     rows = [{"template_id": "T1", "scenario_type": "valid", "query": "x"}] * 3
     embs = [_vec(1.0, 0.0)] * 3
     assert len(d.filter_batch(rows, embs)) == 3
+
+
+@pytest.mark.asyncio
+async def test_missing_required_field_keeps_extracted_values():
+    """
+    "log me in as a@b.com" has no password. Validation must fail rather than
+    invent one -- but the email that WAS extracted is returned, and the missing
+    field is named, instead of discarding correct work.
+    """
+    only_email = json.dumps({"email": "a@b.com"})
+    svc = _svc_with_responses([only_email, only_email])
+    res = await svc.extract("log me in as a@b.com", SCHEMA)
+    assert res.ok is False and res.degraded is False
+    assert res.values == {"email": "a@b.com"}
+    assert res.missing_required == ["password"]
+
+
+@pytest.mark.asyncio
+async def test_blank_or_placeholder_values_count_as_missing():
+    """A model filling a required field it has no value for with " " or "N/A"
+    must not pass validation: the field is reported missing instead."""
+    padded = json.dumps({"email": "a@b.com", "password": " "})
+    placeholder = json.dumps({"email": "a@b.com", "password": "N/A"})
+    svc = _svc_with_responses([padded, placeholder])
+    res = await svc.extract("log me in as a@b.com", SCHEMA)
+    assert res.ok is False
+    assert res.values == {"email": "a@b.com"}
+    assert res.missing_required == ["password"]

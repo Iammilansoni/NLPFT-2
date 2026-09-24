@@ -5,7 +5,7 @@ Tests password hashing, JWT generation, and user authentication logic.
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from jose import jwt
 
 from app.services.auth_service import (
@@ -118,10 +118,12 @@ class TestJWTTokens:
         
         payload = jwt.decode(token, settings.secret_key, algorithms=["HS256"])
         exp_timestamp = payload["exp"]
-        exp_datetime = datetime.fromtimestamp(exp_timestamp)
+        # Compare in UTC on both sides: naive fromtimestamp() is LOCAL time, which
+        # only matched utcnow() on machines (like CI) running in UTC.
+        exp_datetime = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
         
         # Token should expire ~configured_minutes from now
-        expected_expiry = datetime.utcnow() + timedelta(minutes=configured_minutes)
+        expected_expiry = datetime.now(timezone.utc) + timedelta(minutes=configured_minutes)
         time_diff = abs((exp_datetime - expected_expiry).total_seconds())
         
         assert time_diff < 10  # Within 10 seconds tolerance

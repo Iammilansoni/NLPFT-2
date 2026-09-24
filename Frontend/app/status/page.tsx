@@ -58,8 +58,8 @@ export default function StatusPage() {
           }
         },
         timestamp: data.timestamp,
-        uptime_seconds: data.uptime_seconds || 0,
-        total_requests: data.total_requests || 0
+        uptime_seconds: data.metrics?.uptime_seconds || 0,
+        total_requests: data.metrics?.total_requests || 0
       };
       setHealth(transformedData);
       setLastChecked(new Date());
@@ -117,7 +117,7 @@ export default function StatusPage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-3">
-                <span className={`inline-block w-3 h-3 rounded-full ${allOperational ? 'bg-green-500' : criticalDown ? 'bg-red-500' : 'bg-yellow-500'
+                <span className={`inline-block w-3 h-3 rounded-full ${allOperational ? 'bg-success' : criticalDown ? 'bg-destructive' : 'bg-warning'
                   }`}></span>
                 System Status
               </h1>
@@ -132,14 +132,14 @@ export default function StatusPage() {
         <div className="bg-card border border-border rounded-xl shadow-sm p-8 mb-8">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
-              <div className={`p-4 rounded-xl ${allOperational ? 'bg-green-500/20' : criticalDown ? 'bg-red-500/20' : 'bg-yellow-500/20'
+              <div className={`p-4 rounded-xl ${allOperational ? 'bg-success/20' : criticalDown ? 'bg-destructive/20' : 'bg-warning/20'
                 }`}>
                 {allOperational ? (
-                  <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
+                  <CheckCircle className="w-8 h-8 text-success dark:text-success" />
                 ) : criticalDown ? (
-                  <XCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
+                  <XCircle className="w-8 h-8 text-destructive dark:text-destructive" />
                 ) : (
-                  <AlertCircle className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
+                  <AlertCircle className="w-8 h-8 text-warning dark:text-warning" />
                 )}
               </div>
               <div>
@@ -159,16 +159,16 @@ export default function StatusPage() {
               <button
                 onClick={() => setAutoRefresh(!autoRefresh)}
                 className={`px-4 py-2 rounded-lg border transition-all ${autoRefresh
-                  ? 'bg-blue-500 text-white border-blue-600'
+                  ? 'bg-card text-foreground border-border hover:bg-muted'
                   : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600'
                   }`}
               >
-                {autoRefresh ? '⏸ Pause' : '▶ Resume'}
+                {autoRefresh ? 'Pause auto-refresh' : 'Resume auto-refresh'}
               </button>
               <button
                 onClick={checkHealth}
                 disabled={isLoading}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-all shadow-lg hover:shadow-xl"
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-all shadow-sm"
               >
                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                 Refresh
@@ -179,20 +179,20 @@ export default function StatusPage() {
           {health && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="text-center p-6 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-                <div className={`text-3xl font-bold mb-2 ${allOperational ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                <div className={`text-3xl font-bold mb-2 ${allOperational ? 'text-success dark:text-success' : 'text-destructive dark:text-destructive'
                   }`}>
                   {allOperational ? '✓' : '✗'} {allOperational ? 'Operational' : 'Degraded'}
                 </div>
                 <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">System Status</div>
               </div>
               <div className="text-center p-6 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-                <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-2">
+                <div className="text-3xl font-bold text-info dark:text-info mb-2">
                   {formatUptime(health.uptime_seconds)}
                 </div>
                 <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">Server Uptime</div>
               </div>
               <div className="text-center p-6 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-                <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-2">
+                <div className="text-3xl font-bold text-info dark:text-info mb-2">
                   {health.total_requests.toLocaleString()}
                 </div>
                 <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">Total Requests</div>
@@ -203,7 +203,7 @@ export default function StatusPage() {
           {lastChecked && (
             <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
               <span>Last checked: {lastChecked.toLocaleTimeString()}</span>
-              {autoRefresh && <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Auto-refresh: 10s</span>}
+              {autoRefresh && <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 bg-success rounded-full animate-pulse"></span> Auto-refresh: 10s</span>}
             </div>
           )}
         </div>
@@ -214,12 +214,12 @@ export default function StatusPage() {
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6">
             <div className="flex items-start gap-4">
               <div className={`p-3 rounded-lg ${health?.services.postgresql.connected
-                ? 'bg-green-100 dark:bg-green-900'
-                : 'bg-red-100 dark:bg-red-900'
+                ? 'bg-success/10 dark:bg-success'
+                : 'bg-destructive/10 dark:bg-destructive'
                 }`}>
                 <Database className={`w-6 h-6 ${health?.services.postgresql.connected
-                  ? 'text-green-600 dark:text-green-400'
-                  : 'text-red-600 dark:text-red-400'
+                  ? 'text-success dark:text-success'
+                  : 'text-destructive dark:text-destructive'
                   }`} />
               </div>
               <div className="flex-1">
@@ -228,19 +228,19 @@ export default function StatusPage() {
                     PostgreSQL Database
                   </h3>
                   {health?.services.postgresql.connected ? (
-                    <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    <CheckCircle className="w-5 h-5 text-success dark:text-success" />
                   ) : (
-                    <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                    <XCircle className="w-5 h-5 text-destructive dark:text-destructive" />
                   )}
                 </div>
                 <p className="text-slate-600 dark:text-slate-400 mb-2">
                   {health?.services.postgresql.message}
                 </p>
                 {health?.services.postgresql.error && (
-                  <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800">
+                  <div className="mt-2 p-3 bg-destructive/10 dark:bg-destructive/20 rounded border border-destructive/25 dark:border-destructive">
                     <div className="flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                      <div className="text-sm text-red-700 dark:text-red-300">
+                      <AlertCircle className="w-4 h-4 text-destructive dark:text-destructive flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-destructive dark:text-destructive">
                         <div className="font-medium mb-1">Error Details:</div>
                         <div className="font-mono text-xs">{health.services.postgresql.error}</div>
                       </div>
@@ -260,12 +260,12 @@ export default function StatusPage() {
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6">
             <div className="flex items-start gap-4">
               <div className={`p-3 rounded-lg ${health?.services.redis.connected
-                ? 'bg-green-100 dark:bg-green-900'
-                : 'bg-yellow-100 dark:bg-yellow-900'
+                ? 'bg-success/10 dark:bg-success'
+                : 'bg-warning/10 dark:bg-warning'
                 }`}>
                 <Server className={`w-6 h-6 ${health?.services.redis.connected
-                  ? 'text-green-600 dark:text-green-400'
-                  : 'text-yellow-600 dark:text-yellow-400'
+                  ? 'text-success dark:text-success'
+                  : 'text-warning dark:text-warning'
                   }`} />
               </div>
               <div className="flex-1">
@@ -274,19 +274,19 @@ export default function StatusPage() {
                     Redis Cache
                   </h3>
                   {health?.services.redis.connected ? (
-                    <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    <CheckCircle className="w-5 h-5 text-success dark:text-success" />
                   ) : (
-                    <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                    <AlertCircle className="w-5 h-5 text-warning dark:text-warning" />
                   )}
                 </div>
                 <p className="text-slate-600 dark:text-slate-400 mb-2">
                   {health?.services.redis.message}
                 </p>
                 {health?.services.redis.error && (
-                  <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-800">
+                  <div className="mt-2 p-3 bg-warning/10 dark:bg-warning/20 rounded border border-warning/25 dark:border-warning">
                     <div className="flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
-                      <div className="text-sm text-yellow-700 dark:text-yellow-300">
+                      <AlertCircle className="w-4 h-4 text-warning dark:text-warning flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-warning dark:text-warning">
                         <div className="font-medium mb-1">Error Details:</div>
                         <div className="font-mono text-xs">{health.services.redis.error}</div>
                       </div>

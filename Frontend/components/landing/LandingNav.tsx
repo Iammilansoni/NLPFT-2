@@ -2,7 +2,8 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, X, Zap } from 'lucide-react';
+import { Menu, Network, X } from 'lucide-react';
+import { DEMO_MODE } from '@/lib/constants';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -18,7 +19,7 @@ import { cn } from '@/lib/utils';
  */
 
 const NAV_LINKS = [
-  { href: '/product', label: 'Product' },
+  { href: '/#how', label: 'How it works' },
   { href: '/docs', label: 'Docs' },
   { href: '/help', label: 'Help' },
   { href: '/about', label: 'About' },
@@ -79,7 +80,7 @@ export function LandingNav() {
   return (
     <>
       <header
-        className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/95 backdrop-blur-sm supports-[backdrop-filter]:bg-background/80"
+        className="fixed top-0 left-0 right-0 z-50 border-b border-border/60 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60"
         role="banner"
       >
         <nav
@@ -94,10 +95,10 @@ export function LandingNav() {
               className="flex items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               aria-label="NLPForge home"
             >
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground font-semibold text-sm">
-                <Zap className="h-5 w-5" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-gradient text-white shadow-glow">
+                <Network className="h-[18px] w-[18px]" />
               </div>
-              <span className="font-bold text-xl tracking-tight text-foreground">
+              <span className="font-display font-bold text-lg tracking-tight text-foreground">
                 NLPForge
               </span>
             </Link>
@@ -133,10 +134,12 @@ export function LandingNav() {
                     href="/auth/login"
                     className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors rounded-md px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
-                    Sign In
+                    Sign in
                   </Link>
-                  <Button asChild size="sm" className="h-9 px-4">
-                    <Link href="/auth/register">Get Started</Link>
+                  <Button asChild size="sm" className="h-9 px-4 rounded-full shadow-glow">
+                    <Link href={DEMO_MODE ? '/auth/login?demo=1' : '/auth/register'}>
+                      {DEMO_MODE ? 'Try the demo' : 'Get started'}
+                    </Link>
                   </Button>
                 </>
               )}
@@ -222,7 +225,7 @@ export function LandingNav() {
                   onClick={closeMobileMenu}
                   className="block px-3 py-3 text-base font-medium text-muted-foreground hover:text-foreground rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
-                  Sign In
+                  Sign in
                 </Link>
                 <Button asChild className="w-full h-11">
                   <Link href="/auth/register" onClick={closeMobileMenu}>

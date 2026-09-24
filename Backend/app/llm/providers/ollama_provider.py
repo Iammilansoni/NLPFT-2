@@ -28,7 +28,6 @@ from app.llm.providers.base import (
     LLMResponse,
     ModelNotFoundError,
     ProviderError,
-    ProviderModel,
     ProviderType,
     TransientError,
 )
@@ -58,57 +57,6 @@ class OllamaLLMProvider(BaseLLMProvider):
             system_prompt="You are a helpful AI teacher.",
         )
     """
-    
-    POPULAR_MODELS = [
-        ProviderModel(
-            id="llama3.1:8b-instruct-q4_K_M",
-            name="Llama 3.1 8B Instruct",
-            description="Fast, instruction-tuned Llama 3.1",
-            context_length=128000,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        ProviderModel(
-            id="llama3.2:3b-instruct-q4_K_M",
-            name="Llama 3.2 3B Instruct",
-            description="Lightweight Llama for fast inference",
-            context_length=128000,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        ProviderModel(
-            id="mistral:7b-instruct-q4_K_M",
-            name="Mistral 7B Instruct",
-            description="Efficient and capable Mistral",
-            context_length=32768,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        ProviderModel(
-            id="qwen2.5:7b-instruct-q4_K_M",
-            name="Qwen 2.5 7B Instruct",
-            description="Alibaba's latest Qwen model",
-            context_length=32768,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        ProviderModel(
-            id="gemma2:9b-instruct-q4_K_M",
-            name="Gemma 2 9B Instruct",
-            description="Google's open Gemma model",
-            context_length=8192,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-        ProviderModel(
-            id="deepseek-r1:8b",
-            name="DeepSeek R1 8B",
-            description="DeepSeek reasoning model",
-            context_length=64000,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-    ]
     
     def __init__(
         self,
@@ -457,34 +405,6 @@ class OllamaLLMProvider(BaseLLMProvider):
                 message=f"Generation test failed: {e}",
                 error_code="GENERATION_ERROR",
             )
-    
-    async def list_models(self) -> List[ProviderModel]:
-        """
-        List locally available models.
-        """
-        try:
-            local_models = await self._list_local_models()
-            
-            models = []
-            for m in local_models:
-                models.append(ProviderModel(
-                    id=m["name"],
-                    name=m["name"],
-                    description=f"Size: {m.get('size', 'unknown')}",
-                    context_length=m.get("details", {}).get("context_length", 4096),
-                ))
-            
-            # Add popular models that aren't local
-            local_names = {m.id for m in models}
-            for popular in self.POPULAR_MODELS:
-                if popular.id not in local_names:
-                    models.append(popular)
-            
-            return models
-            
-        except Exception as e:
-            logger.warning(f"Failed to list Ollama models: {e}")
-            return self.POPULAR_MODELS
     
     async def close(self):
         """Close the HTTP client"""

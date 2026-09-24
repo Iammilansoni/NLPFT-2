@@ -1,416 +1,88 @@
 'use client';
 
-import { LandingNav } from '@/components/landing/LandingNav';
-import { UserFlowDiagram } from '@/components/diagrams/UserFlowDiagram';
-import { ArchitectureDiagram } from '@/components/diagrams/ArchitectureDiagram';
-import { CompleteUserJourney } from '@/components/diagrams/CompleteUserJourney';
-import {
-    Zap,
-    Search,
-    Database,
-    Shield,
-    Cpu,
-    GitBranch,
-    ArrowRight,
-    Github,
-    ExternalLink
-} from 'lucide-react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
+import { Github } from 'lucide-react';
+import { LandingNav } from '@/components/landing/LandingNav';
+import { LandingFooter } from '@/components/landing/LandingFooter';
+import { REPO_URL } from '@/lib/constants';
 
-/**
- * About Us Page - NLPForge
- * 
- * Blog-style page with comprehensive project information
- * following the "Enterprise Calm" design direction
- */
+const ARCHITECTURE = `Next.js 16 (App Router)
+   │  same-origin /api/*  →  proxied to FastAPI
+   ▼
+FastAPI  ── JWT (HttpOnly cookies), rate limits, structured errors
+   │
+   ├─ Stage 1  embed query ──► Ollama nomic-embed-text   (local mode)
+   │                          fastembed ONNX bge-small   (cloud mode)
+   │          KNN ──► PostgreSQL + pgvector HNSW, tenant-scoped
+   ├─ Stage 2  max-pool utterance scores → template  (cross-encoder optional)
+   └─ Stage 3  JSON-Schema-constrained LLM decode → Pydantic → repair retry
+                                             (Ollama llama3.2:3b, circuit breaker)
 
-interface FeatureCardProps {
-    icon: React.ReactNode;
-    title: string;
-    description: string;
-}
+Celery + Redis ── LLM-generated utterance datasets, background jobs
+Redis ── rate limits, JWT denylist, circuit-breaker state, Celery broker`;
 
-function FeatureCard({ icon, title, description }: FeatureCardProps) {
-    return (
-        <div className="group p-6 rounded-xl border border-border bg-card hover:shadow-lg hover:border-primary/30 transition-all duration-300">
-            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary mb-4 group-hover:bg-primary/20 transition-colors">
-                {icon}
-            </div>
-            <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3>
-            <p className="text-muted-foreground text-sm leading-relaxed">{description}</p>
-        </div>
-    );
-}
-
-interface TechBadgeProps {
-    name: string;
-    category: 'frontend' | 'backend' | 'database' | 'ai';
-}
-
-function TechBadge({ name, category }: TechBadgeProps) {
-    const colors = {
-        frontend: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-        backend: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-        database: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-        ai: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-    };
-
-    return (
-        <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${colors[category]}`}>
-            {name}
-        </span>
-    );
-}
+const STACK: [string, string[]][] = [
+  ['Frontend', ['Next.js 16', 'React 18', 'TypeScript', 'Tailwind CSS', 'TanStack Query']],
+  ['Backend', ['FastAPI', 'Python 3.11', 'SQLAlchemy 2 (async)', 'Pydantic v2', 'Celery']],
+  ['Data', ['PostgreSQL 16', 'pgvector (HNSW)', 'Row-level security', 'Redis', 'Alembic']],
+  ['AI / ML', ['Ollama', 'nomic-embed-text', 'bge-small (ONNX)', 'llama3.2:3b', 'FlashRank']],
+];
 
 export default function AboutPage() {
-    return (
-        <div className="min-h-screen bg-background">
-            {/* Navigation */}
-            <LandingNav />
+  return (
+    <div className="min-h-screen bg-background">
+      <LandingNav />
+      <main className="max-w-4xl mx-auto px-6 py-16 space-y-14">
+        <section className="space-y-4">
+          <h1 className="text-4xl font-bold tracking-tight">About NLPForge</h1>
+          <p className="text-lg text-muted-foreground leading-relaxed">
+            NLPForge is a routing layer for API catalogues. It resolves one natural-language request
+            to one endpoint and returns a request body that validates against that endpoint&apos;s
+            schema. It is deliberately not an agent: it has no planning loop or multi-step execution,
+            which is what lets routing be treated as a measurable retrieval problem.
+          </p>
+        </section>
 
-            {/* Hero Section */}
-            <section className="pt-32 pb-16 px-4 sm:px-6 lg:px-8">
-                <div className="max-w-4xl mx-auto text-center">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
-                        <Zap className="w-4 h-4" />
-                        AI-Powered API Testing Platform
-                    </div>
-                    <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground tracking-tight mb-6">
-                        About <span className="text-primary">NLPForge</span>
-                    </h1>
-                    <p className="text-xl text-muted-foreground leading-relaxed max-w-3xl mx-auto">
-                        Transform natural language queries into executable API test cases using
-                        LLM-powered semantic understanding. Built for developers, by developers.
-                    </p>
+        <section className="space-y-4">
+          <h2 className="text-2xl font-semibold">Architecture</h2>
+          <pre className="rounded-xl border border-border/60 bg-muted/30 p-5 text-xs md:text-sm font-mono leading-relaxed overflow-x-auto">
+            {ARCHITECTURE}
+          </pre>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-2xl font-semibold">Technology</h2>
+          <div className="grid sm:grid-cols-2 gap-4">
+            {STACK.map(([group, items]) => (
+              <div key={group} className="rounded-xl border border-border/60 bg-card p-5">
+                <h3 className="font-semibold mb-3">{group}</h3>
+                <div className="flex flex-wrap gap-2">
+                  {items.map((i) => (
+                    <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-muted text-muted-foreground">{i}</span>
+                  ))}
                 </div>
-            </section>
+              </div>
+            ))}
+          </div>
+        </section>
 
-            {/* Main Content - Blog Style */}
-            <main className="px-4 sm:px-6 lg:px-8 pb-24">
-                <div className="max-w-4xl mx-auto">
-
-                    {/* Mission Section */}
-                    <article className="prose dark:prose-invert max-w-none mb-16">
-                        <div className="p-8 rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 mb-12">
-                            <h2 className="text-2xl font-bold text-foreground mb-4 mt-0">Our Mission</h2>
-                            <p className="text-muted-foreground text-lg leading-relaxed mb-0">
-                                NLPForge bridges the gap between natural language and API testing. We believe that
-                                describing what you want to test should be as simple as writing a sentence. Our platform
-                                understands your intent, matches the most relevant API templates, extracts parameters,
-                                and generates complete executable test cases—all automatically.
-                            </p>
-                        </div>
-
-                        {/* How It Works */}
-                        <section className="mb-16">
-                            <h2 className="text-3xl font-bold text-foreground mb-8">How It Works</h2>
-                            <div className="grid gap-6">
-                                <div className="flex gap-4 p-5 rounded-xl border border-border bg-card">
-                                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold">1</div>
-                                    <div>
-                                        <h3 className="font-semibold text-foreground mb-1">Understand Your Intent</h3>
-                                        <p className="text-muted-foreground text-sm">Our semantic search engine uses advanced embeddings to deeply understand what you want to test, going beyond simple keyword matching.</p>
-                                    </div>
-                                </div>
-                                <div className="flex gap-4 p-5 rounded-xl border border-border bg-card">
-                                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold">2</div>
-                                    <div>
-                                        <h3 className="font-semibold text-foreground mb-1">Match to API Templates</h3>
-                                        <p className="text-muted-foreground text-sm">Two-stage retrieval with vector similarity search and FlashRank re-ranking ensures the most relevant API template is selected.</p>
-                                    </div>
-                                </div>
-                                <div className="flex gap-4 p-5 rounded-xl border border-border bg-card">
-                                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold">3</div>
-                                    <div>
-                                        <h3 className="font-semibold text-foreground mb-1">Extract Values Automatically</h3>
-                                        <p className="text-muted-foreground text-sm">LLM-powered slot extraction pulls values like emails, passwords, and IDs from your natural language query to populate request parameters.</p>
-                                    </div>
-                                </div>
-                                <div className="flex gap-4 p-5 rounded-xl border border-border bg-card">
-                                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold">4</div>
-                                    <div>
-                                        <h3 className="font-semibold text-foreground mb-1">Generate Executable Test Cases</h3>
-                                        <p className="text-muted-foreground text-sm">Get complete, ready-to-run API test cases with populated request bodies, headers, and endpoints—no manual work required.</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
-
-                        {/* Example Box */}
-                        <section className="mb-16">
-                            <h2 className="text-3xl font-bold text-foreground mb-6">See It In Action</h2>
-                            <div className="rounded-xl border border-border overflow-hidden">
-                                <div className="bg-muted/30 px-5 py-3 border-b border-border">
-                                    <span className="text-sm font-medium text-foreground">Example Query</span>
-                                </div>
-                                <div className="p-5 bg-card">
-                                    <p className="text-muted-foreground mb-4 italic">
-                                        &quot;Authenticate with email krishna@nlpforge.com and password secure123&quot;
-                                    </p>
-                                    <div className="flex items-center gap-2 text-primary mb-4">
-                                        <ArrowRight className="w-4 h-4" />
-                                        <span className="text-sm font-medium">NLPForge Processing</span>
-                                    </div>
-                                    <pre className="bg-muted/50 rounded-lg p-4 text-sm overflow-x-auto">
-                                        {`{
-  "api_name": "User_Login",
-  "base_url": "https://api.example.com",
-  "endpoint": "/auth/login",
-  "method": "POST",
-  "extracted_request_body": {
-    "email": "krishna@nlpforge.com",
-    "password": "secure123"
-  }
-}`}
-                                    </pre>
-                                </div>
-                            </div>
-                        </section>
-                    </article>
-
-                    {/* Features Grid */}
-                    <section className="mb-16">
-                        <h2 className="text-3xl font-bold text-foreground mb-8 text-center">Core Features</h2>
-                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <FeatureCard
-                                icon={<Search className="w-6 h-6" />}
-                                title="Semantic Search"
-                                description="Two-stage retrieval with vector similarity and FlashRank re-ranking for precise API template matching."
-                            />
-                            <FeatureCard
-                                icon={<Cpu className="w-6 h-6" />}
-                                title="LLM Slot Extraction"
-                                description="Automatically extract values from natural language queries to populate API request schemas."
-                            />
-                            <FeatureCard
-                                icon={<Database className="w-6 h-6" />}
-                                title="Synthetic Datasets"
-                                description="Generate diverse test data using any LLM provider, then embed for semantic search via Ollama."
-                            />
-                            <FeatureCard
-                                icon={<GitBranch className="w-6 h-6" />}
-                                title="Template Builder"
-                                description="Create and manage API templates with JSON schemas, approval workflows, and version control."
-                            />
-                            <FeatureCard
-                                icon={<Shield className="w-6 h-6" />}
-                                title="Enterprise Security"
-                                description="JWT authentication, complete audit trails, and multi-tenant data isolation for compliance."
-                            />
-                            <FeatureCard
-                                icon={<Zap className="w-6 h-6" />}
-                                title="Flexible AI Providers"
-                                description="Supports 7 LLM providers: OpenAI, Gemini, Claude, Ollama (local), DeepSeek, Grok, and HuggingFace."
-                            />
-                        </div>
-                    </section>
-
-                    {/* Technology Stack */}
-                    <section className="mb-16">
-                        <h2 className="text-3xl font-bold text-foreground mb-8 text-center">Technology Stack</h2>
-                        <div className="p-8 rounded-2xl border border-border bg-card">
-                            <div className="grid sm:grid-cols-2 gap-8">
-                                <div>
-                                    <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                                        Frontend
-                                    </h3>
-                                    <div className="flex flex-wrap gap-2">
-                                        <TechBadge name="Next.js 14" category="frontend" />
-                                        <TechBadge name="TypeScript" category="frontend" />
-                                        <TechBadge name="Tailwind CSS" category="frontend" />
-                                        <TechBadge name="shadcn/ui" category="frontend" />
-                                        <TechBadge name="React Query" category="frontend" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                                        Backend
-                                    </h3>
-                                    <div className="flex flex-wrap gap-2">
-                                        <TechBadge name="FastAPI" category="backend" />
-                                        <TechBadge name="Python 3.11+" category="backend" />
-                                        <TechBadge name="SQLAlchemy" category="backend" />
-                                        <TechBadge name="Pydantic" category="backend" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-purple-500"></span>
-                                        Database
-                                    </h3>
-                                    <div className="flex flex-wrap gap-2">
-                                        <TechBadge name="PostgreSQL 15" category="database" />
-                                        <TechBadge name="Redis Stack" category="database" />
-                                        <TechBadge name="RediSearch" category="database" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                                        AI / ML
-                                    </h3>
-                                    <div className="flex flex-wrap gap-2">
-                                        <TechBadge name="OpenAI" category="ai" />
-                                        <TechBadge name="Gemini" category="ai" />
-                                        <TechBadge name="Anthropic" category="ai" />
-                                        <TechBadge name="Ollama" category="ai" />
-                                        <TechBadge name="FlashRank" category="ai" />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* Embedding Models */}
-                    <section className="mb-16">
-                        <h2 className="text-3xl font-bold text-foreground mb-4 text-center">Embedding Models</h2>
-                        <p className="text-center text-muted-foreground mb-8 max-w-2xl mx-auto">
-                            NLPForge supports 13+ embedding models via Ollama for semantic search, with additional size variants available. Choose based on your speed, accuracy, and resource requirements.
-                        </p>
-                        <div className="overflow-hidden rounded-xl border border-border">
-                            <table className="w-full">
-                                <thead className="bg-muted/50">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Model</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Parameters</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Context</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Speed</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Best For</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border bg-card text-sm">
-                                    <tr>
-                                        <td className="px-4 py-3">
-                                            <span className="font-mono text-primary">nomic-embed-text</span>
-                                            <span className="ml-2 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">Recommended</span>
-                                        </td>
-                                        <td className="px-4 py-3 text-muted-foreground">137M</td>
-                                        <td className="px-4 py-3 text-muted-foreground">8192</td>
-                                        <td className="px-4 py-3"><span className="text-emerald-600">Fast</span></td>
-                                        <td className="px-4 py-3 text-foreground">Long documents, RAG, Production</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="px-4 py-3"><span className="font-mono text-primary">all-minilm</span></td>
-                                        <td className="px-4 py-3 text-muted-foreground">22-33M</td>
-                                        <td className="px-4 py-3 text-muted-foreground">256</td>
-                                        <td className="px-4 py-3"><span className="text-emerald-600">Fastest</span></td>
-                                        <td className="px-4 py-3 text-foreground">Prototyping, Edge devices</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="px-4 py-3"><span className="font-mono text-primary">mxbai-embed-large</span></td>
-                                        <td className="px-4 py-3 text-muted-foreground">335M</td>
-                                        <td className="px-4 py-3 text-muted-foreground">512</td>
-                                        <td className="px-4 py-3"><span className="text-amber-600">Moderate</span></td>
-                                        <td className="px-4 py-3 text-foreground">State-of-the-art accuracy</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="px-4 py-3"><span className="font-mono text-primary">bge-m3</span></td>
-                                        <td className="px-4 py-3 text-muted-foreground">567M</td>
-                                        <td className="px-4 py-3 text-muted-foreground">8192</td>
-                                        <td className="px-4 py-3"><span className="text-amber-600">Moderate</span></td>
-                                        <td className="px-4 py-3 text-foreground">Multilingual (100+ languages)</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="px-4 py-3"><span className="font-mono text-primary">snowflake-arctic-embed</span></td>
-                                        <td className="px-4 py-3 text-muted-foreground">22-335M</td>
-                                        <td className="px-4 py-3 text-muted-foreground">512</td>
-                                        <td className="px-4 py-3"><span className="text-emerald-600">Fast</span></td>
-                                        <td className="px-4 py-3 text-foreground">Enterprise retrieval</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="px-4 py-3"><span className="font-mono text-primary">qwen3-embedding</span></td>
-                                        <td className="px-4 py-3 text-muted-foreground">0.6-8B</td>
-                                        <td className="px-4 py-3 text-muted-foreground">8192</td>
-                                        <td className="px-4 py-3"><span className="text-red-600">Slow</span></td>
-                                        <td className="px-4 py-3 text-foreground">Maximum quality, Research</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="px-4 py-3"><span className="font-mono text-primary">granite-embedding</span></td>
-                                        <td className="px-4 py-3 text-muted-foreground">30-278M</td>
-                                        <td className="px-4 py-3 text-muted-foreground">512</td>
-                                        <td className="px-4 py-3"><span className="text-emerald-600">Fast</span></td>
-                                        <td className="px-4 py-3 text-foreground">IBM Enterprise, Multilingual</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <p className="text-center text-xs text-muted-foreground mt-4">
-                            Additional models available: bge-base, bge-large, nomic-embed-text-v2-moe, snowflake-arctic-embed2, embeddinggemma, paraphrase-multilingual
-                        </p>
-                    </section>
-
-
-
-                    {/* Complete User Journey Section */}
-                    <section className="mb-16">
-                        <h2 className="text-3xl font-bold text-foreground mb-4 text-center">Complete User Journey</h2>
-                        <p className="text-center text-muted-foreground mb-8 max-w-2xl mx-auto">
-                            Follow the complete end-to-end flow from signing up to running semantic searches on your datasets
-                        </p>
-                        <CompleteUserJourney />
-                    </section>
-
-                    {/* User Flow Diagram Section */}
-                    <section className="mb-16">
-                        <h2 className="text-3xl font-bold text-foreground mb-4 text-center">Processing Pipeline</h2>
-                        <p className="text-center text-muted-foreground mb-8 max-w-2xl mx-auto">
-                            Follow the journey from your natural language query to a complete, executable API test case
-                        </p>
-                        <UserFlowDiagram />
-                    </section>
-
-                    {/* Architecture Diagram Section */}
-                    <section className="mb-16">
-                        <h2 className="text-3xl font-bold text-foreground mb-4 text-center">System Architecture</h2>
-                        <p className="text-center text-muted-foreground mb-8 max-w-2xl mx-auto">
-                            A comprehensive view of NLPForge&apos;s layered architecture and component interactions
-                        </p>
-                        <ArchitectureDiagram />
-                    </section>
-
-                    {/* CTA Section */}
-                    <section className="text-center">
-                        <div className="p-10 rounded-2xl bg-primary/5 border border-primary/20">
-                            <h2 className="text-3xl font-bold text-foreground mb-4">Ready to Get Started?</h2>
-                            <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
-                                Transform your API testing workflow with AI-powered test case generation.
-                                Sign up free and start creating test cases in seconds.
-                            </p>
-                            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                                <Button asChild size="lg" className="h-12 px-8">
-                                    <Link href="/dashboard">
-                                        Launch Dashboard
-                                        <ArrowRight className="w-4 h-4 ml-2" />
-                                    </Link>
-                                </Button>
-                                <Button asChild variant="outline" size="lg" className="h-12 px-8">
-                                    <a
-                                        href="https://github.com/Iammilansoni/NLPForge-Tester"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >
-                                        <Github className="w-4 h-4 mr-2" />
-                                        View on GitHub
-                                        <ExternalLink className="w-3 h-3 ml-2" />
-                                    </a>
-                                </Button>
-                            </div>
-                        </div>
-                    </section>
-                </div>
-            </main>
-
-            {/* Footer */}
-            <footer className="border-t border-border py-8 px-4">
-                <div className="max-w-4xl mx-auto text-center text-sm text-muted-foreground">
-                    <p className="mt-2">
-                        © {new Date().getFullYear()} NLPForge. Open Source under MIT License.
-                    </p>
-                </div>
-            </footer>
-        </div>
-    );
+        <section className="space-y-3">
+          <h2 className="text-2xl font-semibold">Project history</h2>
+          <p className="text-muted-foreground leading-relaxed">
+            v1 was built by a team (Milan Soni, Avadhi Singhal, Abhilash Joshi) during an internship. It
+            was a FastAPI, Redis-vector and Celery prototype. v2 is an individual rewrite by Milan Soni. It
+            moved vectors to pgvector, replaced an unmeasured reranking heuristic with a benchmark-driven
+            pipeline, and added schema-constrained extraction and a cloud runtime.
+          </p>
+          <div className="flex gap-4 text-sm">
+            <a href={REPO_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-primary hover:underline">
+              <Github className="w-4 h-4" /> Source code
+            </a>
+            <Link href="/docs" className="text-primary hover:underline">Documentation</Link>
+          </div>
+        </section>
+      </main>
+      <LandingFooter />
+    </div>
+  );
 }

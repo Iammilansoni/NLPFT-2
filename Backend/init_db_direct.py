@@ -43,8 +43,8 @@ async def main():
         from app.core.postgres import Base
         from app.models.database_models import (
             User, UserSettings, LLMProviderConfig, Template, Parameter,
-            ExpectedResponse, Metadata, Dataset, CSVData, Model,
-            EmbeddingModel, Embedding, AuditLog
+            ExpectedResponse, Metadata, Dataset, CSVData, AuditLog,
+            ModelCatalogEntry, ModelCatalogSource
         )
 
         # Import auxiliary models so their tables are registered with Base.metadata

@@ -16,10 +16,10 @@ interface JsonDisplayProps {
 
 // Syntax highlighting colors - Professional subdued palette
 const TOKEN_COLORS = {
-  key: 'text-blue-600 dark:text-blue-400',
-  string: 'text-green-600 dark:text-green-500',
-  number: 'text-orange-600 dark:text-orange-400',
-  boolean: 'text-violet-600 dark:text-violet-400',
+  key: 'text-info dark:text-info',
+  string: 'text-success dark:text-success',
+  number: 'text-warning dark:text-warning',
+  boolean: 'text-primary dark:text-primary',
   null: 'text-slate-500 dark:text-slate-400',
   bracket: 'text-slate-600 dark:text-slate-400',
   punctuation: 'text-slate-500 dark:text-slate-500',
@@ -104,7 +104,7 @@ export function JsonDisplay({
               className={cn(
                 'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all',
                 copied
-                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                  ? 'bg-success/10 text-success dark:text-success'
                   : 'bg-muted hover:bg-accent text-muted-foreground hover:text-foreground'
               )}
             >
