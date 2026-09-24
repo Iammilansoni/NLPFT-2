@@ -45,6 +45,33 @@ Ollama (local mode)        nomic-embed-text (768-d) embeddings, llama3.2:3b extr
 | Generated / uploaded datasets | Postgres `datasets`, `csv_data` + CSV on a shared volume | Written by the Celery worker. |
 | Routable vectors | Postgres `vector_rows` | One row per utterance, storing `embedding_model` and `dimension`. There is one partial HNSW index per dimension (384/768/1536). |
 | Sessions | HttpOnly cookies (JWT) + Redis deny-list | Access tokens are short-lived; refresh tokens rotate. |
+| Model catalogue | Postgres `model_catalog`, `model_catalog_sources` | Every model each provider reports serving, with its lifecycle state and the health of each provider's last sync. |
+
+## Model catalogue
+
+No model list is written into the code. `app/llm/model_discovery.py` asks each
+provider what it serves right now (Ollama `/api/tags` + `/api/show`, Gemini
+`models.list`, the OpenAI-style `/models` of Groq, OpenRouter, OpenAI, DeepSeek and
+xAI, Anthropic `/v1/models`). Whether a model is for chat or embeddings comes from
+the provider's own metadata where it exists. An embedding model's dimension is read
+from provider metadata, or measured by embedding one string. It is never guessed from
+the name.
+
+A Celery Beat job (`MODEL_CATALOG_SYNC_MINUTES`, default 6 h) and every change to a
+user's connection re-sync the catalogue (`app/services/model_catalog_service.py`):
+
+| Event | Result |
+|---|---|
+| A provider lists a model for the first time | Added. After the provider's first sync, new arrivals get a "New" badge. |
+| A successful listing no longer includes a model | `deprecated`: still usable, and flagged on every connection that uses it |
+| Still missing after `MODEL_RETIRE_GRACE_HOURS` (72), or past a shutdown date the provider announced | `retired`: hidden from pickers |
+| Retired, unused, and older than `MODEL_RETIRED_RETENTION_DAYS` (7) | Deleted. A model still referenced by a connection or dataset is never deleted. |
+| A provider is unreachable, or one of its keys fails | No lifecycle change. An outage must not retire a provider's models. |
+
+Models found with deployment or public credentials are shared. Models found with a
+user's own key are visible only to that user, so private models (fine-tunes, custom
+endpoints) never leak between tenants. Only Ollama and custom endpoints accept a
+user-supplied URL, and link-local addresses such as cloud metadata services are refused.
 
 ## Tenancy
 

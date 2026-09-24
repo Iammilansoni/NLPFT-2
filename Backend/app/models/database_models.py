@@ -45,7 +45,18 @@ Tables (as per diagram):
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import TIMESTAMP, Column, ForeignKey, Index, Integer, Numeric, Text
+from sqlalchemy import (
+    TIMESTAMP,
+    Boolean,
+    Column,
+    Date,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
@@ -200,6 +211,69 @@ Index(
     unique=True,
     postgresql_where=(LLMProviderConfig.is_default == 1)
 )
+
+
+class ModelCatalogEntry(Base):
+    """
+    MODEL_CATALOG table - every LLM and embedding model a provider reports serving
+
+    Filled by `app.services.model_catalog_service` from live provider listings
+    (`app.llm.model_discovery`), never from a hand-written list.
+
+    scope: "global" for models found with deployment-wide or public credentials
+    (Ollama, OpenRouter's public listing, keys in the environment); a user id
+    for models found with that user's saved API key, so one user's private
+    models (fine-tunes, custom endpoints) are never listed to another.
+
+    Lifecycle: active -> deprecated (a successful listing stopped including it)
+    -> retired (still missing after the grace period, or past the provider's
+    shutdown date) -> deleted once nothing references it.
+    """
+    __tablename__ = "model_catalog"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    scope = Column(Text, nullable=False)
+    provider = Column(Text, nullable=False)
+    model_id = Column(Text, nullable=False)
+    kind = Column(Text, nullable=False)  # "llm" | "embedding"
+    display_name = Column(Text, nullable=False)
+    description = Column(Text, nullable=True)
+    context_tokens = Column(Integer, nullable=True)
+    dimension = Column(Integer, nullable=True)  # embedding width; NULL until measured
+    is_local = Column(Boolean, nullable=False, default=False)
+    is_free = Column(Boolean, nullable=True)  # NULL when the provider publishes no pricing
+    status = Column(Text, nullable=False, default="active")
+    status_reason = Column(Text, nullable=True)  # plain-English explanation of the status
+    shutdown_date = Column(Date, nullable=True)  # announced by the provider, when it does
+    first_seen_at = Column(TIMESTAMP, default=utc_now, nullable=False)
+    last_seen_at = Column(TIMESTAMP, default=utc_now, nullable=False)
+    missing_since = Column(TIMESTAMP, nullable=True)
+    retired_at = Column(TIMESTAMP, nullable=True)
+    extra = Column(JSONB, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("scope", "provider", "model_id", name="uq_model_catalog_scope_provider_model"),
+        Index("idx_model_catalog_kind_status", "kind", "status"),
+    )
+
+
+class ModelCatalogSource(Base):
+    """
+    MODEL_CATALOG_SOURCES table - sync health per (scope, provider)
+
+    Lets the settings page say "Groq: 21 models, synced 3 min ago" or
+    "Gemini: the API key was rejected" instead of silently showing a short list.
+    """
+    __tablename__ = "model_catalog_sources"
+
+    scope = Column(Text, primary_key=True)
+    provider = Column(Text, primary_key=True)
+    first_success_at = Column(TIMESTAMP, nullable=True)
+    last_attempt_at = Column(TIMESTAMP, nullable=True)
+    last_success_at = Column(TIMESTAMP, nullable=True)
+    last_error = Column(Text, nullable=True)
+    last_error_code = Column(Text, nullable=True)
+    model_count = Column(Integer, nullable=False, default=0)
 
 
 

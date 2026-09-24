@@ -423,4 +423,43 @@ def _store_csv_to_postgresql_sync(
     return dataset_id
 
 
+# ---------------------------------------------------------------------------
+# Model catalogue
+# ---------------------------------------------------------------------------
 
+@celery_app.task(name="nlpforge.sync_model_catalog", max_retries=0, soft_time_limit=600, time_limit=660)
+def sync_model_catalog_task(user_id: Optional[str] = None, provider: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Re-list provider models into the catalogue. With no arguments this is the
+    scheduled full sync (every deployment and user credential); with a user id
+    it refreshes that user's connections, e.g. right after they save one.
+    """
+    return asyncio.run(_sync_model_catalog_async(user_id, provider))
+
+
+async def _sync_model_catalog_async(user_id: Optional[str], provider: Optional[str]) -> Dict[str, Any]:
+    from app.core.postgres import AsyncSessionLocal, engine
+    from app.services.model_catalog_service import sync_catalog
+
+    try:
+        async with AsyncSessionLocal() as db:
+            results = await sync_catalog(
+                db,
+                user_id=uuid.UUID(user_id) if user_id else None,
+                provider=provider,
+                include_global=user_id is None,
+            )
+        summary = [r.to_dict() for r in results]
+        for r in summary:
+            if r["ok"]:
+                logger.info(
+                    f"Model catalogue: {r['provider_label']} ({r['scope']}) {r['model_count']} models, "
+                    f"+{r['added']} new, {r['deprecated']} deprecated, {r['retired']} retired, {r['deleted']} deleted"
+                )
+            else:
+                logger.warning(f"Model catalogue: {r['provider_label']} ({r['scope']}) not synced: {r['error']}")
+        return {"results": summary}
+    finally:
+        # asyncio.run() closes this loop; pooled asyncpg connections bound to
+        # it would be unusable by the next task's loop.
+        await engine.dispose()

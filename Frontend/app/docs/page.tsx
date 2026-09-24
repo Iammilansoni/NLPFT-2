@@ -1,5 +1,6 @@
 'use client'
 
+import { getAllProviders } from '@/lib/constants/llm-providers'
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import {
@@ -285,23 +286,23 @@ Content-Type: application/json
               <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">LLM Providers</h2>
-                  <p className="text-muted-foreground">Configure API keys in Settings → AI Providers. Each provider is used during dataset generation.</p>
+                  <p className="text-muted-foreground">
+                    Connect providers in Settings → AI Providers. Model lists are not written into the app:
+                    each provider is asked which models it serves, and Settings → Model catalogue shows the
+                    result, including models that are new or being phased out.
+                  </p>
                 </div>
                 <div className="grid gap-4">
-                  {[
-                    { name: 'Gemini (Google AI)', key: 'GEMINI_API_KEY', models: 'gemini-2.0-flash, gemini-1.5-pro', status: 'Recommended' },
-                    { name: 'OpenAI', key: 'OPENAI_API_KEY', models: 'gpt-4o, gpt-4-turbo, gpt-3.5-turbo', status: 'Supported' },
-                    { name: 'Anthropic Claude', key: 'ANTHROPIC_API_KEY', models: 'claude-3-5-sonnet, claude-3-haiku', status: 'Supported' },
-                    { name: 'Ollama (local)', key: 'None required', models: 'llama3, mistral, phi3', status: 'Local only' },
-                  ].map(p => (
-                    <div key={p.name} className="flex items-start gap-4 p-4 rounded-xl border border-border/60 bg-card">
+                  {getAllProviders().map(p => (
+                    <div key={p.id} className="flex items-start gap-4 p-4 rounded-xl border border-border/60 bg-card">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-semibold text-foreground text-sm">{p.name}</span>
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">{p.status}</span>
+                          {p.local && <span className="text-xs px-2 py-0.5 rounded-full bg-info/10 text-info font-medium">Runs locally</span>}
+                          {p.freeTier && !p.local && <span className="text-xs px-2 py-0.5 rounded-full bg-success/10 text-success font-medium">Free tier</span>}
                         </div>
-                        <p className="text-xs text-muted-foreground">Models: {p.models}</p>
-                        <code className="text-xs font-mono text-muted-foreground mt-1 block">Env: {p.key}</code>
+                        <p className="text-xs text-muted-foreground">{p.description}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{p.requiresApiKey ? 'Needs an API key.' : 'No API key needed.'}</p>
                       </div>
                     </div>
                   ))}

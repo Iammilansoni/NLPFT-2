@@ -478,3 +478,77 @@ export interface SemanticRetrieveResponse {
   confidence?: number;
   alternatives?: SemanticRetrieveStage2Result[];
 }
+
+// ============================================================================
+// Model catalogue
+// ============================================================================
+
+export type CatalogModelStatus = 'active' | 'deprecated' | 'retired';
+
+export interface CatalogModel {
+  provider: string;
+  provider_label?: string;
+  model_id: string;
+  kind: 'llm' | 'embedding';
+  display_name: string;
+  description?: string | null;
+  context_tokens?: number | null;
+  /** Embedding width; null until measured. */
+  dimension?: number | null;
+  is_local: boolean;
+  is_free?: boolean | null;
+  is_new?: boolean;
+  status: CatalogModelStatus;
+  /** Plain-English explanation of a non-active status. */
+  status_reason?: string | null;
+  /** Shutdown date announced by the provider (ISO date). */
+  shutdown_date?: string | null;
+  first_seen_at?: string;
+  last_seen_at?: string;
+  /** Listed for everyone (deployment/public credentials) vs found with your own key. */
+  shared?: boolean;
+}
+
+export interface CatalogSource {
+  provider: string;
+  provider_label: string;
+  scope: 'shared' | 'yours';
+  model_count: number;
+  last_success_at: string | null;
+  last_attempt_at: string | null;
+  last_error: string | null;
+  last_error_code: string | null;
+}
+
+export interface ModelCatalogResponse {
+  models: CatalogModel[];
+  sources: CatalogSource[];
+  counts: { llm: number; embedding: number };
+  policy: {
+    sync_interval_minutes: number;
+    retire_grace_hours: number;
+    retired_retention_days: number;
+    new_badge_days: number;
+  };
+}
+
+export interface ModelCatalogSyncResult {
+  provider: string;
+  provider_label: string;
+  scope: 'shared' | 'yours';
+  ok: boolean;
+  model_count: number;
+  added: number;
+  deprecated: number;
+  retired: number;
+  deleted: number;
+  error: string | null;
+}
+
+export interface ModelDiscoveryResponse {
+  ok: boolean;
+  error?: string;
+  error_code?: string;
+  provider_label?: string;
+  models: CatalogModel[];
+}

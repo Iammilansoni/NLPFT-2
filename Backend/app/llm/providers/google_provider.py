@@ -32,7 +32,6 @@ from app.llm.providers.base import (
     LLMResponse,
     ModelNotFoundError,
     ProviderError,
-    ProviderModel,
     ProviderType,
     RateLimitError,
     TransientError,
@@ -92,109 +91,6 @@ class GoogleProvider(BaseLLMProvider):
         async for chunk in provider.generate_stream(prompt="Hello"):
             print(chunk.content, end="", flush=True)
     """
-    
-    DEFAULT_MODELS = [
-        # Gemini 3.0 Series (Preview)
-        ProviderModel(
-            id="gemini-3-pro-preview",
-            name="Gemini 3 Pro Preview",
-            description="Latest flagship model preview",
-            context_length=1000000,
-            supports_vision=True,
-            supports_functions=True,
-        ),
-        ProviderModel(
-            id="gemini-3-flash-preview",
-            name="Gemini 3 Flash Preview",
-            description="Fast, efficient next-gen model",
-            context_length=1000000,
-            supports_vision=True,
-            supports_functions=True,
-        ),
-        # Gemini 2.5 Series (Stable)
-        ProviderModel(
-            id="gemini-2.5-pro",
-            name="Gemini 2.5 Pro",
-            description="State-of-the-art thinking model for complex reasoning",
-            context_length=1000000,
-            supports_vision=True,
-            supports_functions=True,
-        ),
-        ProviderModel(
-            id="gemini-2.5-pro-preview-06-05",
-            name="Gemini 2.5 Pro Preview",
-            description="Latest 2.5 Pro preview with enhanced capabilities",
-            context_length=1000000,
-            supports_vision=True,
-            supports_functions=True,
-        ),
-        ProviderModel(
-            id="gemini-2.5-flash",
-            name="Gemini 2.5 Flash",
-            description="Best price-performance, great for high-volume tasks",
-            context_length=1000000,
-            supports_vision=True,
-            supports_functions=True,
-        ),
-        ProviderModel(
-            id="gemini-2.5-flash-preview-05-20",
-            name="Gemini 2.5 Flash Preview",
-            description="Latest 2.5 Flash preview",
-            context_length=1000000,
-            supports_vision=True,
-            supports_functions=True,
-        ),
-        ProviderModel(
-            id="gemini-2.5-flash-lite",
-            name="Gemini 2.5 Flash-Lite",
-            description="Lightweight, ultra-fast for simple tasks",
-            context_length=1000000,
-            supports_vision=True,
-            supports_functions=True,
-        ),
-        # Gemini 2.0 Series (Retiring March 3, 2026)
-        ProviderModel(
-            id="gemini-2.0-flash",
-            name="Gemini 2.0 Flash",
-            description="[RETIRING Mar 2026] Fast multimodal model",
-            context_length=1000000,
-            supports_vision=True,
-            supports_functions=True,
-        ),
-        ProviderModel(
-            id="gemini-2.0-flash-lite",
-            name="Gemini 2.0 Flash-Lite",
-            description="[RETIRING Mar 2026] Lightweight for high throughput",
-            context_length=1000000,
-            supports_vision=True,
-            supports_functions=True,
-        ),
-        # Gemini 1.5 Series (Legacy - Retired for new projects Apr 2025)
-        ProviderModel(
-            id="gemini-1.5-pro",
-            name="Gemini 1.5 Pro",
-            description="[LEGACY] Advanced reasoning with 1M context",
-            context_length=1000000,
-            supports_vision=True,
-            supports_functions=True,
-        ),
-        ProviderModel(
-            id="gemini-1.5-flash",
-            name="Gemini 1.5 Flash",
-            description="[LEGACY] Fast and efficient for high-volume",
-            context_length=1000000,
-            supports_vision=True,
-            supports_functions=True,
-        ),
-        ProviderModel(
-            id="gemini-1.5-flash-8b",
-            name="Gemini 1.5 Flash 8B",
-            description="[LEGACY] Smallest Gemini, fastest inference",
-            context_length=1000000,
-            supports_vision=True,
-            supports_functions=True,
-        ),
-    ]
     
     def __init__(
         self,
@@ -780,15 +676,6 @@ class GoogleProvider(BaseLLMProvider):
                 message=f"Connection failed: {e}",
                 error_code="CONNECTION_ERROR",
             )
-    
-    async def list_models(self) -> List[ProviderModel]:
-        """
-        List available Gemini models.
-        
-        Returns predefined list for reliability. Could fetch from API
-        using genai.list_models() but that requires initialization.
-        """
-        return self.DEFAULT_MODELS
     
     async def count_tokens(self, text: str) -> int:
         """

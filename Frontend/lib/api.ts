@@ -21,6 +21,9 @@ import type {
   QueryResponse,
   ApiErrorResponse,
   SemanticRetrieveResponse,
+  ModelCatalogResponse,
+  ModelCatalogSyncResult,
+  ModelDiscoveryResponse,
 } from './api-types';
 import { getApiBase } from './runtime-config';
 
@@ -715,7 +718,6 @@ class ApiClient {
       description: string;
       requires_api_key: boolean;
       supports_custom_base_url: boolean;
-      default_models: string[];
       implemented?: boolean;
     }>;
     implemented: string[];
@@ -748,6 +750,41 @@ class ApiClient {
   }> {
     return this.request(`/api/v1/llm-config/ollama/pull?model_name=${encodeURIComponent(modelName)}`, {
       method: 'POST',
+    });
+  }
+
+  // ============================================================================
+  // Model Catalogue API (live provider listings)
+  // ============================================================================
+
+  /** Models visible to the current user, with per-provider sync health. */
+  async getModelCatalog(params: { kind?: 'llm' | 'embedding'; provider?: string; includeRetired?: boolean } = {}): Promise<ModelCatalogResponse> {
+    const query = new URLSearchParams();
+    if (params.kind) query.set('kind', params.kind);
+    if (params.provider) query.set('provider', params.provider);
+    if (params.includeRetired) query.set('include_retired', 'true');
+    const qs = query.toString();
+    return this.request(`/api/v1/model-catalog${qs ? `?${qs}` : ''}`);
+  }
+
+  /** Re-list the user's providers now instead of waiting for the scheduled sync. */
+  async syncModelCatalog(): Promise<{ results: ModelCatalogSyncResult[] }> {
+    return this.request('/api/v1/model-catalog/sync', { method: 'POST' });
+  }
+
+  /**
+   * List a provider's models live. Pass `apiKey` for a key that is not saved
+   * yet, or `configId` to use a saved connection's key.
+   */
+  async discoverModels(body: { provider: string; apiKey?: string; baseUrl?: string; configId?: string }): Promise<ModelDiscoveryResponse> {
+    return this.request('/api/v1/model-catalog/discover', {
+      method: 'POST',
+      body: JSON.stringify({
+        provider: body.provider,
+        api_key: body.apiKey || null,
+        base_url: body.baseUrl || null,
+        config_id: body.configId || null,
+      }),
     });
   }
 

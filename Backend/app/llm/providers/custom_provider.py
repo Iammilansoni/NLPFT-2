@@ -32,7 +32,6 @@ from app.llm.providers.base import (
     LLMResponse,
     ModelNotFoundError,
     ProviderError,
-    ProviderModel,
     ProviderType,
     RateLimitError,
     TransientError,
@@ -70,18 +69,6 @@ class CustomHTTPProvider(BaseLLMProvider):
             system_prompt="You are a helpful assistant.",
         )
     """
-    
-    DEFAULT_MODELS = [
-        # These are example placeholders - users specify their own models
-        ProviderModel(
-            id="custom-model",
-            name="Custom Model",
-            description="Specify your model name in the config",
-            context_length=4096,
-            supports_vision=False,
-            supports_functions=False,
-        ),
-    ]
     
     def __init__(
         self,
@@ -286,31 +273,6 @@ class CustomHTTPProvider(BaseLLMProvider):
                 message=f"Connection failed: {e}",
                 error_code="CONNECTION_ERROR",
             )
-    
-    async def list_models(self) -> List[ProviderModel]:
-        """
-        Try to list models from the endpoint.
-        Many servers support GET /models or /v1/models.
-        """
-        try:
-            client = await self._get_client()
-            response = await client.get("/models")
-            
-            if response.status_code == 200:
-                data = response.json()
-                models = []
-                for model_data in data.get("data", []):
-                    models.append(ProviderModel(
-                        id=model_data.get("id", "unknown"),
-                        name=model_data.get("id", "Unknown Model"),
-                        description=model_data.get("description", ""),
-                        context_length=model_data.get("context_window", 4096),
-                    ))
-                return models if models else self.DEFAULT_MODELS
-        except Exception as e:
-            logger.debug(f"Could not list models from custom endpoint: {e}")
-        
-        return self.DEFAULT_MODELS
     
     async def close(self):
         """Close the HTTP client"""

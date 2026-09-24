@@ -13,6 +13,7 @@ from app.api.v1 import (
     email_verification,
     embedding_validation,
     llm_config,
+    model_catalog,
     model_validation,
     models,
     multi_model_query,
@@ -44,6 +45,7 @@ router.include_router(embedding_validation.router, tags=["Embedding Validation"]
 router.include_router(models.router, tags=["Models"])
 router.include_router(user_settings.router, tags=["User Settings"])
 router.include_router(llm_config.router, tags=["LLM Configuration"])
+router.include_router(model_catalog.router, tags=["Model Catalogue"])
 
 # Audit Logs
 router.include_router(audit_logs.router, tags=["Audit Logs"])

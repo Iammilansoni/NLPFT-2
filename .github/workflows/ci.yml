@@ -99,6 +99,11 @@ jobs:
           # Second boot must be a no-op, not a failure.
           python init_db_direct.py
           python scripts/run_migrations.py
+      - name: Model catalogue lifecycle tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://nlpforge:ci_password@localhost:5432/nlpforge
+          ALLOW_DESTRUCTIVE_DB_TESTS: nlpforge
+        run: pytest tests/integration/test_model_catalog.py -m integration -v --timeout=120
       - name: Create a non-superuser application role
         run: |
           psql -h localhost -U nlpforge -d nlpforge -c "CREATE ROLE app_ci LOGIN PASSWORD 'app_ci' NOSUPERUSER NOBYPASSRLS"

@@ -41,6 +41,16 @@ def get_service(db: AsyncSession = Depends(get_db)) -> LLMConfigService:
     return LLMConfigService(db)
 
 
+def refresh_model_catalog(user_id: UUID) -> None:
+    """Re-list this user's providers in the background after a connection changes."""
+    try:
+        from app.worker.tasks import sync_model_catalog_task
+
+        sync_model_catalog_task.delay(str(user_id))
+    except Exception as e:  # noqa: BLE001 -- the next scheduled sync catches up
+        logger.warning(f"Could not queue a model catalogue refresh: {e}")
+
+
 # =============================================================================
 # PROVIDER INFO
 # =============================================================================
@@ -143,6 +153,7 @@ async def create_config(
     
     try:
         config = await service.create_config(current_user.u_id, data)
+        refresh_model_catalog(current_user.u_id)
         return service.to_response(config)
     except ValueError as e:
         raise HTTPException(
@@ -186,6 +197,7 @@ async def update_config(
     
     try:
         config = await service.update_config(config_id, data)
+        refresh_model_catalog(current_user.u_id)
         return service.to_response(config)
     except ValueError as e:
         raise HTTPException(
@@ -216,6 +228,7 @@ async def delete_config(
         )
     
     await service.delete_config(config_id)
+    refresh_model_catalog(current_user.u_id)
     return {"message": "Configuration deleted successfully"}
 
 

@@ -146,7 +146,8 @@ services:
   celery-worker:
     image: nlpforge-backend:latest
     command: >
-      celery -A app.worker.celery_app:celery_app worker
+      celery -A app.worker.celery_app:celery_app worker -B
+      --schedule=/tmp/celerybeat-schedule
       --loglevel=info --concurrency=2 --queues=nlpforge --hostname=worker@%h
     env_file:
       - path: ./.env

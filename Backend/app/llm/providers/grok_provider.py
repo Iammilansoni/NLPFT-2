@@ -34,7 +34,6 @@ from app.llm.providers.base import (
     LLMResponse,
     ModelNotFoundError,
     ProviderError,
-    ProviderModel,
     ProviderType,
     RateLimitError,
     TransientError,
@@ -72,96 +71,6 @@ class GrokProvider(BaseLLMProvider):
         async for chunk in provider.generate_stream(prompt="Hello"):
             print(chunk.content, end="", flush=True)
     """
-    
-    DEFAULT_MODELS = [
-        # =========================================================================
-        # Grok 4.1 Fast Series
-        # =========================================================================
-        ProviderModel(
-            id="grok-4.1-fast-reasoning",
-            name="Grok 4.1 Fast Reasoning",
-            description="Fast reasoning with 2M context ($0.20/$0.50 per M tokens)",
-            context_length=2000000,
-            supports_vision=False,
-            supports_functions=True,
-        ),
-        ProviderModel(
-            id="grok-4.1-fast-non-reasoning",
-            name="Grok 4.1 Fast Non-Reasoning",
-            description="Fast non-reasoning with 2M context ($0.20/$0.50 per M tokens)",
-            context_length=2000000,
-            supports_vision=False,
-            supports_functions=True,
-        ),
-        # =========================================================================
-        # Grok Code
-        # =========================================================================
-        ProviderModel(
-            id="grok-code-fast-1",
-            name="Grok Code Fast 1",
-            description="Optimized for code generation ($0.20/$1.50 per M tokens)",
-            context_length=256000,
-            supports_vision=False,
-            supports_functions=True,
-        ),
-        # =========================================================================
-        # Grok 4 Fast Series
-        # =========================================================================
-        ProviderModel(
-            id="grok-4-fast-reasoning",
-            name="Grok 4 Fast Reasoning",
-            description="Fast reasoning model ($0.20/$0.50 per M tokens)",
-            context_length=2000000,
-            supports_vision=False,
-            supports_functions=True,
-        ),
-        ProviderModel(
-            id="grok-4-fast-non-reasoning",
-            name="Grok 4 Fast Non-Reasoning",
-            description="Fast general model ($0.20/$0.50 per M tokens)",
-            context_length=2000000,
-            supports_vision=False,
-            supports_functions=True,
-        ),
-        ProviderModel(
-            id="grok-4-0709",
-            name="Grok 4 (0709)",
-            description="Flagship Grok 4 model ($3.00/$15.00 per M tokens)",
-            context_length=256000,
-            supports_vision=False,
-            supports_functions=True,
-        ),
-        # =========================================================================
-        # Grok 3 Series
-        # =========================================================================
-        ProviderModel(
-            id="grok-3-mini",
-            name="Grok 3 Mini",
-            description="Lightweight Grok 3 ($0.30/$0.50 per M tokens)",
-            context_length=131072,
-            supports_vision=False,
-            supports_functions=True,
-        ),
-        ProviderModel(
-            id="grok-3",
-            name="Grok 3",
-            description="Standard Grok 3 model ($3.00/$15.00 per M tokens)",
-            context_length=131072,
-            supports_vision=False,
-            supports_functions=True,
-        ),
-        # =========================================================================
-        # Grok 2 Vision
-        # =========================================================================
-        ProviderModel(
-            id="grok-2-vision-1212",
-            name="Grok 2 Vision",
-            description="Multimodal vision model ($2.00/$10.00 per M tokens)",
-            context_length=32768,
-            supports_vision=True,
-            supports_functions=True,
-        ),
-    ]
     
     def __init__(
         self,
@@ -516,66 +425,6 @@ class GrokProvider(BaseLLMProvider):
                 message=f"Connection failed: {e}",
                 error_code="CONNECTION_ERROR",
             )
-    
-    async def list_models(self) -> List[ProviderModel]:
-        """
-        List available Grok models.
-        
-        Attempts to fetch from API, falls back to predefined list.
-        """
-        try:
-            client = await self._get_client()
-            response = await client.get("/models", headers=self._get_headers())
-            
-            # Handle non-200 responses - surface auth errors
-            if response.status_code != 200:
-                try:
-                    self._handle_error_response(response)
-                except AuthenticationError:
-                    # Re-raise auth errors so they're not hidden
-                    raise
-                except Exception as e:
-                    logger.warning(f"Failed to fetch Grok models (status {response.status_code}): {e}")
-                    return self.DEFAULT_MODELS.copy()
-            
-            data = response.json()
-            models = []
-            
-            for model_data in data.get("data", []):
-                model_id = model_data.get("id")
-                
-                # Skip malformed entries without id
-                if not model_id:
-                    logger.debug(f"Skipping Grok model entry with missing id: {model_data}")
-                    continue
-                
-                # Try to find matching default model
-                matching = next((m for m in self.DEFAULT_MODELS if m.id == model_id), None)
-                
-                if matching:
-                    models.append(matching)
-                else:
-                    # Create new model from API data
-                    models.append(ProviderModel(
-                        id=model_id,
-                        name=model_data.get("name", model_id),
-                        description=model_data.get("description", ""),
-                        context_length=model_data.get("context_window", 32768),
-                        supports_vision=model_data.get("vision", False),
-                        supports_functions=True,
-                    ))
-            
-            if models:
-                logger.info(f"Fetched {len(models)} Grok models from API")
-                return models
-        
-        except AuthenticationError:
-            # Re-raise auth errors
-            raise
-        except Exception as e:
-            logger.warning(f"Failed to fetch Grok models from API: {e}, using defaults")
-        
-        return self.DEFAULT_MODELS
     
     async def _async_sleep(self, seconds: float):
         """Async sleep helper for retries"""

@@ -21,6 +21,7 @@ Usage:
 from typing import Any, Dict, Optional, Type
 
 from app.core.logger import logger
+from app.llm.model_discovery import OPENAI_COMPATIBLE_BASE_URLS
 from app.llm.providers.anthropic_provider import AnthropicProvider
 from app.llm.providers.base import (
     BaseLLMProvider,
@@ -44,6 +45,8 @@ PROVIDER_CLASSES: Dict[ProviderType, Type[BaseLLMProvider]] = {
     ProviderType.OLLAMA: OllamaLLMProvider,
     ProviderType.GROK: GrokProvider,  # xAI Grok
     ProviderType.DEEPSEEK: OpenAIProvider,  # DeepSeek uses OpenAI-compatible API
+    ProviderType.GROQ: OpenAIProvider,  # Groq uses OpenAI-compatible API
+    ProviderType.OPENROUTER: OpenAIProvider,  # OpenRouter uses OpenAI-compatible API
     ProviderType.ANTHROPIC: AnthropicProvider,  # Anthropic Claude
     ProviderType.HUGGINGFACE: HuggingFaceProvider,  # HuggingFace Inference
     ProviderType.CUSTOM: CustomHTTPProvider,  # Custom HTTP endpoints
@@ -51,7 +54,8 @@ PROVIDER_CLASSES: Dict[ProviderType, Type[BaseLLMProvider]] = {
 
 # Default base URLs for providers using OpenAI-compatible API
 COMPATIBLE_BASE_URLS: Dict[ProviderType, str] = {
-    ProviderType.DEEPSEEK: "https://api.deepseek.com/v1",
+    ptype: OPENAI_COMPATIBLE_BASE_URLS[ptype.value]
+    for ptype in (ProviderType.DEEPSEEK, ProviderType.GROQ, ProviderType.OPENROUTER)
 }
 
 
@@ -119,7 +123,7 @@ class LLMProviderFactory:
         # Create provider instance
         logger.info(f"Creating {ptype.value} provider with model: {model}")
         
-        return provider_class(
+        provider = provider_class(
             model=model,
             api_key=api_key,
             base_url=base_url,
@@ -127,6 +131,8 @@ class LLMProviderFactory:
             max_retries=max_retries,
             **kwargs,
         )
+        provider._catalog_provider = ptype.value
+        return provider
     
     @classmethod
     def create_from_db_config(
@@ -194,7 +200,6 @@ class LLMProviderFactory:
                 "description": "GPT-5.x, o3/o4 Reasoning, GPT-4.1, GPT-4o, Open-Weight OSS",
                 "requires_api_key": True,
                 "supports_custom_base_url": True,
-                "default_models": ["gpt-5.2", "gpt-5-mini", "o3", "gpt-4.1", "gpt-4o", "gpt-oss-120b"],
                 "implemented": True,
             },
             ProviderType.GOOGLE.value: {
@@ -202,7 +207,6 @@ class LLMProviderFactory:
                 "description": "Gemini 3.0, 2.5 Pro/Flash, 2.0 Flash, 1.5 series",
                 "requires_api_key": True,
                 "supports_custom_base_url": False,
-                "default_models": ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"],
                 "implemented": True,
             },
             ProviderType.GROK.value: {
@@ -210,7 +214,20 @@ class LLMProviderFactory:
                 "description": "Grok 4/3 models from xAI with reasoning and vision capabilities",
                 "requires_api_key": True,
                 "supports_custom_base_url": False,
-                "default_models": ["grok-3", "grok-4", "grok-4-fast-reasoning"],
+                "implemented": True,
+            },
+            ProviderType.GROQ.value: {
+                "name": "Groq",
+                "description": "Open-weight models (Llama, Qwen, GPT-OSS) on Groq's fast inference hardware",
+                "requires_api_key": True,
+                "supports_custom_base_url": False,
+                "implemented": True,
+            },
+            ProviderType.OPENROUTER.value: {
+                "name": "OpenRouter",
+                "description": "One key for hundreds of models from every major lab, including free ones",
+                "requires_api_key": True,
+                "supports_custom_base_url": False,
                 "implemented": True,
             },
             ProviderType.OLLAMA.value: {
@@ -218,7 +235,6 @@ class LLMProviderFactory:
                 "description": "Local LLMs (Llama, Mistral, Qwen, DeepSeek, etc.)",
                 "requires_api_key": False,
                 "supports_custom_base_url": True,
-                "default_models": ["llama3.1:8b-instruct-q4_K_M", "mistral:7b-instruct-q4_K_M", "qwen2.5:7b-instruct-q4_K_M"],
                 "implemented": True,
             },
             ProviderType.DEEPSEEK.value: {
@@ -226,7 +242,6 @@ class LLMProviderFactory:
                 "description": "DeepSeek Chat, Coder, and R1 Reasoning models",
                 "requires_api_key": True,
                 "supports_custom_base_url": True,
-                "default_models": ["deepseek-chat", "deepseek-coder", "deepseek-reasoner"],
                 "implemented": True,
             },
             ProviderType.ANTHROPIC.value: {
@@ -234,7 +249,6 @@ class LLMProviderFactory:
                 "description": "Claude 4 Opus/Sonnet, Claude 3.5 Sonnet/Haiku, Claude 3 Opus",
                 "requires_api_key": True,
                 "supports_custom_base_url": False,
-                "default_models": ["claude-sonnet-4-5-20250929", "claude-opus-4-5-20251101", "claude-haiku-4-5-20251001", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"],
                 "implemented": True,
             },
             ProviderType.HUGGINGFACE.value: {
@@ -242,7 +256,6 @@ class LLMProviderFactory:
                 "description": "Inference API and custom endpoints",
                 "requires_api_key": True,
                 "supports_custom_base_url": True,
-                "default_models": ["meta-llama/Llama-3.3-70B-Instruct", "mistralai/Mistral-7B-Instruct-v0.3", "microsoft/Phi-3-mini-4k-instruct"],
                 "implemented": True,
             },
             ProviderType.CUSTOM.value: {
@@ -250,7 +263,6 @@ class LLMProviderFactory:
                 "description": "Custom HTTP endpoints with configurable request/response format",
                 "requires_api_key": False,
                 "supports_custom_base_url": True,
-                "default_models": [],
                 "implemented": True,
             },
         }

@@ -31,6 +31,7 @@ import {
   RefreshCw,
   Plus,
   Layers,
+  Boxes,
   Eye,
   EyeOff,
   Settings2,
@@ -56,6 +57,7 @@ import {
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour'
 import { LLMProviderSettings } from '@/components/settings/LLMProviderSettings'
 import { RuntimeInfoPanel } from '@/components/settings/RuntimeInfoPanel'
+import { ModelCatalogPanel } from '@/components/settings/ModelCatalogPanel'
 import { PageHeader } from '@/components/ui/page-header'
 
 // ============================================================================
@@ -66,6 +68,7 @@ const NAV_ITEMS = [
   { id: 'profile', label: 'Profile', icon: UserCircle, description: 'Manage your account information', color: 'from-info to-primary' },
   { id: 'security', label: 'Security', icon: Shield, description: 'Password, 2FA, and sessions', color: 'from-success to-success' },
   { id: 'llm-providers', label: 'AI Providers', icon: Sparkles, description: 'Configure LLM integrations', color: 'from-primary to-brand-2' },
+  { id: 'catalogue', label: 'Model catalogue', icon: Boxes, description: 'Every model your providers serve', color: 'from-info to-primary' },
   { id: 'models', label: 'Pipeline', icon: Layers, description: 'How queries are routed', color: 'from-warning to-warning' },
 ] as const
 
@@ -907,6 +910,8 @@ export default function SettingsPage() {
         return renderSecuritySection()
       case 'llm-providers':
         return <LLMProviderSettings />
+      case 'catalogue':
+        return <ModelCatalogPanel />
       case 'models':
         return renderModelsSection()
       default:
