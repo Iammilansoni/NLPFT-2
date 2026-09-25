@@ -97,6 +97,9 @@ class Token(BaseModel):
 class AuthCookieResponse(BaseModel):
     """Response for cookie-based auth: tokens are in HttpOnly cookies, body has user only."""
     user: UserResponse
+    # Registration only: {"email_sent": bool, "code": str | None}. The code is
+    # present only when the server has no SMTP settings.
+    verification: Optional[dict] = None
 
 
 class TokenData(BaseModel):

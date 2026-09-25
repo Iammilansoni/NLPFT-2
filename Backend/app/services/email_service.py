@@ -30,6 +30,24 @@ class EmailService:
         self.from_email = settings.smtp_from_email or self.smtp_user
         self.from_name = settings.smtp_from_name
     
+    @property
+    def enabled(self) -> bool:
+        """True when SMTP credentials are set, so codes can go out by email."""
+        return bool(self.smtp_user and self.smtp_password)
+
+    def delivery(self, otp: str) -> dict:
+        """
+        How a fresh verification code reaches the user.
+
+        A clone of the repo has no mail server. Rather than leaving new users
+        stuck with a code only in the server log, the code comes back in the
+        API response and the verify page shows it. Setting SMTP_USER and
+        SMTP_PASSWORD switches this off: the code then only goes by email.
+        """
+        if self.enabled:
+            return {"email_sent": True, "code": None}
+        return {"email_sent": False, "code": otp}
+
     def generate_otp(self) -> str:
         """Generate a 6-digit OTP"""
         return str(random.randint(100000, 999999))

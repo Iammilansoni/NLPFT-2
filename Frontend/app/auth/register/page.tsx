@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Eye, EyeOff, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { verifyCodeKey } from '@/lib/auth';
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
 
 const GOOGLE_ENABLED = Boolean(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
@@ -86,7 +87,11 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      await register(formData);
+      const result = await register(formData);
+      const code = result.verification?.code;
+      if (code) {
+        try { sessionStorage.setItem(verifyCodeKey(formData.email), code); } catch { /* shown after "Resend" instead */ }
+      }
       router.push(`/auth/verify-email?email=${encodeURIComponent(formData.email)}`);
     } catch (err: any) {
       const errorMessage = err.response?.data?.detail ||

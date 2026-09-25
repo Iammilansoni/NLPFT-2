@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from '@/hooks/use-toast'
 import apiClient from '@/lib/api-client'
+import { verifyCodeKey } from '@/lib/auth'
 
 function VerifyEmailContent() {
   const router = useRouter()
@@ -21,6 +22,17 @@ function VerifyEmailContent() {
   const [isVerified, setIsVerified] = useState(false)
   const [error, setError] = useState('')
   const [countdown, setCountdown] = useState(0)
+  // Set when the server has no email (SMTP) configured: the code comes back
+  // from the API instead of by email, and is shown on this page.
+  const [shownCode, setShownCode] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!email) return
+    try {
+      const saved = sessionStorage.getItem(verifyCodeKey(email))
+      if (saved) setShownCode(saved)
+    } catch { /* storage blocked: "Get a new code" still works */ }
+  }, [email])
 
   // Countdown timer for resend button
   useEffect(() => {
@@ -48,6 +60,7 @@ function VerifyEmailContent() {
       })
 
       setIsVerified(true)
+      try { sessionStorage.removeItem(verifyCodeKey(email)) } catch { /* nothing to clean */ }
 
       toast({
         title: "Email Verified!",
@@ -78,16 +91,23 @@ function VerifyEmailContent() {
     setError('')
 
     try {
-      await apiClient.post('/api/v1/auth/resend-otp', {
+      const response = await apiClient.post('/api/v1/auth/resend-otp', {
         email
       })
+      const code: string | null = response.data?.code ?? null
 
       setCountdown(60) // 60 second cooldown
 
-      toast({
-        title: "OTP Resent",
-        description: "A new OTP has been sent to your email.",
-      })
+      if (code) {
+        setShownCode(code)
+        setOtp('')
+        try { sessionStorage.setItem(verifyCodeKey(email), code) } catch { /* shown on screen anyway */ }
+      } else {
+        toast({
+          title: "OTP Resent",
+          description: "A new OTP has been sent to your email.",
+        })
+      }
     } catch (err: any) {
       const errorMessage = err.response?.data?.detail || 'Failed to resend OTP'
       setError(errorMessage)
@@ -136,12 +156,26 @@ function VerifyEmailContent() {
               Verify Your Email
             </CardTitle>
             <CardDescription className="text-center">
-              We&apos;ve sent a 6-digit code to<br />
+              {shownCode ? 'Your 6-digit code for' : <>We&apos;ve sent a 6-digit code to</>}<br />
               <span className="font-semibold text-foreground">{email}</span>
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleVerify} className="space-y-4">
+              {shownCode && (
+                <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-center space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    This server has no email set up, so here is your code:
+                  </p>
+                  <p className="font-mono text-3xl font-semibold tracking-widest">{shownCode}</p>
+                  <Button type="button" size="sm" variant="secondary" onClick={() => { setOtp(shownCode); setError('') }}>
+                    Use this code
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    To send codes by email instead, set SMTP_USER and SMTP_PASSWORD in the server&apos;s .env.
+                  </p>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="otp">Enter OTP Code</Label>
                 <Input
@@ -193,7 +227,7 @@ function VerifyEmailContent() {
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
                   <span className="bg-background px-2 text-muted-foreground">
-                    Didn&apos;t receive code?
+                    {shownCode ? 'Code expired?' : <>Didn&apos;t receive code?</>}
                   </span>
                 </div>
               </div>
@@ -218,14 +252,16 @@ function VerifyEmailContent() {
                 ) : (
                   <>
                     <RefreshCw className="h-4 w-4 mr-2" />
-                    Resend OTP
+                    {shownCode ? 'Get a new code' : 'Resend OTP'}
                   </>
                 )}
               </Button>
 
-              <p className="text-center text-sm text-muted-foreground">
-                Check your spam folder if you don&apos;t see the email
-              </p>
+              {!shownCode && (
+                <p className="text-center text-sm text-muted-foreground">
+                  Check your spam folder if you don&apos;t see the email
+                </p>
+              )}
             </form>
           </CardContent>
         </Card>

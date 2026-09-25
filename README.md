@@ -139,6 +139,11 @@ Open **http://localhost:3000** → **Try the live demo**. The demo account comes
 API templates. Try *"change my password from oldpass1 to NewPass#9"*. API docs:
 http://localhost:8000/docs · End-to-end check: `python scripts/smoke_test.py`.
 
+**Your own account:** click *Sign up*. With no e-mail server configured, the verify page shows
+your 6-digit code on screen. To e-mail codes instead, put your SMTP login (for example a Gmail
+[app password](https://myaccount.google.com/apppasswords)) in `SMTP_USER` / `SMTP_PASSWORD` in
+`.env` and restart the backend.
+
 ## Tech stack
 
 | Layer | |
