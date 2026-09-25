@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth import get_current_user
+from app.api.v1.embeddings import raise_for_embedding_error
 from app.core.postgres import get_db
 from app.core.rate_limit import limiter
 from app.models.schemas import UserResponse
@@ -190,7 +191,9 @@ async def embed_dataset(
     force_reembed: bool = Query(False, description="Replace vectors made with another model"),
 ):
     """Embed a dataset with the caller's embedding model, on the worker."""
-    return await queue_embedding(db, current_user.u_id, dataset_id, force_reembed=force_reembed)
+    return raise_for_embedding_error(
+        await queue_embedding(db, current_user.u_id, dataset_id, force_reembed=force_reembed)
+    )
 
 
 @router.post("/datasets/{dataset_id}/reembed")
@@ -200,7 +203,9 @@ async def reembed_dataset(
     db: AsyncSession = Depends(get_db),
 ):
     """Replace a dataset's vectors using the caller's embedding model."""
-    return await queue_embedding(db, current_user.u_id, dataset_id, force_reembed=True)
+    return raise_for_embedding_error(
+        await queue_embedding(db, current_user.u_id, dataset_id, force_reembed=True)
+    )
 
 
 @router.get("/datasets/{dataset_id}/embedding-status")
@@ -223,7 +228,7 @@ async def get_embedding_status(
         dataset_id=dataset_id
     )
 
-    return result
+    return raise_for_embedding_error(result)
 
 
 @router.get("/health")

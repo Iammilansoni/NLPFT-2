@@ -137,7 +137,7 @@ docker compose up -d --build  # first boot pulls ~2.3 GB of Ollama models
 
 Open **http://localhost:3000** → **Try the live demo**. The demo account comes with 20 indexed
 API templates. Try *"change my password from oldpass1 to NewPass#9"*. API docs:
-http://localhost:8000/docs · End-to-end check: `python scripts/smoke_test.py`.
+http://localhost:8000/docs · End-to-end check: `python scripts/smoke_test.py` · Tenant isolation check: `python scripts/tenancy_check.py`.
 
 **Your own account:** click *Sign up*. With no e-mail server configured, the verify page shows
 your 6-digit code on screen. To e-mail codes instead, put your SMTP login (for example a Gmail

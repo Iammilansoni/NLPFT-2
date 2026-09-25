@@ -604,7 +604,11 @@ async def generate_dataset(
             # ── Dispatch to Celery — returns immediately ──────────────────────
             from app.worker.tasks import generate_dataset_task
 
-            celery_result = generate_dataset_task.delay(
+            # The owner is recorded before the job exists, so a status poll can
+            # never see a task that has no owner yet.
+            task_id = str(uuid.uuid4())
+            remember_task_owner(task_id, current_user.u_id)
+            generate_dataset_task.apply_async(args=[
                 {
                     "template_data": template_data,
                     "num_examples": dataset_request.num_examples,
@@ -615,8 +619,7 @@ async def generate_dataset(
                     "template_id": dataset_request.template_id,
                     "dataset_name": template.api_name,
                 }
-            )
-            task_id = celery_result.id  # Standard Celery UUID
+            ], task_id=task_id)
 
             logger.info(
                 f"Dispatched generate_dataset_task task_id={task_id} "
@@ -742,6 +745,30 @@ async def list_datasets(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# Generation jobs live in the Celery result backend, which has no notion of
+# users. Each job's owner is kept next to it so only they can poll it.
+TASK_OWNER_TTL_SECONDS = 7 * 24 * 3600
+
+
+def _task_owner_key(task_id: str) -> str:
+    return f"nlpforge:task-owner:{task_id}"
+
+
+def remember_task_owner(task_id: str, user_id) -> None:
+    from app.worker.celery_app import celery_app
+
+    celery_app.backend.client.set(_task_owner_key(task_id), str(user_id), ex=TASK_OWNER_TTL_SECONDS)
+
+
+def task_owned_by(task_id: str, user_id) -> bool:
+    from app.worker.celery_app import celery_app
+
+    owner = celery_app.backend.client.get(_task_owner_key(task_id))
+    if isinstance(owner, bytes):
+        owner = owner.decode()
+    return owner == str(user_id)
+
+
 @router.get("/status/{task_id}")
 async def get_task_status(
     task_id: str,
@@ -761,6 +788,16 @@ async def get_task_status(
     from celery.result import AsyncResult
 
     from app.worker.celery_app import celery_app
+
+    # Uploads are tracked in this process by the task manager, which checks
+    # the owner itself; generation jobs are in Celery.
+    upload_task = get_task_manager().get_task(task_id, user_id=current_user.u_id)
+    if upload_task:
+        return {key: value for key, value in upload_task.items() if key != "user_id"}
+
+    # Someone else's job is reported exactly like an unknown one.
+    if not task_owned_by(task_id, current_user.u_id):
+        raise HTTPException(status_code=404, detail="Task not found")
 
     async_result = AsyncResult(task_id, app=celery_app)
     state = async_result.state          # "PENDING", "PROGRESS", "SUCCESS", etc.
@@ -1767,16 +1804,17 @@ async def get_dataset_embedding_status(
     # get_enhanced_embedding_service came from embedding_service.py, deleted in
     # the v2 refactor. This endpoint has been raising NameError on every call
     # since. multi_model_embedding_service carries the surviving implementation.
+    from app.api.v1.embeddings import raise_for_embedding_error
     from app.services.multi_model_embedding_service import (
         get_multi_model_embedding_service,
     )
 
     embedding_service = get_multi_model_embedding_service()
-    return await embedding_service.get_embedding_status(
+    return raise_for_embedding_error(await embedding_service.get_embedding_status(
         db=db,
         user_id=current_user.u_id,
         dataset_id=UUID(dataset_id),
-    )
+    ))
 
 
 @router.post("/{dataset_id}/reembed")
@@ -1786,12 +1824,12 @@ async def reembed_dataset(
     db: AsyncSession = Depends(get_db)
 ):
     """Replace a dataset's vectors using the user's current embedding model (runs on the worker)."""
+    from app.api.v1.embeddings import raise_for_embedding_error
     from app.services.multi_model_embedding_service import queue_embedding
 
-    result = await queue_embedding(db, current_user.u_id, UUID(dataset_id), force_reembed=True)
-    if not result.get("success"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
-    return result
+    return raise_for_embedding_error(
+        await queue_embedding(db, current_user.u_id, UUID(dataset_id), force_reembed=True)
+    )
 
 @router.post("/{dataset_id}/search")
 async def search_dataset(
@@ -1826,6 +1864,14 @@ async def search_dataset(
         get_multi_model_semantic_service,
     )
 
+    owned = await db.execute(
+        select(Dataset.dataset_id).where(
+            Dataset.dataset_id == UUID(dataset_id), Dataset.u_id == current_user.u_id
+        )
+    )
+    if owned.scalar_one_or_none() is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
+
     semantic_service = get_multi_model_semantic_service()
     search = await semantic_service.semantic_search(
         db=db,
@@ -1835,6 +1881,8 @@ async def search_dataset(
         dataset_id=UUID(dataset_id),
         include_slot_extraction=False,
     )
+    if search.get("error") == "NO_RESULTS":
+        search = {**search, "success": True, "stage1_vector_search": []}
 
     if not search.get("success"):
         result = search
