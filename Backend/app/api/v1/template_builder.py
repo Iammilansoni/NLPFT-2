@@ -12,6 +12,7 @@ Features:
 - Dataset generation ONLY for approved templates
 """
 
+import json
 from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID, uuid4
@@ -49,6 +50,13 @@ router = APIRouter(prefix="/templates", tags=["Template Builder"])
 
 
 # --- Helper Functions ---
+
+def _example_text(value) -> Optional[str]:
+    """parameters.example is a text column; numbers, booleans and objects arrive as JSON values."""
+    if value is None or isinstance(value, str):
+        return value
+    return json.dumps(value)
+
 
 def validate_uuid(template_id: str) -> UUID:
     """
@@ -128,7 +136,7 @@ async def create_template(
                 name=param.name,
                 type=param.type,
                 required=1 if param.required else 0,
-                example=param.example,
+                example=_example_text(param.example),
                 description=param.description
             )
             db.add(new_param)
@@ -244,7 +252,7 @@ async def create_draft_template(
                 name=param.name,
                 type=param.type,
                 required=1 if param.required else 0,
-                example=param.example,
+                example=_example_text(param.example),
                 description=param.description
             )
             db.add(new_param)
@@ -344,7 +352,7 @@ async def update_draft_template(
         
         # Check status
         metadata_result = await db.execute(
-            select(Metadata).where(Metadata.t_id == template.t_id)
+            select(Metadata).where(Metadata.t_id == template.t_id, Metadata.u_id == current_user.u_id)
         )
         metadata = metadata_result.scalar_one_or_none()
         
@@ -404,7 +412,7 @@ async def update_draft_template(
                     name=param.name,
                     type=param.type,
                     required=1 if param.required else 0,
-                    example=param.example,
+                    example=_example_text(param.example),
                     description=param.description
                 )
                 db.add(new_param)
@@ -512,7 +520,7 @@ async def list_templates(
         for template in templates:
             # Get metadata
             metadata_result = await db.execute(
-                select(Metadata).where(Metadata.t_id == template.t_id)
+                select(Metadata).where(Metadata.t_id == template.t_id, Metadata.u_id == current_user.u_id)
             )
             metadata = metadata_result.scalar_one_or_none()
             
@@ -664,7 +672,7 @@ async def get_template(
         
         # Get metadata
         metadata_result = await db.execute(
-            select(Metadata).where(Metadata.t_id == template.t_id)
+            select(Metadata).where(Metadata.t_id == template.t_id, Metadata.u_id == current_user.u_id)
         )
         metadata = metadata_result.scalar_one_or_none()
         
@@ -748,7 +756,7 @@ async def update_template(
         
         # Check status - allow editing for both draft and rejected templates
         metadata_result = await db.execute(
-            select(Metadata).where(Metadata.t_id == template.t_id)
+            select(Metadata).where(Metadata.t_id == template.t_id, Metadata.u_id == current_user.u_id)
         )
         metadata = metadata_result.scalar_one_or_none()
         
@@ -809,7 +817,7 @@ async def update_template(
                     name=param.name,
                     type=param.type,
                     required=1 if param.required else 0,
-                    example=param.example,
+                    example=_example_text(param.example),
                     description=param.description
                 )
                 db.add(new_param)
@@ -881,7 +889,7 @@ async def delete_template(
         
         # Check status
         metadata_result = await db.execute(
-            select(Metadata).where(Metadata.t_id == template.t_id)
+            select(Metadata).where(Metadata.t_id == template.t_id, Metadata.u_id == current_user.u_id)
         )
         metadata = metadata_result.scalar_one_or_none()
         
@@ -1049,7 +1057,7 @@ async def submit_template_for_review(
         
         # Get metadata
         metadata_result = await db.execute(
-            select(Metadata).where(Metadata.t_id == UUID(template_id))
+            select(Metadata).where(Metadata.t_id == UUID(template_id), Metadata.u_id == current_user.u_id)
         )
         metadata = metadata_result.scalar_one_or_none()
         
@@ -1131,7 +1139,7 @@ async def submit_for_review(
         
         # Get metadata
         metadata_result = await db.execute(
-            select(Metadata).where(Metadata.t_id == UUID(template_id))
+            select(Metadata).where(Metadata.t_id == UUID(template_id), Metadata.u_id == current_user.u_id)
         )
         metadata = metadata_result.scalar_one_or_none()
         
@@ -1205,19 +1213,12 @@ async def approve_template_by_id(
     Changes status from 'review' to 'approved'.
     Only approved templates can generate datasets.
     
-    **Requires:** User must have `is_expert=True`
+    **Requires:** the caller owns the template (tenancy: nobody acts on another user's template)
     """
     try:
-        # Check if user is expert
-        if not current_user.is_expert:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only expert users can approve templates"
-            )
-        
         # Get metadata
         metadata_result = await db.execute(
-            select(Metadata).where(Metadata.t_id == UUID(template_id))
+            select(Metadata).where(Metadata.t_id == UUID(template_id), Metadata.u_id == current_user.u_id)
         )
         metadata = metadata_result.scalar_one_or_none()
         
@@ -1227,10 +1228,10 @@ async def approve_template_by_id(
                 detail="Template not found"
             )
         
-        if metadata.status != TemplateStatus.REVIEW.value:
+        if metadata.status == TemplateStatus.APPROVED.value:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Template must be in 'review' status. Current status: '{metadata.status}'"
+                detail="Template is already approved"
             )
         
         # Approve template
@@ -1287,20 +1288,13 @@ async def approve_template(
     Changes status from 'review' to 'approved'.
     Only approved templates can generate datasets.
     
-    **Requires:** User must have `is_expert=True`
+    **Requires:** the caller owns the template (tenancy: nobody acts on another user's template)
     **Deprecated:** Use POST /{template_id}/approve instead
     """
     try:
-        # Check if user is expert
-        if not current_user.is_expert:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only expert users can approve templates"
-            )
-        
         # Get metadata
         metadata_result = await db.execute(
-            select(Metadata).where(Metadata.t_id == UUID(approval_data.template_id))
+            select(Metadata).where(Metadata.t_id == UUID(approval_data.template_id), Metadata.u_id == current_user.u_id)
         )
         metadata = metadata_result.scalar_one_or_none()
         
@@ -1310,10 +1304,10 @@ async def approve_template(
                 detail="Template not found"
             )
         
-        if metadata.status != TemplateStatus.REVIEW.value:
+        if metadata.status == TemplateStatus.APPROVED.value:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Template must be in 'review' status. Current status: '{metadata.status}'"
+                detail="Template is already approved"
             )
         
         # Approve template
@@ -1373,19 +1367,12 @@ async def reject_template_by_id(
     Changes status from 'review' to 'rejected'.
     Template can be revised and re-submitted.
     
-    **Requires:** User must have `is_expert=True`
+    **Requires:** the caller owns the template (tenancy: nobody acts on another user's template)
     """
     try:
-        # Check if user is expert
-        if not current_user.is_expert:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only expert users can reject templates"
-            )
-        
         # Get metadata
         metadata_result = await db.execute(
-            select(Metadata).where(Metadata.t_id == UUID(template_id))
+            select(Metadata).where(Metadata.t_id == UUID(template_id), Metadata.u_id == current_user.u_id)
         )
         metadata = metadata_result.scalar_one_or_none()
         
@@ -1462,20 +1449,13 @@ async def reject_template(
     Changes status from 'review' to 'rejected'.
     Template can be revised and re-submitted.
     
-    **Requires:** User must have `is_expert=True`
+    **Requires:** the caller owns the template (tenancy: nobody acts on another user's template)
     **Deprecated:** Use POST /{template_id}/reject instead
     """
     try:
-        # Check if user is expert
-        if not current_user.is_expert:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only expert users can reject templates"
-            )
-        
         # Get metadata
         metadata_result = await db.execute(
-            select(Metadata).where(Metadata.t_id == UUID(rejection_data.template_id))
+            select(Metadata).where(Metadata.t_id == UUID(rejection_data.template_id), Metadata.u_id == current_user.u_id)
         )
         metadata = metadata_result.scalar_one_or_none()
         
@@ -1549,19 +1529,12 @@ async def disable_template(
     Changes status from 'approved' to 'draft', making it unavailable 
     for dataset generation until re-approved.
     
-    **Requires:** User must have `is_expert=True`
+    **Requires:** the caller owns the template (tenancy: nobody acts on another user's template)
     """
     try:
-        # Check if user is expert
-        if not current_user.is_expert:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only expert users can disable templates"
-            )
-        
         # Get metadata
         metadata_result = await db.execute(
-            select(Metadata).where(Metadata.t_id == UUID(template_id))
+            select(Metadata).where(Metadata.t_id == UUID(template_id), Metadata.u_id == current_user.u_id)
         )
         metadata = metadata_result.scalar_one_or_none()
         
@@ -1631,19 +1604,12 @@ async def enable_template(
     This allows templates that were previously approved and then disabled
     to be re-enabled without going through the full review process again.
     
-    **Requires:** User must have `is_expert=True`
+    **Requires:** the caller owns the template (tenancy: nobody acts on another user's template)
     """
     try:
-        # Check if user is expert
-        if not current_user.is_expert:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only expert users can enable templates"
-            )
-        
         # Get metadata
         metadata_result = await db.execute(
-            select(Metadata).where(Metadata.t_id == UUID(template_id))
+            select(Metadata).where(Metadata.t_id == UUID(template_id), Metadata.u_id == current_user.u_id)
         )
         metadata = metadata_result.scalar_one_or_none()
         
@@ -1738,7 +1704,7 @@ async def toggle_template_visibility(
         
         # Get metadata
         metadata_result = await db.execute(
-            select(Metadata).where(Metadata.t_id == validated_id)
+            select(Metadata).where(Metadata.t_id == validated_id, Metadata.u_id == current_user.u_id)
         )
         metadata = metadata_result.scalar_one_or_none()
         

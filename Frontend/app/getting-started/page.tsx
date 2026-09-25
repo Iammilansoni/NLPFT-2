@@ -134,7 +134,7 @@ export default function GettingStartedPage() {
                       Templates
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">Create, submit for review, get approved</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">Create one, then switch it on (only you can)</td>
                   <td className="px-4 py-3 text-sm text-foreground">Approved template ready</td>
                 </tr>
                 <tr>

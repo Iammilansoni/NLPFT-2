@@ -137,6 +137,24 @@ async def reset_to_default(current_user: User = Depends(get_current_user), db: A
     return {**overview, "message": f"Back to the deployment default, {overview['active']['label']}."}
 
 
+def raise_for_embedding_error(result: dict) -> dict:
+    """Turn an embedding-service error payload into the matching HTTP status.
+
+    Another user's dataset is reported exactly like a missing one (404), so an
+    ID never reveals that someone else's data exists.
+    """
+    error = result.get("error")
+    if not error or result.get("success") is True:
+        return result
+    if error == ErrorCode.DATASET_NOT_FOUND:
+        code = status.HTTP_404_NOT_FOUND
+    elif error in (ErrorCode.MODEL_MISMATCH, ErrorCode.EMBEDDING_IN_PROGRESS):
+        code = status.HTTP_409_CONFLICT
+    else:
+        code = status.HTTP_400_BAD_REQUEST
+    raise HTTPException(code, result)
+
+
 @router.post("/datasets/{dataset_id}/embed")
 async def embed_dataset(
     dataset_id: uuid.UUID,
@@ -144,11 +162,9 @@ async def embed_dataset(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await queue_embedding(db, current_user.u_id, dataset_id, force_reembed=force)
-    if not result.get("success"):
-        code = status.HTTP_409_CONFLICT if result.get("error") in (ErrorCode.MODEL_MISMATCH, ErrorCode.EMBEDDING_IN_PROGRESS) else status.HTTP_404_NOT_FOUND
-        raise HTTPException(code, result)
-    return result
+    return raise_for_embedding_error(
+        await queue_embedding(db, current_user.u_id, dataset_id, force_reembed=force)
+    )
 
 
 class ReembedRequest(BaseModel):

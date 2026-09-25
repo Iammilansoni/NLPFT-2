@@ -53,6 +53,10 @@ class OTPResponse(BaseModel):
     message: str
     email: str
     expires_in_minutes: int | None = None
+    # False when the server has no SMTP settings; the code is then returned
+    # in `code` so the verify page can show it (see EmailService.delivery).
+    email_sent: bool | None = None
+    code: str | None = None
 
 
 # --- Endpoints ---
@@ -130,11 +134,17 @@ async def send_verification_otp(
 
         logger.info(f"OTP sent to {email} (expires in 10 minutes)")
 
+        delivery = email_service.delivery(otp)
         return OTPResponse(
             success=True,
-            message="OTP sent to your email. Please check your inbox (and spam folder).",
+            message=(
+                "OTP sent to your email. Please check your inbox (and spam folder)."
+                if delivery["email_sent"] else
+                "Email isn't set up on this server, so your code is shown here instead."
+            ),
             email=email,
-            expires_in_minutes=10
+            expires_in_minutes=10,
+            **delivery,
         )
 
     except HTTPException:
@@ -336,11 +346,16 @@ async def resend_otp(
 
         logger.info(f"OTP resent to {email}")
         
+        delivery = email_service.delivery(otp)
         return OTPResponse(
             success=True,
-            message="New OTP sent to your email",
+            message=(
+                "New OTP sent to your email" if delivery["email_sent"] else
+                "Email isn't set up on this server, so your new code is shown here instead."
+            ),
             email=email,
-            expires_in_minutes=10
+            expires_in_minutes=10,
+            **delivery,
         )
     
     except HTTPException:

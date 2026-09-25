@@ -221,7 +221,10 @@ async def register(
     )
 
     response = JSONResponse(
-        content={"user": UserResponse.model_validate(user).model_dump(mode="json")}
+        content={
+            "user": UserResponse.model_validate(user).model_dump(mode="json"),
+            "verification": email_service.delivery(otp),
+        }
     )
     set_auth_cookies(response, access_token, refresh_token)
     return response

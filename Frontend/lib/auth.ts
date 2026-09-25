@@ -31,7 +31,12 @@ export interface RegisterRequest {
 /** Shape returned by login/register — only the user object; tokens are in cookies. */
 export interface AuthResponse {
   user: User;
+  /** Registration only. `code` is set when the server has no email (SMTP) set up. */
+  verification?: { email_sent: boolean; code: string | null };
 }
+
+/** Where the register page leaves a code for the verify page when email is off. */
+export const verifyCodeKey = (email: string) => `nlpforge_verify_code:${email.toLowerCase()}`;
 
 export interface ForgotPasswordRequest { email: string }
 export interface ResetPasswordRequest  { token: string; new_password: string; confirm_password: string }
