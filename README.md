@@ -241,7 +241,7 @@ but hasn't been exercised end to end.
 | `evals/run_eval.py` | routing accuracy; merge gate at Hit@1 ≥ 0.78 | yes |
 | `evals/run_extraction_eval.py` | extraction precision, recall, invented values, latency | manual (needs the local LLM) |
 | `scripts/smoke_test.py` | full user loop against a running stack | manual |
-| `scripts/tenancy_check.py` | two fresh users; one probes ~45 endpoints for the other's templates, datasets, jobs and models | manual |
+| `scripts/tenancy_check.py` | two fresh users; one probes 43 endpoints for the other's templates, datasets, jobs and models | manual |
 | Frontend | `tsc --noEmit`, ESLint, production build | yes |
 </details>
 
