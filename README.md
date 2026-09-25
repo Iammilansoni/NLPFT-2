@@ -14,7 +14,7 @@ fills only the rest, and any value it proposes has to appear in the request befo
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%20%2B%20pgvector-4169E1?logo=postgresql&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-local%20LLM-000000?logo=ollama&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-227-2ea44f)
+![Tests](https://img.shields.io/badge/tests-229-2ea44f)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 [Demo](#demo) · [Results](#measured-results) · [Quick start](#quick-start) · [Architecture](docs/ARCHITECTURE.md) · [Benchmarks](evals/README.md)
@@ -41,7 +41,7 @@ fills only the rest, and any value it proposes has to appear in the request befo
 vibes) · a hybrid rules + LLM extractor with a grounding check against hallucination · async
 FastAPI with PostgreSQL + pgvector, row-level multi-tenancy, Celery and Redis · a provider-agnostic
 model layer with automatic lifecycle management · a Next.js 16 / TypeScript product UI ·
-227 tests.
+229 tests.
 
 ## How it works
 
@@ -93,11 +93,13 @@ resolves to one endpoint, and when a value is missing it says which one instead 
 - **Embedding safety:** every dataset records the provider, model and dimension that embedded it.
   Search never compares vectors from different models; it offers *switch model* or *re-embed*
   instead. Wide models (for example 3072-dim) get a half-precision index automatically.
-- **API catalogue and datasets:** documented templates with a review workflow; an LLM generates
-  example requests on a Celery worker, or you upload a CSV.
-- **Multi-tenant and secure:** PostgreSQL row-level security plus a tenant filter on every
-  vector query, JWT cookies with refresh rotation, encrypted provider keys, rate limiting, and
-  SSRF checks on user-supplied model URLs.
+- **Your own API catalogue:** each user documents their APIs as templates and switches them on
+  (only the owner can). An LLM generates example requests on a Celery worker, or you upload a CSV;
+  then embed and route.
+- **Multi-tenant and secure:** every template, dataset, embedding, background job and model
+  setting belongs to one user; others get *not found*, never a hint it exists. PostgreSQL row-level
+  security plus an owner filter on every query, JWT cookies with refresh rotation, encrypted
+  provider keys, rate limiting, and SSRF checks on user-supplied model URLs.
 
 ## Measured results
 
@@ -137,12 +139,20 @@ docker compose up -d --build  # first boot pulls ~2.3 GB of Ollama models
 
 Open **http://localhost:3000** → **Try the live demo**. The demo account comes with 20 indexed
 API templates. Try *"change my password from oldpass1 to NewPass#9"*. API docs:
-http://localhost:8000/docs · End-to-end check: `python scripts/smoke_test.py` · Tenant isolation check: `python scripts/tenancy_check.py`.
+http://localhost:8000/docs.
 
-**Your own account:** click *Sign up*. With no e-mail server configured, the verify page shows
-your 6-digit code on screen. To e-mail codes instead, put your SMTP login (for example a Gmail
-[app password](https://myaccount.google.com/apppasswords)) in `SMTP_USER` / `SMTP_PASSWORD` in
-`.env` and restart the backend.
+**Your own account** starts empty: the demo catalogue belongs to the demo account only.
+
+1. **Sign up.** With no e-mail server configured, the verify page shows your 6-digit code on
+   screen. To e-mail codes instead, set `SMTP_USER` / `SMTP_PASSWORD` in `.env` (for example a
+   Gmail [app password](https://myaccount.google.com/apppasswords)) and restart the backend.
+2. **Templates → New:** describe one of your APIs, then switch it **on** to make it available.
+3. **Datasets:** generate example requests for it with an LLM, or upload a CSV (`query` column).
+   Uploads are embedded automatically; for generated datasets click **Embed**.
+4. **Dashboard:** type a request. It's routed only among your own templates.
+
+**Checks against a running stack:** `python scripts/smoke_test.py` (full user loop) ·
+`python scripts/tenancy_check.py` (two new users; one tries every endpoint on the other's data).
 
 ## Tech stack
 
@@ -152,7 +162,7 @@ your 6-digit code on screen. To e-mail codes instead, put your SMTP login (for e
 | AI / ML | pgvector HNSW, Ollama (`nomic-embed-text`, `llama3.2:3b`), fastembed ONNX, FlashRank, 20+ provider APIs |
 | Data | PostgreSQL 16 + pgvector (row-level security), Redis |
 | Frontend | Next.js 16 (App Router), React, TypeScript, Tailwind, TanStack Query |
-| Tooling | Docker Compose, GitHub Actions (lint, 227 tests, Postgres integration, accuracy gate, frontend build), Playwright |
+| Tooling | Docker Compose, GitHub Actions (lint, 229 tests, Postgres integration, accuracy gate, frontend build), Playwright |
 
 <details>
 <summary><b>Architecture and project structure</b></summary>
@@ -175,7 +185,7 @@ Backend/app/
 Backend/alembic/   migrations: pgvector, per-dimension HNSW, RLS, model catalogue
 Frontend/          Next.js app: dashboard, templates, datasets, settings
 evals/             routing benchmark (180 requests) and extraction benchmark (100 requests)
-scripts/           demo recording, GIF builder, smoke test
+scripts/           demo recording, GIF builder, smoke test, tenancy check
 ```
 
 Request flow, data model, tenancy and failure behaviour are in
@@ -197,9 +207,11 @@ Request flow, data model, tenancy and failure behaviour are in
   dimension, rather than trusting a number.
 - **No hard-coded model lists.** Providers are data (one registry entry per provider), models come
   live from each provider, and a failed listing never retires anything.
-- **Tenancy in two layers.** Superuser roles bypass RLS, so every vector query also filters on the
-  transaction-bound tenant, set with `set_config(..., is_local => true)` so a pooled connection
-  can't leak it.
+- **Tenancy in two layers.** Superuser roles bypass RLS, so every query also filters on the owner;
+  vector queries use the transaction-bound tenant, set with `set_config(..., is_local => true)` so
+  a pooled connection can't leak it. Another user's object answers 404, exactly like a missing one.
+- **Owners approve their own templates.** There's no cross-tenant reviewer: nobody but the author
+  can see a template, so nobody else could review it.
 </details>
 
 <details>
@@ -212,7 +224,7 @@ Request flow, data model, tenancy and failure behaviour are in
 | `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, … | optional | deployment-wide provider keys; users can add their own in Settings |
 | `EMBEDDING_PROVIDER`, `EMBEDDING_MODEL` | optional | default embedding model for users who haven't chosen one |
 | `MODEL_CATALOG_SYNC_MINUTES`, `MODEL_RETIRE_GRACE_HOURS` | optional | model-catalogue sync interval and retirement grace period |
-| `SMTP_*`, `GOOGLE_CLIENT_ID` | optional | e-mail verification, Google sign-in |
+| `SMTP_*`, `GOOGLE_CLIENT_ID` | optional | e-mail sign-up codes (without them the code is shown on screen), Google sign-in |
 
 Everything else has a working default: see [`.env.example`](.env.example). A cloud deployment
 path (Fly.io + Neon, in-process ONNX embeddings) is described in [DEPLOYMENT.md](DEPLOYMENT.md)
@@ -224,11 +236,12 @@ but hasn't been exercised end to end.
 
 | Suite | Scope | CI |
 |---|---|---|
-| `Backend/tests/unit` (195) | routing, grounded extraction, embedding clients, model discovery, tenancy SQL, auth | yes |
+| `Backend/tests/unit` (197) | routing, grounded extraction, embedding clients, model discovery, tenancy SQL, auth | yes |
 | `Backend/tests/integration` (32) | real Postgres: migrations on an empty database, model-catalogue lifecycle, cross-tenant isolation as a non-superuser; auth and dataset API flows | catalogue + RLS suites |
 | `evals/run_eval.py` | routing accuracy; merge gate at Hit@1 ≥ 0.78 | yes |
 | `evals/run_extraction_eval.py` | extraction precision, recall, invented values, latency | manual (needs the local LLM) |
 | `scripts/smoke_test.py` | full user loop against a running stack | manual |
+| `scripts/tenancy_check.py` | two fresh users; one probes ~45 endpoints for the other's templates, datasets, jobs and models | manual |
 | Frontend | `tsc --noEmit`, ESLint, production build | yes |
 </details>
 
